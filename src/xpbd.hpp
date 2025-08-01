@@ -12,8 +12,6 @@ namespace xpbd
         std::vector<glm::vec2> prevPos;
         std::vector<glm::vec2> vel;
         std::vector<float> w;
-        std::vector<size_t> object_id;
-        size_t count = 0;
     };
     struct DistanceConstraints
     {
@@ -22,12 +20,10 @@ namespace xpbd
         std::vector<float> restDist;
         std::vector<float> compliance;
         std::vector<float> lambda;
-        size_t count = 0;
     };
     struct AABB
     {
         float l, r, b, t;
-        size_t object_id;
     };
     struct AABBsIntersection
     {
@@ -40,6 +36,14 @@ namespace xpbd
         float kineticFriction;
         float compliance;
     };
+    // struct ContourColliders
+    // {
+    //     std::vector<std::vector<size_t>> particle_ids;
+    //     std::vector<float> staticFriction;
+    //     std::vector<float> kineticFriction;
+    //     std::vector<float> compliance;
+    //     std::vector<size_t> collider_id;
+    // };
     struct PointEdgeCollisionConstraint
     {
         size_t point;
@@ -48,18 +52,20 @@ namespace xpbd
         float staticFriction = 1.0f;
         float kineticFriction = 0.5f;
         float compliance = 0.0f;
+        float lambda;
     };
 #endif // xpbd_define
 
     bool should_tick(float &sec, const float dt);
     void iterate(Particles &p, float dt, glm::vec2 gravity);
     void update_velocities(Particles &p, float dt);
-    void add_particle(Particles &p, glm::vec2 pos, float mass, size_t object_id);
+    void add_particle(Particles &p, glm::vec2 pos, float mass);
     void add_distance_constraint(DistanceConstraints &dc, size_t i1, size_t i2, float compliance, float restDist);
     float get_distance_between_particles(const Particles &particles, size_t i1, size_t i2);
-    void solve_distance_constraints( Particles &p,  DistanceConstraints &dc, float dt);
-    void reset_distance_constraints_lambdas(DistanceConstraints &dc);
-    std::vector<AABB> generate_aabbs(const Particles &particles);
+    void solve_distance_constraints(Particles &p, DistanceConstraints &dc, float dt);
+    void reset_constraints_lambdas(std::vector<float> &lambdas);
+    std::vector<AABB> generate_colliders_aabbs(const Particles &particles, const std::vector<std::vector<size_t>> particles_ids);
     std::vector<AABBsIntersection> find_aabbs_intersections(const std::vector<AABB> &aabb);
     std::vector<PointEdgeCollisionConstraint> generate_contour_contour_collisions(Particles &particles, ContourCollider &contourA, ContourCollider &contourB);
+    void solve_point_edge_collision_constraint(Particles &particles, PointEdgeCollisionConstraint &constraint, float dt);
 }

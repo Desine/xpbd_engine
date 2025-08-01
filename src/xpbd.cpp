@@ -14,7 +14,7 @@ namespace xpbd
 
     void iterate(Particles &p, float dt, glm::vec2 gravity)
     {
-        for (size_t i = 0; i < p.count; ++i)
+        for (size_t i = 0; i < p.pos.size(); ++i)
         {
             if (p.w[i] == 0.0f)
                 continue;
@@ -27,18 +27,16 @@ namespace xpbd
 
     void update_velocities(Particles &p, float dt)
     {
-        for (size_t i = 0; i < p.count; ++i)
+        for (size_t i = 0; i < p.pos.size(); ++i)
             p.vel[i] = (p.pos[i] - p.prevPos[i]) / dt;
     }
 
-    void add_particle(Particles &p, glm::vec2 pos, float mass, size_t object_id)
+    void add_particle(Particles &p, glm::vec2 pos, float mass)
     {
         p.pos.push_back(pos);
         p.prevPos.push_back(pos);
         p.vel.push_back({0, 0});
         p.w.push_back(1 / mass);
-        p.object_id.push_back(object_id);
-        p.count++;
     }
 
     void add_distance_constraint(DistanceConstraints &dc, size_t i1, size_t i2, float compliance, float restDist)
@@ -48,7 +46,6 @@ namespace xpbd
         dc.restDist.push_back(restDist);
         dc.compliance.push_back(compliance);
         dc.lambda.push_back(0);
-        dc.count++;
     }
 
     float get_distance_between_particles(const Particles &particles, size_t i1, size_t i2)
@@ -58,11 +55,11 @@ namespace xpbd
 
     void solve_distance_constraints(Particles &p, DistanceConstraints &dc, float dt)
     {
-        for (size_t i = 0; i < dc.count; ++i)
+        for (size_t i = 0; i < dc.i1.size(); ++i)
         {
             size_t i1 = dc.i1[i];
             size_t i2 = dc.i2[i];
-            if (i1 >= p.count || i2 >= p.count)
+            if (i1 >= p.pos.size() || i2 >= p.pos.size())
             {
                 printf("Warning: Invalid distance constraint indices %d of %d\n", i1, i2);
                 continue;
@@ -94,49 +91,42 @@ namespace xpbd
         }
     }
 
-    void reset_distance_constraints_lambdas(DistanceConstraints &dc)
+    void reset_constraints_lambdas(std::vector<float> &lambdas)
     {
-        std::fill(dc.lambda.begin(), dc.lambda.end(), 0.0f);
+        std::fill(lambdas.begin(), lambdas.end(), 0.0f);
     }
 
-    std::vector<AABB> generate_aabbs(const Particles &particles)
+    std::vector<AABB> generate_colliders_aabbs(const Particles &particles, const std::vector<std::vector<size_t>> particles_ids)
     {
-        std::vector<AABB> aabb;
+        std::vector<AABB> aabbs;
 
-        AABB current;
-        current.object_id = -1;
-        for (size_t i = 0; i < particles.count; i++)
+        for (size_t o = 0; o < particles_ids.size(); o++)
         {
-            if (current.object_id != particles.object_id[i])
+            AABB current;
+            current.l = std::numeric_limits<float>::max();
+            current.r = -std::numeric_limits<float>::max();
+            current.b = std::numeric_limits<float>::max();
+            current.t = -std::numeric_limits<float>::max();
+            for (size_t i = 0; i < particles_ids[o].size(); i++)
             {
-                current.object_id = particles.object_id[i];
-                current.l = FLT_MAX;
-                current.r = -FLT_MAX;
-                current.b = FLT_MAX;
-                current.t = -FLT_MAX;
-                aabb.push_back(current);
+                size_t id = particles_ids[o][i];
+                glm::vec2 pos = particles.pos[id];
+                if (pos.x < current.l)
+                    current.l = particles.pos[id].x;
+                if (pos.x > current.r)
+                    current.r = particles.pos[id].x;
+                if (pos.y < current.b)
+                    current.b = particles.pos[id].y;
+                if (pos.y > current.t)
+                    current.t = particles.pos[id].y;
             }
-            AABB &back = aabb.back();
-            glm::vec2 pos = particles.pos[i];
-            if (pos.x < back.l)
-                back.l = particles.pos[i].x;
-            if (pos.x > back.r)
-                back.r = particles.pos[i].x;
-            if (pos.y < back.b)
-                back.b = particles.pos[i].y;
-            if (pos.y > back.t)
-                back.t = particles.pos[i].y;
+            aabbs.push_back(current);
         }
-        return aabb;
+        return aabbs;
     }
 
     inline bool aabbs_intersect(const AABB &a, const AABB &b)
     {
-        if (&a == &b)
-        {
-            printf("случилось невозможное\n");
-        }
-        return false;
         return !(a.r < b.l || a.l > b.r || a.t < b.b || a.b > b.t);
     }
     std::vector<AABBsIntersection> find_aabbs_intersections(const std::vector<AABB> &aabb)
@@ -145,7 +135,7 @@ namespace xpbd
         for (size_t i = 0; i < aabb.size(); ++i)
             for (size_t j = i + 1; j < aabb.size(); ++j)
                 if (aabbs_intersect(aabb[i], aabb[j]))
-                    oc.push_back({aabb[i].object_id, aabb[j].object_id});
+                    oc.push_back({i, j});
         return oc;
     }
 
@@ -237,4 +227,76 @@ namespace xpbd
         detect(contourB, contourA);
         return constraints;
     }
+    void solve_point_edge_collision_constraint(
+        Particles &particles,
+        PointEdgeCollisionConstraint &constraint,
+        float dt)
+    {
+        size_t i_p = constraint.point;
+        size_t i_e0 = constraint.edge1;
+        size_t i_e1 = constraint.edge2;
+
+        glm::vec2 &p_pos = particles.pos[i_p];
+        glm::vec2 &p_prev = particles.prevPos[i_p];
+        float w_p = particles.w[i_p];
+
+        glm::vec2 &e0_pos = particles.pos[i_e0];
+        glm::vec2 &e1_pos = particles.pos[i_e1];
+        glm::vec2 &e0_prev = particles.prevPos[i_e0];
+        glm::vec2 &e1_prev = particles.prevPos[i_e1];
+        float w_e0 = particles.w[i_e0];
+        float w_e1 = particles.w[i_e1];
+
+        glm::vec2 edge = e1_pos - e0_pos;
+        float edgeLengthSq = glm::dot(edge, edge);
+        if (edgeLengthSq < 1e-6f)
+            return;
+
+        float t = glm::clamp(glm::dot(p_pos - e0_pos, edge) / edgeLengthSq, 0.0f, 1.0f);
+        glm::vec2 closest = e0_pos + t * edge;
+
+        glm::vec2 n = p_pos - closest;
+        float C = glm::length(n);
+        if (C < 1e-6f)
+            return;
+        n /= C;
+
+        // Gradients
+        glm::vec2 grad_p = n;
+        glm::vec2 grad_e0 = -n * (1.0f - t);
+        glm::vec2 grad_e1 = -n * t;
+
+        float w_sum = w_p + w_e0 * (1.0f - t) * (1.0f - t) + w_e1 * t * t;
+        if (w_sum < 1e-6f)
+            return;
+
+        float alpha = constraint.compliance / (dt * dt);
+        float deltaLambda = (-C - alpha * constraint.lambda) / (w_sum + alpha);
+        constraint.lambda += deltaLambda;
+
+        // Apply position correction
+        p_pos += w_p * deltaLambda * grad_p;
+        e0_pos += w_e0 * deltaLambda * grad_e0;
+        e1_pos += w_e1 * deltaLambda * grad_e1;
+
+        // --- Friction (static) ---
+        glm::vec2 tangent(-n.y, n.x);
+
+        glm::vec2 p_disp = p_pos - p_prev;
+        glm::vec2 e0_disp = e0_pos - e0_prev;
+        glm::vec2 e1_disp = e1_pos - e1_prev;
+        glm::vec2 edge_disp = e0_disp * (1.0f - t) + e1_disp * t;
+
+        glm::vec2 rel_disp = p_disp - edge_disp;
+        float tangential_disp = glm::dot(rel_disp, tangent);
+
+        float max_friction = constraint.staticFriction * fabs(deltaLambda);
+        float friction_correction = glm::clamp(-tangential_disp, -max_friction, max_friction);
+
+        // Apply frictional correction
+        p_pos += (w_p / w_sum) * friction_correction * tangent;
+        e0_pos -= (w_e0 * (1.0f - t) / w_sum) * friction_correction * tangent;
+        e1_pos -= (w_e1 * t / w_sum) * friction_correction * tangent;
+    }
+
 }
