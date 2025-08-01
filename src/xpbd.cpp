@@ -31,11 +31,11 @@ namespace xpbd
             p.vel[i] = (p.pos[i] - p.prevPos[i]) / dt;
     }
 
-    void add_particle(Particles &p, glm::vec2 pos, float mass)
+    void add_particle(Particles &p, glm::vec2 pos, float mass, glm::vec2 vel)
     {
         p.pos.push_back(pos);
         p.prevPos.push_back(pos);
-        p.vel.push_back({0, 0});
+        p.vel.push_back(vel);
         p.w.push_back(1 / mass);
     }
 
@@ -47,11 +47,17 @@ namespace xpbd
         dc.compliance.push_back(compliance);
         dc.lambda.push_back(0);
     }
-
-    float get_distance_between_particles(const Particles &particles, size_t i1, size_t i2)
+    void add_distance_constraint_auto_restDist(DistanceConstraints &dc, size_t i1, size_t i2, float compliance, Particles &p)
     {
-        return glm::distance(particles.pos[i1], particles.pos[i2]);
+        dc.i1.push_back(i1);
+        dc.i2.push_back(i2);
+        float restDist = glm::distance(p.pos[i1], p.pos[i2]);
+        dc.restDist.push_back(restDist);
+        dc.compliance.push_back(compliance);
+        dc.lambda.push_back(0);
     }
+
+   
 
     void solve_distance_constraints(Particles &p, DistanceConstraints &dc, float dt)
     {
@@ -61,7 +67,7 @@ namespace xpbd
             size_t i2 = dc.i2[i];
             if (i1 >= p.pos.size() || i2 >= p.pos.size())
             {
-                printf("Warning: Invalid distance constraint indices %d of %d\n", i1, i2);
+                printf("Warning: Invalid distance constraint indices %d or %d, max index %d\n", i1, i2, p.pos.size() - 1);
                 continue;
             }
 
@@ -228,7 +234,7 @@ namespace xpbd
         return constraints;
     }
     void solve_point_edge_collision_constraint(
-        Particles &particles,
+        Particles &p,
         PointEdgeCollisionConstraint &constraint,
         float dt)
     {
@@ -236,16 +242,16 @@ namespace xpbd
         size_t i_e0 = constraint.edge1;
         size_t i_e1 = constraint.edge2;
 
-        glm::vec2 &p_pos = particles.pos[i_p];
-        glm::vec2 &p_prev = particles.prevPos[i_p];
-        float w_p = particles.w[i_p];
+        glm::vec2 &p_pos = p.pos[i_p];
+        glm::vec2 &p_prev = p.prevPos[i_p];
+        float w_p = p.w[i_p];
 
-        glm::vec2 &e0_pos = particles.pos[i_e0];
-        glm::vec2 &e1_pos = particles.pos[i_e1];
-        glm::vec2 &e0_prev = particles.prevPos[i_e0];
-        glm::vec2 &e1_prev = particles.prevPos[i_e1];
-        float w_e0 = particles.w[i_e0];
-        float w_e1 = particles.w[i_e1];
+        glm::vec2 &e0_pos = p.pos[i_e0];
+        glm::vec2 &e1_pos = p.pos[i_e1];
+        glm::vec2 &e0_prev = p.prevPos[i_e0];
+        glm::vec2 &e1_prev = p.prevPos[i_e1];
+        float w_e0 = p.w[i_e0];
+        float w_e1 = p.w[i_e1];
 
         glm::vec2 edge = e1_pos - e0_pos;
         float edgeLengthSq = glm::dot(edge, edge);

@@ -8,6 +8,24 @@
 #include "renderer.hpp"
 #include "xpbd.hpp"
 
+void add_poligon(xpbd::Particles &p, xpbd::DistanceConstraints &dc, glm::vec2 pos, float radius, size_t segments, float mass, float compliance)
+{
+    if (segments < 3)
+        segments = 3;
+
+    float angleStep = 2.0f * float(M_PI) / segments;
+    for (int i = 0; i < segments; ++i)
+    {
+        float angle = i * angleStep;
+        glm::vec2 dir = glm::vec2(cosf(angle), sinf(angle));
+        xpbd::add_particle(p, dir * radius + pos, mass / segments);
+    }
+
+    size_t start = p.pos.size() - 1;
+    for (int i = 0; i < segments; ++i)
+        xpbd::add_distance_constraint_auto_restDist(dc, start - i, start - (i + 1) % segments, compliance, p);
+}
+
 int main()
 {
     size_t substeps = 10;
@@ -25,42 +43,44 @@ int main()
     xpbd::ContourCollider contour1;
     xpbd::ContourCollider contour2;
 
-    add_particle(particles, {0, 0}, 1);
-    add_particle(particles, {0, 100}, 1);
-    add_particle(particles, {100, 100}, 1);
-    add_particle(particles, {100, 0}, 1);
+    xpbd::add_particle(particles, {0, 0}, 1);
+    xpbd::add_particle(particles, {0, 100}, 1);
+    xpbd::add_particle(particles, {100, 100}, 1);
+    xpbd::add_particle(particles, {100, 0}, 1);
 
-    add_distance_constraint(distanceConstraints, 0, 1, 0.002f, 100);
-    add_distance_constraint(distanceConstraints, 1, 2, 0.002f, 100);
-    add_distance_constraint(distanceConstraints, 2, 3, 0.002f, 100);
-    add_distance_constraint(distanceConstraints, 3, 0, 0.002f, 100);
+    xpbd::add_distance_constraint(distanceConstraints, 0, 1, 0.002f, 100);
+    xpbd::add_distance_constraint(distanceConstraints, 1, 2, 0.002f, 100);
+    xpbd::add_distance_constraint(distanceConstraints, 2, 3, 0.002f, 100);
+    xpbd::add_distance_constraint(distanceConstraints, 3, 0, 0.002f, 100);
 
-    add_distance_constraint(distanceConstraints, 0, 2, 0.0f, 140);
+    xpbd::add_distance_constraint(distanceConstraints, 0, 2, 0.0f, 140);
 
     contour1.particle_ids.push_back(0);
     contour1.particle_ids.push_back(1);
     contour1.particle_ids.push_back(2);
     contour1.particle_ids.push_back(3);
 
-    add_particle(particles, {-100, -100}, 1);
-    add_particle(particles, {-100, -200}, 1);
-    add_particle(particles, {-200, -200}, 1);
-    add_particle(particles, {-200, -100}, 1);
+    xpbd::add_particle(particles, {-100, -100}, 1);
+    xpbd::add_particle(particles, {-100, -200}, 1);
+    xpbd::add_particle(particles, {-200, -200}, 1);
+    xpbd::add_particle(particles, {-200, -100}, 1);
 
-    add_distance_constraint(distanceConstraints, 4, 5, 0.002f, 100);
-    add_distance_constraint(distanceConstraints, 5, 6, 0.002f, 100);
-    add_distance_constraint(distanceConstraints, 6, 7, 0.002f, 100);
-    add_distance_constraint(distanceConstraints, 7, 4, 0.002f, 100);
+    xpbd::add_distance_constraint(distanceConstraints, 4, 5, 0.002f, 100);
+    xpbd::add_distance_constraint(distanceConstraints, 5, 6, 0.002f, 100);
+    xpbd::add_distance_constraint(distanceConstraints, 6, 7, 0.002f, 100);
+    xpbd::add_distance_constraint(distanceConstraints, 7, 4, 0.002f, 100);
 
-    add_distance_constraint(distanceConstraints, 4, 6, 0.005f, 140);
-    add_distance_constraint(distanceConstraints, 5, 7, 0.005f, 140);
+    xpbd::add_distance_constraint(distanceConstraints, 4, 6, 0.005f, 140);
+    xpbd::add_distance_constraint(distanceConstraints, 5, 7, 0.005f, 140);
 
-    add_distance_constraint(distanceConstraints, 0, 5, 0.1f, 0);
+    xpbd::add_distance_constraint(distanceConstraints, 0, 5, 0.1f, 0);
 
     contour2.particle_ids.push_back(4);
     contour2.particle_ids.push_back(5);
     contour2.particle_ids.push_back(6);
     contour2.particle_ids.push_back(7);
+
+    add_poligon(particles, distanceConstraints, {300, 300}, 70, 5, 5, 0.1f);
 
     renderer::setup_window();
     renderer::setup_view();
