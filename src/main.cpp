@@ -16,29 +16,45 @@ int main()
     float rate = 60.0f;
     float deltaTick = 1.0f / rate;
     glm::vec2 gravity = {0, -9.8f};
+    gravity = {0, 0};
     xpbd::Particles particles;
     xpbd::DistanceConstraints distanceConstraints;
+    xpbd::ContourCollider contour1;
+    xpbd::ContourCollider contour2;
 
-    add_particle(particles, {0, 100}, 1, 0);
-    add_particle(particles, {100, 300}, 2, 0);
-    add_particle(particles, {210, 500}, 3, 0);
-    add_particle(particles, {330, 270}, 4, 0);
+    add_particle(particles, {100, 100}, 1, 0);
+    add_particle(particles, {100, 300}, 1, 0);
+    add_particle(particles, {300, 300}, 1, 0);
+    add_particle(particles, {500, 500}, 0.5f, 0);
 
-    add_distance_constraint(distanceConstraints, 0, 1, 0.005f, 200);
-    add_distance_constraint(distanceConstraints, 1, 2, 0.002f, 150);
-    add_distance_constraint(distanceConstraints, 2, 3, 0.003f, 200);
-    add_distance_constraint(distanceConstraints, 2, 0, 0.001f, 200);
+    add_distance_constraint(distanceConstraints, 0, 1, 0.01f, 100);
+    add_distance_constraint(distanceConstraints, 1, 2, 0.01f, 100);
+    add_distance_constraint(distanceConstraints, 2, 0, 0.01f, 100);
+    add_distance_constraint(distanceConstraints, 2, 3, 0.001f, 100);
 
+    contour1.particle_ids.push_back(0);
+    contour1.particle_ids.push_back(1);
+    contour1.particle_ids.push_back(2);
 
+    add_particle(particles, {0, 0}, 1, 1);
     add_particle(particles, {0, 100}, 1, 1);
-    add_particle(particles, {100, 100}, 2, 1);
-    add_particle(particles, {210, 100}, 3, 1);
-    add_particle(particles, {230, 170}, 3, 1);
+    add_particle(particles, {100, 100}, 1, 1);
+    add_particle(particles, {100, 0}, 1, 1);
 
-    add_distance_constraint(distanceConstraints, 4, 5, 0.005f, 200);
-    add_distance_constraint(distanceConstraints, 5, 6, 0.002f, 150);
-    add_distance_constraint(distanceConstraints, 6, 7, 0.003f, 200);
-    add_distance_constraint(distanceConstraints, 6, 4, 0.001f, 200);
+    add_distance_constraint(distanceConstraints, 4, 5, 0.005f, 100);
+    add_distance_constraint(distanceConstraints, 5, 6, 0.01f, 100);
+    add_distance_constraint(distanceConstraints, 6, 7, 0.005f, 100);
+    add_distance_constraint(distanceConstraints, 7, 4, 0.005f, 100);
+
+    add_distance_constraint(distanceConstraints, 4, 6, 0.01f, 140);
+    add_distance_constraint(distanceConstraints, 5, 7, 0.01f, 140);
+
+    add_distance_constraint(distanceConstraints, 3, 7, 0.001f, 0);
+
+    contour2.particle_ids.push_back(4);
+    contour2.particle_ids.push_back(5);
+    contour2.particle_ids.push_back(6);
+    contour2.particle_ids.push_back(7);
 
     renderer::setup_window();
     renderer::setup_view();
@@ -66,7 +82,8 @@ int main()
         ImGui::EndFrame();
 
         std::vector<xpbd::AABB> aabb;
-        std::vector<xpbd::AABBsIntersections> aabbs_intersections;
+        std::vector<xpbd::AABBsIntersection> aabbs_intersections;
+        std::vector<xpbd::PointEdgeCollisionConstraint> pointEdgeCollisionConstraints;
         float substep_time = deltaTick / substeps;
         float iteration_time = substep_time / iterations;
         while (xpbd::should_tick(sec, deltaTick))
@@ -80,13 +97,20 @@ int main()
                     xpbd::solve_distance_constraints(particles, distanceConstraints, iteration_time);
                     aabb = xpbd::generate_aabbs(particles);
                     aabbs_intersections = xpbd::find_aabbs_intersections(aabb);
+                    pointEdgeCollisionConstraints = xpbd::generate_contour_contour_collisions(particles, contour1, contour2);
+                    for (auto p : pointEdgeCollisionConstraints)
+                    {
+                        renderer::set_color(sf::Color::Red);
+                        renderer::draw_circle(particles.pos[p.point], 5);
+                        renderer::set_color(sf::Color::Magenta);
+                        renderer::draw_line(particles.pos[p.edge1], particles.pos[p.edge2]);
+                    }
                 }
                 xpbd::update_velocities(particles, substep_time);
             }
         }
 
-        sf::Color color = sf::Color::Green;
-
+        renderer::set_color(sf::Color::Green);
         for (size_t i = 0; i < particles.count; ++i)
         {
             renderer::draw_circle(particles.pos[i], 3);
@@ -97,6 +121,7 @@ int main()
             size_t p2 = distanceConstraints.i2[i];
             renderer::draw_line(particles.pos[p1], particles.pos[p2]);
         }
+        renderer::set_color(sf::Color::Blue);
         for (auto a : aabb)
         {
             renderer::set_color(sf::Color::Blue);
@@ -107,7 +132,6 @@ int main()
             printf("aabbs intersect index %d with %d\n", a.i1, a.i2);
         }
         printf("\n");
-        
 
         ImGui::SFML::Render(renderer::window);
         renderer::window.display();
