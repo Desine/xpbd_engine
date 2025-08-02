@@ -196,7 +196,7 @@ namespace xpbd
 
     std::vector<AABB> generate_particles_aabbs(const Particles &particles, const std::vector<std::vector<size_t>> indices)
     {
-        std::vector<AABB> aabbs;
+        std::vector<AABB> out;
 
         for (size_t o = 0; o < indices.size(); o++)
         {
@@ -218,9 +218,9 @@ namespace xpbd
                 if (pos.y > current.t)
                     current.t = particles.pos[id].y;
             }
-            aabbs.push_back(current);
+            out.push_back(current);
         }
-        return aabbs;
+        return out;
     }
 
     inline bool aabbs_intersect(const AABB &a, const AABB &b)
@@ -244,21 +244,21 @@ namespace xpbd
     }
     std::vector<AABBsIntersection> find_aabbs_intersections(const std::vector<AABB> &aabbs)
     {
-        std::vector<AABBsIntersection> oc;
+        std::vector<AABBsIntersection> out;
         for (size_t i = 0; i < aabbs.size(); ++i)
             for (size_t j = i + 1; j < aabbs.size(); ++j)
                 if (aabbs_intersect(aabbs[i], aabbs[j]))
-                    oc.push_back({i, j});
-        return oc;
+                    out.push_back({i, j});
+        return out;
     }
     std::vector<AABBsIntersection> find_aabbs_intersections(const std::vector<AABB> &aabbs1, const std::vector<AABB> &aabbs2)
     {
-        std::vector<AABBsIntersection> oc;
+        std::vector<AABBsIntersection> out;
         for (size_t i = 0; i < aabbs1.size(); ++i)
             for (size_t j = 0; j < aabbs2.size(); ++j)
                 if (aabbs_intersect(aabbs1[i], aabbs2[j]))
-                    oc.push_back({i, j});
-        return oc;
+                    out.push_back({i, j});
+        return out;
     }
 
     bool point_in_polygon(const glm::vec2 point, const std::vector<glm::vec2> positions)
@@ -287,7 +287,7 @@ namespace xpbd
         const std::vector<size_t> &pointIndices,
         const std::vector<size_t> &polygonIndices)
     {
-        std::vector<PointEdgeCollision> collisions;
+        std::vector<PointEdgeCollision> out;
         std::vector<glm::vec2> polygonPositions;
         for (size_t pid : polygonIndices)
             polygonPositions.push_back(p.pos[pid]);
@@ -328,12 +328,12 @@ namespace xpbd
                 }
             }
 
-            collisions.push_back({pid,
+            out.push_back({pid,
                                   polygonIndices[nearestEdge],
                                   polygonIndices[(nearestEdge + 1) % n]});
         }
 
-        return collisions;
+        return out;
     }
     void populate_constraints_from_detections(
         const std::vector<PointEdgeCollision> &detections,

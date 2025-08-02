@@ -116,13 +116,13 @@ int main()
                     std::vector<xpbd::AABB> aabbs_polygons = xpbd::generate_particles_aabbs(particles, polygonColliders.indices);
                     std::vector<xpbd::AABBsIntersection> aabbs_polygon_polygon_intersections = xpbd::find_aabbs_intersections(aabbs_polygons);
 
-                    xpbd::PointEdgeCollisionConstraints pointEdgeCollisionConstraints;
+                    xpbd::PointEdgeCollisionConstraints pecc;
                     renderer::set_color(sf::Color::Blue);
                     for (auto a : aabbs_polygon_polygon_intersections)
                     {
                         renderer::draw_axis_aligned_bounding_box(aabbs_polygons[a.i1].l, aabbs_polygons[a.i1].r, aabbs_polygons[a.i1].b, aabbs_polygons[a.i1].t);
                         renderer::draw_axis_aligned_bounding_box(aabbs_polygons[a.i2].l, aabbs_polygons[a.i2].r, aabbs_polygons[a.i2].b, aabbs_polygons[a.i2].t);
-                        xpbd::add_point_edge_collision_constraints_of_polygon_to_polygon_colliders(particles, pointEdgeCollisionConstraints, polygonColliders, a.i1, a.i2);
+                        xpbd::add_point_edge_collision_constraints_of_polygon_to_polygon_colliders(particles, pecc, polygonColliders, a.i1, a.i2);
                     }
 
                     std::vector<xpbd::AABB> aabbs_points = xpbd::generate_particles_aabbs(particles, pointColliders.indices);
@@ -131,14 +131,13 @@ int main()
                     {
                         renderer::draw_axis_aligned_bounding_box(aabbs_polygons[a.i1].l, aabbs_polygons[a.i1].r, aabbs_polygons[a.i1].b, aabbs_polygons[a.i1].t);
                         renderer::draw_axis_aligned_bounding_box(aabbs_polygons[a.i2].l, aabbs_polygons[a.i2].r, aabbs_polygons[a.i2].b, aabbs_polygons[a.i2].t);
-                        xpbd::add_point_edge_collision_constraints_of_point_to_polygon_colliders(particles, pointEdgeCollisionConstraints, pointColliders, polygonColliders, a.i1, a.i2);
+                        xpbd::add_point_edge_collision_constraints_of_point_to_polygon_colliders(particles, pecc, pointColliders, polygonColliders, a.i1, a.i2);
                     }
 
-                    xpbd::solve_point_edge_collision_constraints(particles, pointEdgeCollisionConstraints, substep_time);
+                    xpbd::solve_point_edge_collision_constraints(particles, pecc, substep_time);
 
-                    for (size_t i = 0; i < pointEdgeCollisionConstraints.point.size(); ++i)
+                    for (size_t i = 0; i < pecc.point.size(); ++i)
                     {
-                        auto &pecc = pointEdgeCollisionConstraints;
                         renderer::set_color(sf::Color::Red);
                         renderer::draw_circle(particles.pos[pecc.point[i]], 5);
                         renderer::set_color(sf::Color::Magenta);
