@@ -139,9 +139,13 @@ int main()
                     aabbs_intersections = xpbd::find_aabbs_intersections(aabbs);
 
                     xpbd::PointEdgeCollisionConstraints pointEdgeCollisionConstraints;
-                    xpbd::add_point_edge_collision_constraints(particles, pointEdgeCollisionConstraints, contourColliders, 0, 1);
-                    xpbd::add_point_edge_collision_constraints(particles, pointEdgeCollisionConstraints, contourColliders, 0, 2);
-                    xpbd::add_point_edge_collision_constraints(particles, pointEdgeCollisionConstraints, contourColliders, 1, 2);
+                    for (auto a : aabbs_intersections)
+                    {
+                        printf("aabbs intersect index %d with %d\n", a.i1, a.i2);
+                        xpbd::add_point_edge_collision_constraints(particles, pointEdgeCollisionConstraints, contourColliders, a.i1, a.i2);
+                    }
+                    printf("\n");
+
                     xpbd::solve_point_edge_collision_constraints(particles, pointEdgeCollisionConstraints, substep_time);
 
                     for (size_t i = 0; i < pointEdgeCollisionConstraints.point.size(); ++i)
@@ -167,11 +171,6 @@ int main()
         renderer::set_color(sf::Color::Blue);
         for (auto a : aabbs)
             renderer::draw_axis_aligned_bounding_box(a.l, a.r, a.b, a.t);
-
-        for (auto a : aabbs_intersections)
-            printf("aabbs intersect index %d with %d\n", a.i1, a.i2);
-
-        printf("\n");
 
         ImGui::SFML::Render(renderer::window);
         renderer::window.display();
