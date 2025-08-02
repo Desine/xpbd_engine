@@ -36,14 +36,16 @@ namespace xpbd
         p.pos.push_back(pos);
         p.prev.push_back(pos);
         p.vel.push_back({0, 0});
-        p.w.push_back(1 / mass);
+        float w = mass == 0 ? 0 : 1 / mass;
+        p.w.push_back(w);
     }
     void add_particle(Particles &p, glm::vec2 pos, float mass, glm::vec2 vel)
     {
         p.pos.push_back(pos);
         p.prev.push_back(pos);
         p.vel.push_back(vel);
-        p.w.push_back(1 / mass);
+        float w = mass == 0 ? 0 : 1 / mass;
+        p.w.push_back(w);
     }
 
     void add_distance_constraint(DistanceConstraints &dc, size_t i1, size_t i2, float compliance, float restDist)

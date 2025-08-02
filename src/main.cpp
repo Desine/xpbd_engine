@@ -41,11 +41,11 @@ int main()
     float sec = 0.0f;
     float rate = 60.0f;
     float deltaTick = 1.0f / rate;
-    float timeScale = 1;
+    float timeScale = 10;
     bool paused = true;
     bool stepOnce = false;
     glm::vec2 gravity = {0, -9.8f};
-    gravity = {0, 0};
+    // gravity = {0, 0};
     xpbd::Particles particles;
     xpbd::DistanceConstraints distanceConstraints;
     xpbd::VolumeConstraints volumeConstraints;
@@ -58,6 +58,11 @@ int main()
     xpbd::add_contour_collider(contourColliders, {8, 9, 10, 11, 12}, 1, 0.5f, 0);
 
     json_body_loader::load("square", particles, distanceConstraints, volumeConstraints, contourColliders);
+
+    json_body_loader::load("ground", particles, distanceConstraints, volumeConstraints, contourColliders);
+    printf("w: %d\n", particles.w[particles.w.size()-1]);
+
+    json_body_loader::load("square", particles, distanceConstraints, volumeConstraints, contourColliders, {200, 600});
 
     renderer::setup_window();
     renderer::setup_view();
@@ -86,7 +91,7 @@ int main()
             paused = !paused;
         if (ImGui::Button("stepOnce - todo"))
             stepOnce = true;
-        ImGui::SliderFloat("timeScale", &timeScale, 0.001f, 5, "%.3f");
+        ImGui::SliderFloat("timeScale", &timeScale, 0.01f, 50, "%.3f");
         size_t min_value = 1;
         size_t max_value = 10;
         ImGui::SliderScalar("substeps", ImGuiDataType_U64, &substeps, &min_value, &max_value, "%zu", ImGuiSliderFlags_None);
