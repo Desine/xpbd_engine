@@ -210,6 +210,14 @@ namespace xpbd
     {
         return !(a.r < b.l || a.l > b.r || a.t < b.b || a.b > b.t);
     }
+
+    void add_contour_collider(xpbd::ContourColliders &cc, std::vector<size_t> indices, float staticFriction, float kineticFriction, float compliance)
+    {
+        cc.indices.push_back(indices);
+        cc.staticFriction.push_back(staticFriction);
+        cc.kineticFriction.push_back(kineticFriction);
+        cc.compliance.push_back(compliance);
+    }
     std::vector<AABBsIntersection> find_aabbs_intersections(const std::vector<AABB> &aabb)
     {
         std::vector<AABBsIntersection> oc;
@@ -242,7 +250,7 @@ namespace xpbd
         return windingNumber != 0;
     }
 
-    void add_point_edge_collisions(Particles &p, PointEdgeCollisionConstraints &pecc, ContourColliders &cc, size_t cc_id1, size_t cc_id2)
+    void add_point_edge_collision_constraints(Particles &p, PointEdgeCollisionConstraints &pecc, ContourColliders &cc, size_t cc_id1, size_t cc_id2)
     {
         if (cc.indices[cc_id1].size() < 2 || cc.indices[cc_id2].size() < 2)
             return;

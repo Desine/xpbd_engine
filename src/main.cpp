@@ -62,10 +62,7 @@ int main()
 
     xpbd::add_distance_constraint(distanceConstraints, 0, 2, 0.0f, 140);
 
-    contourColliders.compliance.push_back(0);
-    contourColliders.staticFriction.push_back(1);
-    contourColliders.kineticFriction.push_back(0.5f);
-    contourColliders.indices.push_back({0, 1, 2, 3});
+    xpbd::add_contour_collider(contourColliders, {0, 1, 2, 3}, 1, 0.5f, 0);
 
     xpbd::add_particle(particles, {-100, -100}, 1);
     xpbd::add_particle(particles, {-100, -200}, 1);
@@ -82,12 +79,11 @@ int main()
 
     xpbd::add_distance_constraint(distanceConstraints, 0, 5, 0.1f, 0);
 
-    contourColliders.compliance.push_back(0);
-    contourColliders.staticFriction.push_back(1);
-    contourColliders.kineticFriction.push_back(0.5f);
-    contourColliders.indices.push_back({4, 5, 6, 7});
+    xpbd::add_contour_collider(contourColliders, {4, 5, 6, 7}, 1, 0.5f, 0);
 
-    add_poligon(particles, distanceConstraints, volumeConstraints, {300, 300}, 70, 5, 5, 0.1f);
+    add_poligon(particles, distanceConstraints, volumeConstraints, {300, 300}, 70, 5, 5, 0.001f);
+    xpbd::add_distance_constraint(distanceConstraints, 7, 8, 0.1f, 0);
+    xpbd::add_contour_collider(contourColliders, {8, 9, 10, 11, 12}, 1, 0.5f, 0);
 
     renderer::setup_window();
     renderer::setup_view();
@@ -143,7 +139,9 @@ int main()
                     aabbs_intersections = xpbd::find_aabbs_intersections(aabbs);
 
                     xpbd::PointEdgeCollisionConstraints pointEdgeCollisionConstraints;
-                    xpbd::add_point_edge_collisions(particles, pointEdgeCollisionConstraints, contourColliders, 0, 1);
+                    xpbd::add_point_edge_collision_constraints(particles, pointEdgeCollisionConstraints, contourColliders, 0, 1);
+                    xpbd::add_point_edge_collision_constraints(particles, pointEdgeCollisionConstraints, contourColliders, 0, 2);
+                    xpbd::add_point_edge_collision_constraints(particles, pointEdgeCollisionConstraints, contourColliders, 1, 2);
                     xpbd::solve_point_edge_collision_constraints(particles, pointEdgeCollisionConstraints, substep_time);
 
                     for (size_t i = 0; i < pointEdgeCollisionConstraints.point.size(); ++i)
@@ -170,9 +168,8 @@ int main()
         for (auto a : aabbs)
             renderer::draw_axis_aligned_bounding_box(a.l, a.r, a.b, a.t);
 
-        // for some reason this printf turns off collisions
-        // for (auto a : aabbs_intersections)
-        //     printf("aabbs intersect index %d with %d\n", a.i1, a.i2);
+        for (auto a : aabbs_intersections)
+            printf("aabbs intersect index %d with %d\n", a.i1, a.i2);
 
         printf("\n");
 

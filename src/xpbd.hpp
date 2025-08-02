@@ -69,6 +69,7 @@ namespace xpbd
     void reset_constraints_lambdas(std::vector<float> &lambdas);
     std::vector<AABB> generate_colliders_aabbs(const Particles &p, const std::vector<std::vector<size_t>> particles_ids);
     std::vector<AABBsIntersection> find_aabbs_intersections(const std::vector<AABB> &aabb);
-    void add_point_edge_collisions(Particles &p, PointEdgeCollisionConstraints &pecc, ContourColliders &cc, size_t cc_id1, size_t cc_id2);
+    void add_contour_collider(xpbd::ContourColliders &cc, std::vector<size_t> indices, float staticFriction, float kineticFriction, float compliance);
+    void add_point_edge_collision_constraints(Particles &p, PointEdgeCollisionConstraints &pecc, ContourColliders &cc, size_t cc_id1, size_t cc_id2);
     void solve_point_edge_collision_constraints(Particles &p, PointEdgeCollisionConstraints &pecc, float dt);
 }
