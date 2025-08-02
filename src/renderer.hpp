@@ -16,8 +16,9 @@ namespace renderer
     extern sf::Color color;
 
     void set_color(sf::Color color);
-    void draw_segmented_line(const std::vector<glm::vec2> &points);
     void draw_line(const glm::vec2 &from, const glm::vec2 &to);
+    void draw_segmented_line(const std::vector<glm::vec2> &points);
+    void draw_segmented_loop(const std::vector<glm::vec2> &points);
     void draw_circle(const glm::vec2 &pos, float radius);
     void draw_axis_aligned_bounding_box(float left, float right, float bottom, float top);
 

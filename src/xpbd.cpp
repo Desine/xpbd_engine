@@ -31,6 +31,13 @@ namespace xpbd
             p.vel[i] = (p.pos[i] - p.prev[i]) / dt;
     }
 
+    void add_particle(Particles &p, glm::vec2 pos, float mass)
+    {
+        p.pos.push_back(pos);
+        p.prev.push_back(pos);
+        p.vel.push_back({0, 0});
+        p.w.push_back(1 / mass);
+    }
     void add_particle(Particles &p, glm::vec2 pos, float mass, glm::vec2 vel)
     {
         p.pos.push_back(pos);
@@ -118,6 +125,14 @@ namespace xpbd
             area += utils::cross_2d(p0, p1);
         }
         return 0.5f * area;
+    }
+
+    void add_volume_constraint(Particles &p, VolumeConstraints &vc, std::vector<size_t> indices, float compliance)
+    {
+        vc.indices.push_back(indices);
+        vc.restVolume.push_back(compute_polygon_area(p, indices));
+        vc.compliance.push_back(compliance);
+        vc.lambda.push_back(0);
     }
 
     void add_volume_constraint(Particles &p, VolumeConstraints &vc, std::vector<size_t> indices, float compliance, float restPressure)

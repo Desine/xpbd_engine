@@ -3,10 +3,11 @@
 #include <SFML/Graphics.hpp>
 
 #include <stdio.h>
-#include "string.h"
+#include <string.h>
 
 #include "renderer.hpp"
 #include "xpbd.hpp"
+#include "json_body_loader.hpp"
 
 void add_poligon(xpbd::Particles &p, xpbd::DistanceConstraints &dc, xpbd::VolumeConstraints &vc, glm::vec2 pos, float radius, size_t segments, float mass, float compliance)
 {
@@ -50,40 +51,13 @@ int main()
     xpbd::VolumeConstraints volumeConstraints;
     xpbd::ContourColliders contourColliders;
 
-    xpbd::add_particle(particles, {0, 0}, 1);
-    xpbd::add_particle(particles, {0, 100}, 1);
-    xpbd::add_particle(particles, {100, 100}, 1);
-    xpbd::add_particle(particles, {100, 0}, 1);
-
-    xpbd::add_distance_constraint(distanceConstraints, 0, 1, 0.002f, 100);
-    xpbd::add_distance_constraint(distanceConstraints, 1, 2, 0.002f, 100);
-    xpbd::add_distance_constraint(distanceConstraints, 2, 3, 0.002f, 100);
-    xpbd::add_distance_constraint(distanceConstraints, 3, 0, 0.002f, 100);
-
-    xpbd::add_distance_constraint(distanceConstraints, 0, 2, 0.0f, 140);
-
-    xpbd::add_contour_collider(contourColliders, {0, 1, 2, 3}, 1, 0.5f, 0);
-
-    xpbd::add_particle(particles, {-100, -100}, 1);
-    xpbd::add_particle(particles, {-100, -200}, 1);
-    xpbd::add_particle(particles, {-200, -200}, 1);
-    xpbd::add_particle(particles, {-200, -100}, 1);
-
-    xpbd::add_distance_constraint(distanceConstraints, 4, 5, 0.002f, 100);
-    xpbd::add_distance_constraint(distanceConstraints, 5, 6, 0.002f, 100);
-    xpbd::add_distance_constraint(distanceConstraints, 6, 7, 0.002f, 100);
-    xpbd::add_distance_constraint(distanceConstraints, 7, 4, 0.002f, 100);
-
-    xpbd::add_distance_constraint(distanceConstraints, 4, 6, 0.005f, 140);
-    xpbd::add_distance_constraint(distanceConstraints, 5, 7, 0.005f, 140);
-
-    xpbd::add_distance_constraint(distanceConstraints, 0, 5, 0.1f, 0);
-
-    xpbd::add_contour_collider(contourColliders, {4, 5, 6, 7}, 1, 0.5f, 0);
+    json_body_loader::load("2boxes", particles, distanceConstraints, volumeConstraints, contourColliders);
 
     add_poligon(particles, distanceConstraints, volumeConstraints, {300, 300}, 70, 5, 5, 0.001f);
     xpbd::add_distance_constraint(distanceConstraints, 7, 8, 0.1f, 0);
     xpbd::add_contour_collider(contourColliders, {8, 9, 10, 11, 12}, 1, 0.5f, 0);
+
+    json_body_loader::load("square", particles, distanceConstraints, volumeConstraints, contourColliders);
 
     renderer::setup_window();
     renderer::setup_view();
@@ -112,7 +86,7 @@ int main()
             paused = !paused;
         if (ImGui::Button("stepOnce - todo"))
             stepOnce = true;
-        ImGui::SliderFloat("timeScale", &timeScale, 0, 3, "%.3f");
+        ImGui::SliderFloat("timeScale", &timeScale, 0.001f, 5, "%.3f");
         size_t min_value = 1;
         size_t max_value = 10;
         ImGui::SliderScalar("substeps", ImGuiDataType_U64, &substeps, &min_value, &max_value, "%zu", ImGuiSliderFlags_None);
@@ -139,12 +113,13 @@ int main()
                     aabbs_intersections = xpbd::find_aabbs_intersections(aabbs);
 
                     xpbd::PointEdgeCollisionConstraints pointEdgeCollisionConstraints;
+                    renderer::set_color(sf::Color::Blue);
                     for (auto a : aabbs_intersections)
                     {
-                        printf("aabbs intersect index %d with %d\n", a.i1, a.i2);
+                        renderer::draw_axis_aligned_bounding_box(aabbs[a.i1].l, aabbs[a.i1].r, aabbs[a.i1].b, aabbs[a.i1].t);
+                        renderer::draw_axis_aligned_bounding_box(aabbs[a.i2].l, aabbs[a.i2].r, aabbs[a.i2].b, aabbs[a.i2].t);
                         xpbd::add_point_edge_collision_constraints(particles, pointEdgeCollisionConstraints, contourColliders, a.i1, a.i2);
                     }
-                    printf("\n");
 
                     xpbd::solve_point_edge_collision_constraints(particles, pointEdgeCollisionConstraints, substep_time);
 
@@ -168,9 +143,16 @@ int main()
         for (size_t i = 0; i < distanceConstraints.i1.size(); ++i)
             renderer::draw_line(particles.pos[distanceConstraints.i1[i]], particles.pos[distanceConstraints.i2[i]]);
 
-        renderer::set_color(sf::Color::Blue);
-        for (auto a : aabbs)
-            renderer::draw_axis_aligned_bounding_box(a.l, a.r, a.b, a.t);
+        renderer::set_color(sf::Color::Red);
+        for (size_t i = 0; i < contourColliders.indices.size(); ++i)
+        {
+            std::vector<glm::vec2> points;
+
+            for (auto id : contourColliders.indices[i])
+                points.push_back(particles.pos[id]);
+
+            renderer::draw_segmented_loop(points);
+        }
 
         ImGui::SFML::Render(renderer::window);
         renderer::window.display();

@@ -1,0 +1,46 @@
+{
+  "position": [0, 0],
+  "Particles": [
+    { "pos": [0, 0], "mass": 1 },
+    { "pos": [0, 100], "mass": 1 },
+    { "pos": [100, 100], "mass": 1 },
+    { "pos": [100, 0], "mass": 1 },
+
+    { "pos": [-100, -100], "mass": 1 },
+    { "pos": [-100, -200], "mass": 1 },
+    { "pos": [-200, -200], "mass": 1 },
+    { "pos": [-200, -100], "mass": 1 }
+  ],
+
+  "DistanceConstraints": [
+    { "i1": 0, "i2": 1, "restDistance": 100, "compliance": 0.002 },
+    { "i1": 1, "i2": 2, "restDistance": 100, "compliance": 0.002 },
+    { "i1": 2, "i2": 3, "restDistance": 100, "compliance": 0.002 },
+    { "i1": 3, "i2": 0, "restDistance": 100, "compliance": 0.002 },
+    { "i1": 0, "i2": 2, "restDistance": 140, "compliance": 0.0 },
+
+    { "i1": 4, "i2": 5, "restDistance": 100, "compliance": 0.002 },
+    { "i1": 5, "i2": 6, "restDistance": 100, "compliance": 0.002 },
+    { "i1": 6, "i2": 7, "restDistance": 100, "compliance": 0.002 },
+    { "i1": 7, "i2": 4, "restDistance": 100, "compliance": 0.002 },
+    { "i1": 4, "i2": 6, "restDistance": 140, "compliance": 0.005 },
+    { "i1": 5, "i2": 7, "restDistance": 140, "compliance": 0.005 },
+
+    { "i1": 0, "i2": 5, "restDistance": 0, "compliance": 0.1 }
+  ],
+
+  "ContourColliders": [
+    {
+      "indices": [0, 1, 2, 3],
+      "staticFriction": 1.0,
+      "kineticFriction": 0.5,
+      "compliance": 0.0
+    },
+    {
+      "indices": [4, 5, 6, 7],
+      "staticFriction": 1.0,
+      "kineticFriction": 0.5,
+      "compliance": 0.0
+    }
+  ]
+}

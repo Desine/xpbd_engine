@@ -55,6 +55,12 @@ namespace renderer
             draw_line(points[d], points[d - 1]);
         }
     }
+    void draw_segmented_loop(const std::vector<glm::vec2> &points)
+    {
+        std::vector<glm::vec2> loop = points;
+        loop.push_back(points[0]);
+        draw_segmented_line(loop);
+    }
     void draw_circle(const glm::vec2 &pos, float radius)
     {
         sf::CircleShape shape(radius);
