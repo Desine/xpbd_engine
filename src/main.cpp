@@ -129,7 +129,7 @@ int main()
                     std::vector<xpbd::AABBsIntersection> aabbs_point_polygon_intersections = xpbd::find_aabbs_intersections(aabbs_points, aabbs_polygons);
                     for (auto a : aabbs_point_polygon_intersections)
                     {
-                        renderer::draw_axis_aligned_bounding_box(aabbs_polygons[a.i1].l, aabbs_polygons[a.i1].r, aabbs_polygons[a.i1].b, aabbs_polygons[a.i1].t);
+                        renderer::draw_axis_aligned_bounding_box(aabbs_points[a.i1].l, aabbs_points[a.i1].r, aabbs_points[a.i1].b, aabbs_points[a.i1].t);
                         renderer::draw_axis_aligned_bounding_box(aabbs_polygons[a.i2].l, aabbs_polygons[a.i2].r, aabbs_polygons[a.i2].b, aabbs_polygons[a.i2].t);
                         xpbd::add_point_edge_collision_constraints_of_point_to_polygon_colliders(particles, pecc, pointColliders, polygonColliders, a.i1, a.i2);
                     }
