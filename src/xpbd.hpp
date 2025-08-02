@@ -36,12 +36,25 @@ namespace xpbd
     {
         size_t i1, i2;
     };
-    struct ContourColliders
+    struct PolygonColliders
     {
         std::vector<std::vector<size_t>> indices;
         std::vector<float> staticFriction;
         std::vector<float> kineticFriction;
         std::vector<float> compliance;
+    };
+    struct PointColliders
+    {
+        std::vector<std::vector<size_t>> indices;
+        std::vector<float> staticFriction;
+        std::vector<float> kineticFriction;
+        std::vector<float> compliance;
+    };
+    struct PointEdgeCollision
+    {
+        size_t point;
+        size_t edge1;
+        size_t edge2;
     };
     struct PointEdgeCollisionConstraints
     {
@@ -69,9 +82,12 @@ namespace xpbd
     void add_volume_constraint(Particles &p, VolumeConstraints &vc, std::vector<size_t> indices, float compliance, float restPressure);
     void solve_volume_constraints(Particles &p, VolumeConstraints &vc, float dt);
     void reset_constraints_lambdas(std::vector<float> &lambdas);
-    std::vector<AABB> generate_colliders_aabbs(const Particles &p, const std::vector<std::vector<size_t>> particles_ids);
-    std::vector<AABBsIntersection> find_aabbs_intersections(const std::vector<AABB> &aabb);
-    void add_contour_collider(xpbd::ContourColliders &cc, std::vector<size_t> indices, float staticFriction, float kineticFriction, float compliance);
-    void add_point_edge_collision_constraints(Particles &p, PointEdgeCollisionConstraints &pecc, ContourColliders &cc, size_t cc_id1, size_t cc_id2);
+    std::vector<AABB> generate_particles_aabbs(const Particles &p, const std::vector<std::vector<size_t>> particles_ids);
+    std::vector<AABBsIntersection> find_aabbs_intersections(const std::vector<AABB> &aabbs);
+    std::vector<AABBsIntersection> find_aabbs_intersections(const std::vector<AABB> &aabbs1, const std::vector<AABB> &aabbs2);
+    void add_polygon_collider(xpbd::PolygonColliders &cc, std::vector<size_t> indices, float staticFriction, float kineticFriction, float compliance);
+    void add_point_collider(xpbd::PointColliders &pc, std::vector<size_t> indices, float staticFriction, float kineticFriction, float compliance);
+    void add_point_edge_collision_constraints_of_polygon_to_polygon_colliders(Particles &p, PointEdgeCollisionConstraints &pecc, const PolygonColliders &pc, const size_t cc_id1, const size_t cc_id2);
+    void add_point_edge_collision_constraints_of_point_to_polygon_colliders(Particles &p, PointEdgeCollisionConstraints &pecc, const PointColliders &pointColliders, const PolygonColliders &polygonColliders, const size_t pointColliderId, const size_t polygonColliderId);
     void solve_point_edge_collision_constraints(Particles &p, PointEdgeCollisionConstraints &pecc, float dt);
 }

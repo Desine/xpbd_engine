@@ -29,7 +29,7 @@
     { "i1": 0, "i2": 5, "restDistance": 0, "compliance": 0.1 }
   ],
 
-  "ContourColliders": [
+  "PolygonColliders": [
     {
       "indices": [0, 1, 2, 3],
       "staticFriction": 1.0,

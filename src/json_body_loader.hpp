@@ -16,7 +16,8 @@ namespace json_body_loader
         xpbd::Particles &particles,
         xpbd::DistanceConstraints &distanceConstraints,
         xpbd::VolumeConstraints &volumeConstraints,
-        xpbd::ContourColliders &contourColliders,
+        xpbd::PolygonColliders &polygonColliders,
+        xpbd::PointColliders &pointColliders,
         glm::vec2 offset = {0, 0})
     {
         std::ifstream file(folder + filename + extension);
@@ -82,10 +83,10 @@ namespace json_body_loader
             }
         }
 
-        // Load Contour Colliders
-        if (j.contains("ContourColliders") && j["ContourColliders"].is_array())
+        // Load Polygon Colliders
+        if (j.contains("PolygonColliders") && j["PolygonColliders"].is_array())
         {
-            for (const auto &cc : j["ContourColliders"])
+            for (const auto &cc : j["PolygonColliders"])
             {
                 std::vector<size_t> indices;
                 for (const auto &idx : cc["indices"])
@@ -95,7 +96,24 @@ namespace json_body_loader
                 float kineticFriction = cc["kineticFriction"].get<float>();
                 float compliance = cc["compliance"].get<float>();
 
-                xpbd::add_contour_collider(contourColliders, indices, staticFriction, kineticFriction, compliance);
+                xpbd::add_polygon_collider(polygonColliders, indices, staticFriction, kineticFriction, compliance);
+            }
+        }
+
+        // Load Point Colliders
+        if (j.contains("PointColliders") && j["PointColliders"].is_array())
+        {
+            for (const auto &cc : j["PointColliders"])
+            {
+                std::vector<size_t> indices;
+                for (const auto &idx : cc["indices"])
+                    indices.push_back(idx.get<size_t>() + base_index);
+
+                float staticFriction = cc["staticFriction"].get<float>();
+                float kineticFriction = cc["kineticFriction"].get<float>();
+                float compliance = cc["compliance"].get<float>();
+
+                xpbd::add_point_collider(pointColliders, indices, staticFriction, kineticFriction, compliance);
             }
         }
     }

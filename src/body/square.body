@@ -20,7 +20,7 @@
       "compliance": 0.001
     }
   ],
-  "ContourColliders": [
+  "PointColliders": [
     {
       "indices": [0, 1, 2, 3],
       "staticFriction": 1.0,
