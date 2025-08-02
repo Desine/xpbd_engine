@@ -36,30 +36,22 @@ namespace xpbd
     {
         size_t i1, i2;
     };
-    struct ContourCollider
+    struct ContourColliders
     {
-        std::vector<size_t> particle_ids;
-        float staticFriction;
-        float kineticFriction;
-        float compliance;
+        std::vector<std::vector<size_t>> indices;
+        std::vector<float> staticFriction;
+        std::vector<float> kineticFriction;
+        std::vector<float> compliance;
     };
-    // struct ContourColliders
-    // {
-    //     std::vector<std::vector<size_t>> particle_ids;
-    //     std::vector<float> staticFriction;
-    //     std::vector<float> kineticFriction;
-    //     std::vector<float> compliance;
-    //     std::vector<size_t> collider_id;
-    // };
-    struct PointEdgeCollisionConstraint
+    struct PointEdgeCollisionConstraints
     {
-        size_t point;
-        size_t edge1;
-        size_t edge2;
-        float staticFriction = 1.0f;
-        float kineticFriction = 0.5f;
-        float compliance = 0.0f;
-        float lambda = 0.0f;
+        std::vector<size_t> point;
+        std::vector<size_t> edge1;
+        std::vector<size_t> edge2;
+        std::vector<float> staticFriction;
+        std::vector<float> kineticFriction;
+        std::vector<float> compliance;
+        std::vector<float> lambda;
     };
 #endif // xpbd_define
 
@@ -77,6 +69,6 @@ namespace xpbd
     void reset_constraints_lambdas(std::vector<float> &lambdas);
     std::vector<AABB> generate_colliders_aabbs(const Particles &p, const std::vector<std::vector<size_t>> particles_ids);
     std::vector<AABBsIntersection> find_aabbs_intersections(const std::vector<AABB> &aabb);
-    std::vector<PointEdgeCollisionConstraint> generate_contour_contour_collisions(Particles &p, ContourCollider &cA, ContourCollider &cB);
-    void solve_point_edge_collision_constraint(Particles &p, PointEdgeCollisionConstraint &pecc, float dt);
+    void add_point_edge_collisions(Particles &p, PointEdgeCollisionConstraints &pecc, ContourColliders &cc, size_t cc_id1, size_t cc_id2);
+    void solve_point_edge_collision_constraints(Particles &p, PointEdgeCollisionConstraints &pecc, float dt);
 }

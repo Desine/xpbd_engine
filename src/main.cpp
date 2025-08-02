@@ -48,8 +48,7 @@ int main()
     xpbd::Particles particles;
     xpbd::DistanceConstraints distanceConstraints;
     xpbd::VolumeConstraints volumeConstraints;
-    xpbd::ContourCollider contour1;
-    xpbd::ContourCollider contour2;
+    xpbd::ContourColliders contourColliders;
 
     xpbd::add_particle(particles, {0, 0}, 1);
     xpbd::add_particle(particles, {0, 100}, 1);
@@ -63,13 +62,10 @@ int main()
 
     xpbd::add_distance_constraint(distanceConstraints, 0, 2, 0.0f, 140);
 
-    contour1.compliance = 0;
-    contour1.staticFriction = 1;
-    contour1.kineticFriction = 0.5f;
-    contour1.particle_ids.push_back(0);
-    contour1.particle_ids.push_back(1);
-    contour1.particle_ids.push_back(2);
-    contour1.particle_ids.push_back(3);
+    contourColliders.compliance.push_back(0);
+    contourColliders.staticFriction.push_back(1);
+    contourColliders.kineticFriction.push_back(0.5f);
+    contourColliders.indices.push_back({0, 1, 2, 3});
 
     xpbd::add_particle(particles, {-100, -100}, 1);
     xpbd::add_particle(particles, {-100, -200}, 1);
@@ -86,19 +82,12 @@ int main()
 
     xpbd::add_distance_constraint(distanceConstraints, 0, 5, 0.1f, 0);
 
-    contour2.compliance = 0;
-    contour2.staticFriction = 1;
-    contour2.kineticFriction = 0.5f;
-    contour2.particle_ids.push_back(4);
-    contour2.particle_ids.push_back(5);
-    contour2.particle_ids.push_back(6);
-    contour2.particle_ids.push_back(7);
+    contourColliders.compliance.push_back(0);
+    contourColliders.staticFriction.push_back(1);
+    contourColliders.kineticFriction.push_back(0.5f);
+    contourColliders.indices.push_back({4, 5, 6, 7});
 
     add_poligon(particles, distanceConstraints, volumeConstraints, {300, 300}, 70, 5, 5, 0.1f);
-
-    std::vector<std::vector<size_t>> collider_particles_ids;
-    collider_particles_ids.push_back(contour1.particle_ids);
-    collider_particles_ids.push_back(contour2.particle_ids);
 
     renderer::setup_window();
     renderer::setup_view();
@@ -137,7 +126,6 @@ int main()
 
         std::vector<xpbd::AABB> aabbs;
         std::vector<xpbd::AABBsIntersection> aabbs_intersections;
-        std::vector<xpbd::PointEdgeCollisionConstraint> pointEdgeCollisionConstraints;
 
         float substep_time = deltaTick * timeScale / substeps;
         while (!paused && xpbd::should_tick(sec, deltaTick))
@@ -151,17 +139,20 @@ int main()
                 {
                     xpbd::solve_distance_constraints(particles, distanceConstraints, substep_time);
                     xpbd::solve_volume_constraints(particles, volumeConstraints, substep_time);
-                    aabbs = xpbd::generate_colliders_aabbs(particles, collider_particles_ids);
+                    aabbs = xpbd::generate_colliders_aabbs(particles, contourColliders.indices);
                     aabbs_intersections = xpbd::find_aabbs_intersections(aabbs);
 
-                    pointEdgeCollisionConstraints = xpbd::generate_contour_contour_collisions(particles, contour1, contour2);
-                    for (auto pecc : pointEdgeCollisionConstraints)
+                    xpbd::PointEdgeCollisionConstraints pointEdgeCollisionConstraints;
+                    xpbd::add_point_edge_collisions(particles, pointEdgeCollisionConstraints, contourColliders, 0, 1);
+                    xpbd::solve_point_edge_collision_constraints(particles, pointEdgeCollisionConstraints, substep_time);
+
+                    for (size_t i = 0; i < pointEdgeCollisionConstraints.point.size(); ++i)
                     {
-                        xpbd::solve_point_edge_collision_constraint(particles, pecc, substep_time);
+                        auto &pecc = pointEdgeCollisionConstraints;
                         renderer::set_color(sf::Color::Red);
-                        renderer::draw_circle(particles.pos[pecc.point], 5);
+                        renderer::draw_circle(particles.pos[pecc.point[i]], 5);
                         renderer::set_color(sf::Color::Magenta);
-                        renderer::draw_line(particles.pos[pecc.edge1], particles.pos[pecc.edge2]);
+                        renderer::draw_line(particles.pos[pecc.edge1[i]], particles.pos[pecc.edge2[i]]);
                     }
                 }
                 xpbd::update_velocities(particles, substep_time);

@@ -177,20 +177,20 @@ namespace xpbd
         std::fill(lambdas.begin(), lambdas.end(), 0.0f);
     }
 
-    std::vector<AABB> generate_colliders_aabbs(const Particles &particles, const std::vector<std::vector<size_t>> particles_ids)
+    std::vector<AABB> generate_colliders_aabbs(const Particles &particles, const std::vector<std::vector<size_t>> indices)
     {
         std::vector<AABB> aabbs;
 
-        for (size_t o = 0; o < particles_ids.size(); o++)
+        for (size_t o = 0; o < indices.size(); o++)
         {
             AABB current;
             current.l = std::numeric_limits<float>::max();
             current.r = -std::numeric_limits<float>::max();
             current.b = std::numeric_limits<float>::max();
             current.t = -std::numeric_limits<float>::max();
-            for (size_t i = 0; i < particles_ids[o].size(); i++)
+            for (size_t i = 0; i < indices[o].size(); i++)
             {
-                size_t id = particles_ids[o][i];
+                size_t id = indices[o][i];
                 glm::vec2 pos = particles.pos[id];
                 if (pos.x < current.l)
                     current.l = particles.pos[id].x;
@@ -241,39 +241,35 @@ namespace xpbd
         }
         return windingNumber != 0;
     }
-    std::vector<PointEdgeCollisionConstraint> generate_contour_contour_collisions(
-        Particles &particles,
-        ContourCollider &contourA,
-        ContourCollider &contourB)
+
+    void add_point_edge_collisions(Particles &p, PointEdgeCollisionConstraints &pecc, ContourColliders &cc, size_t cc_id1, size_t cc_id2)
     {
-        std::vector<PointEdgeCollisionConstraint> constraints;
+        if (cc.indices[cc_id1].size() < 2 || cc.indices[cc_id2].size() < 2)
+            return;
 
-        if (contourA.particle_ids.size() < 2 || contourB.particle_ids.size() < 2)
-            return constraints;
-
-        auto detect = [&](const ContourCollider &test, const ContourCollider &target)
+        auto detect = [&](const size_t &test, const size_t &target)
         {
             std::vector<glm::vec2> targetPositions;
-            for (size_t pid : target.particle_ids)
-                targetPositions.push_back(particles.pos[pid]);
+            for (size_t pid : cc.indices[target])
+                targetPositions.push_back(p.pos[pid]);
 
-            for (size_t pid : test.particle_ids)
+            for (size_t pid : cc.indices[test])
             {
-                const glm::vec2 &p = particles.pos[pid];
+                const glm::vec2 &point = p.pos[pid];
 
-                if (!point_in_polygon(p, targetPositions))
+                if (!point_in_polygon(point, targetPositions))
                     continue;
 
                 float minDist = std::numeric_limits<float>::max();
                 size_t nearestEdge = 0;
-                size_t n = target.particle_ids.size();
+                size_t n = cc.indices[target].size();
 
                 for (size_t i = 0; i < n; ++i)
                 {
-                    size_t id1 = target.particle_ids[i];
-                    size_t id2 = target.particle_ids[(i + 1) % n];
-                    const glm::vec2 &e1 = particles.pos[id1];
-                    const glm::vec2 &e2 = particles.pos[id2];
+                    size_t id1 = cc.indices[target][i];
+                    size_t id2 = cc.indices[target][(i + 1) % n];
+                    const glm::vec2 &e1 = p.pos[id1];
+                    const glm::vec2 &e2 = p.pos[id2];
 
                     glm::vec2 edge = e2 - e1;
                     float len = glm::length(edge);
@@ -281,10 +277,10 @@ namespace xpbd
                         continue;
 
                     glm::vec2 dir = edge / len;
-                    glm::vec2 toPoint = p - e1;
+                    glm::vec2 toPoint = point - e1;
                     float proj = glm::clamp(glm::dot(toPoint, dir), 0.0f, len);
                     glm::vec2 closest = e1 + dir * proj;
-                    float dist = glm::length(p - closest);
+                    float dist = glm::length(point - closest);
 
                     if (dist < minDist)
                     {
@@ -293,91 +289,92 @@ namespace xpbd
                     }
                 }
 
-                PointEdgeCollisionConstraint constraint;
-                constraint.point = pid;
-                constraint.edge1 = target.particle_ids[nearestEdge];
-                constraint.edge2 = target.particle_ids[(nearestEdge + 1) % target.particle_ids.size()];
-                constraint.compliance = (contourA.compliance + contourB.compliance) * 0.5f;
-                constraint.staticFriction = (contourA.staticFriction + contourB.staticFriction) * 0.5f;
-                constraint.kineticFriction = (contourA.kineticFriction + contourB.kineticFriction) * 0.5f;
-
-                constraints.push_back(constraint);
+                pecc.point.push_back(pid);
+                pecc.edge1.push_back(cc.indices[target][nearestEdge]);
+                pecc.edge2.push_back(cc.indices[target][(nearestEdge + 1) % cc.indices[target].size()]);
+                pecc.staticFriction.push_back((cc.staticFriction[cc_id1] + cc.staticFriction[cc_id2]) * 0.5f);
+                pecc.kineticFriction.push_back((cc.kineticFriction[cc_id1] + cc.kineticFriction[cc_id2]) * 0.5f);
+                pecc.compliance.push_back((cc.compliance[cc_id1] + cc.compliance[cc_id2]) * 0.5f);
+                pecc.lambda.push_back(0);
             }
         };
-        detect(contourA, contourB);
-        detect(contourB, contourA);
-        return constraints;
+        detect(cc_id1, cc_id2);
+        detect(cc_id2, cc_id1);
     }
-    void solve_point_edge_collision_constraint(
+    void solve_point_edge_collision_constraints(
         Particles &p,
-        PointEdgeCollisionConstraint &constraint,
+        PointEdgeCollisionConstraints &pecc,
         float dt)
     {
-        size_t i_p = constraint.point;
-        size_t i_e0 = constraint.edge1;
-        size_t i_e1 = constraint.edge2;
+        for (size_t i = 0; i < pecc.point.size(); ++i)
+        {
 
-        glm::vec2 &p_pos = p.pos[i_p];
-        glm::vec2 &p_prev = p.prev[i_p];
-        float w_p = p.w[i_p];
+            size_t i_p = pecc.point[i];
+            size_t i_e0 = pecc.edge1[i];
+            size_t i_e1 = pecc.edge2[i];
 
-        glm::vec2 &e0_pos = p.pos[i_e0];
-        glm::vec2 &e1_pos = p.pos[i_e1];
-        glm::vec2 &e0_prev = p.prev[i_e0];
-        glm::vec2 &e1_prev = p.prev[i_e1];
-        float w_e0 = p.w[i_e0];
-        float w_e1 = p.w[i_e1];
+            glm::vec2 &p_pos = p.pos[i_p];
+            glm::vec2 &p_prev = p.prev[i_p];
+            float w_p = p.w[i_p];
 
-        glm::vec2 edge = e1_pos - e0_pos;
-        float edgeLengthSq = glm::dot(edge, edge);
-        if (edgeLengthSq < 1e-6f)
-            return;
+            glm::vec2 &e0_pos = p.pos[i_e0];
+            glm::vec2 &e1_pos = p.pos[i_e1];
+            glm::vec2 &e0_prev = p.prev[i_e0];
+            glm::vec2 &e1_prev = p.prev[i_e1];
+            float w_e0 = p.w[i_e0];
+            float w_e1 = p.w[i_e1];
 
-        float t = glm::clamp(glm::dot(p_pos - e0_pos, edge) / edgeLengthSq, 0.0f, 1.0f);
-        glm::vec2 closest = e0_pos + t * edge;
+            glm::vec2 edge = e1_pos - e0_pos;
+            float edgeLengthSq = glm::dot(edge, edge);
+            if (edgeLengthSq < 1e-6f)
+                return;
 
-        glm::vec2 n = p_pos - closest;
-        float C = glm::length(n);
-        if (C < 1e-6f)
-            return;
-        n /= C;
+            float t = glm::clamp(glm::dot(p_pos - e0_pos, edge) / edgeLengthSq, 0.0f, 1.0f);
+            glm::vec2 closest = e0_pos + t * edge;
 
-        // Gradients
-        glm::vec2 grad_p = n;
-        glm::vec2 grad_e0 = -n * (1.0f - t);
-        glm::vec2 grad_e1 = -n * t;
+            glm::vec2 n = p_pos - closest;
+            float C = glm::length(n);
+            if (C < 1e-6f)
+                return;
+            n /= C;
 
-        float w_sum = w_p + w_e0 * (1.0f - t) * (1.0f - t) + w_e1 * t * t;
-        if (w_sum < 1e-6f)
-            return;
+            // Gradients
+            glm::vec2 grad_p = n;
+            glm::vec2 grad_e0 = -n * (1.0f - t);
+            glm::vec2 grad_e1 = -n * t;
 
-        float alpha = constraint.compliance / (dt * dt);
-        float deltaLambda = (-C - alpha * constraint.lambda) / (w_sum + alpha);
-        constraint.lambda += deltaLambda;
+            float w_sum = w_p + w_e0 * (1.0f - t) * (1.0f - t) + w_e1 * t * t;
+            if (w_sum < 1e-6f)
+                return;
 
-        // Apply position correction
-        p_pos += w_p * deltaLambda * grad_p;
-        e0_pos += w_e0 * deltaLambda * grad_e0;
-        e1_pos += w_e1 * deltaLambda * grad_e1;
+            float alpha = pecc.compliance[i] / (dt * dt);
+            float deltaLambda = (-C - alpha * pecc.lambda[i]) / (w_sum + alpha);
+            pecc.lambda[i] += deltaLambda;
 
-        // --- Friction (static) ---
-        glm::vec2 tangent(-n.y, n.x);
+            // Apply position correction
+            p_pos += w_p * deltaLambda * grad_p;
+            e0_pos += w_e0 * deltaLambda * grad_e0;
+            e1_pos += w_e1 * deltaLambda * grad_e1;
 
-        glm::vec2 p_disp = p_pos - p_prev;
-        glm::vec2 e0_disp = e0_pos - e0_prev;
-        glm::vec2 e1_disp = e1_pos - e1_prev;
-        glm::vec2 edge_disp = e0_disp * (1.0f - t) + e1_disp * t;
+            // --- Friction (static) ---
+            glm::vec2 tangent(-n.y, n.x);
 
-        glm::vec2 rel_disp = p_disp - edge_disp;
-        float tangential_disp = glm::dot(rel_disp, tangent);
+            glm::vec2 p_disp = p_pos - p_prev;
+            glm::vec2 e0_disp = e0_pos - e0_prev;
+            glm::vec2 e1_disp = e1_pos - e1_prev;
+            glm::vec2 edge_disp = e0_disp * (1.0f - t) + e1_disp * t;
 
-        float max_friction = constraint.staticFriction * fabs(deltaLambda);
-        float friction_correction = glm::clamp(-tangential_disp, -max_friction, max_friction);
+            glm::vec2 rel_disp = p_disp - edge_disp;
+            float tangential_disp = glm::dot(rel_disp, tangent);
 
-        // Apply frictional correction
-        p_pos += (w_p / w_sum) * friction_correction * tangent;
-        e0_pos -= (w_e0 * (1.0f - t) / w_sum) * friction_correction * tangent;
-        e1_pos -= (w_e1 * t / w_sum) * friction_correction * tangent;
+            float max_friction = pecc.staticFriction[i] * fabs(deltaLambda);
+            float friction_correction = glm::clamp(-tangential_disp, -max_friction, max_friction);
+
+            // Apply frictional correction
+            p_pos += (w_p / w_sum) * friction_correction * tangent;
+            e0_pos -= (w_e0 * (1.0f - t) / w_sum) * friction_correction * tangent;
+            e1_pos -= (w_e1 * t / w_sum) * friction_correction * tangent;
+        }
     }
 
 }
