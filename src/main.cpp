@@ -8,10 +8,14 @@
 #include "renderer.hpp"
 #include "xpbd.hpp"
 
-void add_poligon(xpbd::Particles &p, xpbd::DistanceConstraints &dc, glm::vec2 pos, float radius, size_t segments, float mass, float compliance)
+void add_poligon(xpbd::Particles &p, xpbd::DistanceConstraints &dc, xpbd::VolumeConstraints &vc, glm::vec2 pos, float radius, size_t segments, float mass, float compliance)
 {
     if (segments < 3)
         segments = 3;
+
+    size_t start = p.pos.size();
+    size_t end = start + segments;
+    std::vector<size_t> ids;
 
     float angleStep = 2.0f * float(M_PI) / segments;
     for (int i = 0; i < segments; ++i)
@@ -19,11 +23,14 @@ void add_poligon(xpbd::Particles &p, xpbd::DistanceConstraints &dc, glm::vec2 po
         float angle = i * angleStep;
         glm::vec2 dir = glm::vec2(cosf(angle), sinf(angle));
         xpbd::add_particle(p, dir * radius + pos, mass / segments);
+
+        ids.push_back(start + i);
     }
 
-    size_t start = p.pos.size() - 1;
     for (int i = 0; i < segments; ++i)
-        xpbd::add_distance_constraint_auto_restDist(dc, start - i, start - (i + 1) % segments, compliance, p);
+        xpbd::add_distance_constraint_auto_restDist(dc, start + i, start + (i + 1) % segments, compliance, p);
+
+    xpbd::add_volume_constraint(p, vc, ids, compliance);
 }
 
 int main()
@@ -40,6 +47,7 @@ int main()
     gravity = {0, 0};
     xpbd::Particles particles;
     xpbd::DistanceConstraints distanceConstraints;
+    xpbd::VolumeConstraints volumeConstraints;
     xpbd::ContourCollider contour1;
     xpbd::ContourCollider contour2;
 
@@ -55,6 +63,9 @@ int main()
 
     xpbd::add_distance_constraint(distanceConstraints, 0, 2, 0.0f, 140);
 
+    contour1.compliance = 0;
+    contour1.staticFriction = 1;
+    contour1.kineticFriction = 0.5f;
     contour1.particle_ids.push_back(0);
     contour1.particle_ids.push_back(1);
     contour1.particle_ids.push_back(2);
@@ -75,12 +86,19 @@ int main()
 
     xpbd::add_distance_constraint(distanceConstraints, 0, 5, 0.1f, 0);
 
+    contour2.compliance = 0;
+    contour2.staticFriction = 1;
+    contour2.kineticFriction = 0.5f;
     contour2.particle_ids.push_back(4);
     contour2.particle_ids.push_back(5);
     contour2.particle_ids.push_back(6);
     contour2.particle_ids.push_back(7);
 
-    add_poligon(particles, distanceConstraints, {300, 300}, 70, 5, 5, 0.1f);
+    add_poligon(particles, distanceConstraints, volumeConstraints, {300, 300}, 70, 5, 5, 0.1f);
+
+    std::vector<std::vector<size_t>> collider_particles_ids;
+    collider_particles_ids.push_back(contour1.particle_ids);
+    collider_particles_ids.push_back(contour2.particle_ids);
 
     renderer::setup_window();
     renderer::setup_view();
@@ -128,12 +146,11 @@ int main()
             {
                 xpbd::iterate(particles, substep_time, gravity);
                 xpbd::reset_constraints_lambdas(distanceConstraints.lambda);
+                xpbd::reset_constraints_lambdas(volumeConstraints.lambda);
                 for (size_t i = 0; i < iterations; i++)
                 {
                     xpbd::solve_distance_constraints(particles, distanceConstraints, substep_time);
-                    std::vector<std::vector<size_t>> collider_particles_ids;
-                    collider_particles_ids.push_back(contour1.particle_ids);
-                    collider_particles_ids.push_back(contour2.particle_ids);
+                    xpbd::solve_volume_constraints(particles, volumeConstraints, substep_time);
                     aabbs = xpbd::generate_colliders_aabbs(particles, collider_particles_ids);
                     aabbs_intersections = xpbd::find_aabbs_intersections(aabbs);
 

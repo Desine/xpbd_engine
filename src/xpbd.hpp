@@ -9,7 +9,7 @@ namespace xpbd
     struct Particles
     {
         std::vector<glm::vec2> pos;
-        std::vector<glm::vec2> prevPos;
+        std::vector<glm::vec2> prev;
         std::vector<glm::vec2> vel;
         std::vector<float> w;
     };
@@ -18,6 +18,13 @@ namespace xpbd
         std::vector<size_t> i1;
         std::vector<size_t> i2;
         std::vector<float> restDist;
+        std::vector<float> compliance;
+        std::vector<float> lambda;
+    };
+    struct VolumeConstraints
+    {
+        std::vector<std::vector<size_t>> indices;
+        std::vector<float> restVolume;
         std::vector<float> compliance;
         std::vector<float> lambda;
     };
@@ -52,7 +59,7 @@ namespace xpbd
         float staticFriction = 1.0f;
         float kineticFriction = 0.5f;
         float compliance = 0.0f;
-        float lambda;
+        float lambda = 0.0f;
     };
 #endif // xpbd_define
 
@@ -63,9 +70,13 @@ namespace xpbd
     void add_distance_constraint(DistanceConstraints &dc, size_t i1, size_t i2, float compliance, float restDist);
     void add_distance_constraint_auto_restDist(DistanceConstraints &dc, size_t i1, size_t i2, float compliance, Particles &p);
     void solve_distance_constraints(Particles &p, DistanceConstraints &dc, float dt);
+    float compute_polygon_area(const std::vector<glm::vec2> &p);
+    float compute_polygon_area(const Particles &p, std::vector<size_t> &indices);
+    void add_volume_constraint(Particles &p, VolumeConstraints &vc, std::vector<size_t> indices, float compliance, float restPressure = 1);
+    void solve_volume_constraints(Particles &p, VolumeConstraints &vc, float dt);
     void reset_constraints_lambdas(std::vector<float> &lambdas);
-    std::vector<AABB> generate_colliders_aabbs(const Particles &particles, const std::vector<std::vector<size_t>> particles_ids);
+    std::vector<AABB> generate_colliders_aabbs(const Particles &p, const std::vector<std::vector<size_t>> particles_ids);
     std::vector<AABBsIntersection> find_aabbs_intersections(const std::vector<AABB> &aabb);
-    std::vector<PointEdgeCollisionConstraint> generate_contour_contour_collisions(Particles &particles, ContourCollider &contourA, ContourCollider &contourB);
-    void solve_point_edge_collision_constraint(Particles &particles, PointEdgeCollisionConstraint &constraints, float dt);
+    std::vector<PointEdgeCollisionConstraint> generate_contour_contour_collisions(Particles &p, ContourCollider &cA, ContourCollider &cB);
+    void solve_point_edge_collision_constraint(Particles &p, PointEdgeCollisionConstraint &pecc, float dt);
 }

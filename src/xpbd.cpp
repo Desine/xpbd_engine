@@ -20,7 +20,7 @@ namespace xpbd
                 continue;
 
             p.vel[i] += gravity * dt;
-            p.prevPos[i] = p.pos[i];
+            p.prev[i] = p.pos[i];
             p.pos[i] += p.vel[i] * dt;
         }
     }
@@ -28,13 +28,13 @@ namespace xpbd
     void update_velocities(Particles &p, float dt)
     {
         for (size_t i = 0; i < p.pos.size(); ++i)
-            p.vel[i] = (p.pos[i] - p.prevPos[i]) / dt;
+            p.vel[i] = (p.pos[i] - p.prev[i]) / dt;
     }
 
     void add_particle(Particles &p, glm::vec2 pos, float mass, glm::vec2 vel)
     {
         p.pos.push_back(pos);
-        p.prevPos.push_back(pos);
+        p.prev.push_back(pos);
         p.vel.push_back(vel);
         p.w.push_back(1 / mass);
     }
@@ -56,8 +56,6 @@ namespace xpbd
         dc.compliance.push_back(compliance);
         dc.lambda.push_back(0);
     }
-
-   
 
     void solve_distance_constraints(Particles &p, DistanceConstraints &dc, float dt)
     {
@@ -94,6 +92,83 @@ namespace xpbd
 
             p1 += w1 * deltaLambda * grad;
             p2 -= w2 * deltaLambda * grad;
+        }
+    }
+
+    float compute_polygon_area(const std::vector<glm::vec2> &p)
+    {
+        float area = 0.0f;
+        size_t N = p.size();
+        for (size_t i = 0; i < N; ++i)
+        {
+            const glm::vec2 &p0 = p[i];
+            const glm::vec2 &p1 = p[(i + 1) % N];
+            area += utils::cross_2d(p0, p1);
+        }
+        return 0.5f * area;
+    }
+    float compute_polygon_area(const Particles &p, std::vector<size_t> &indices)
+    {
+        float area = 0.0f;
+        size_t N = indices.size();
+        for (size_t i = 0; i < N; ++i)
+        {
+            const glm::vec2 &p0 = p.pos[indices[i]];
+            const glm::vec2 &p1 = p.pos[indices[(i + 1) % N]];
+            area += utils::cross_2d(p0, p1);
+        }
+        return 0.5f * area;
+    }
+
+    void add_volume_constraint(Particles &p, VolumeConstraints &vc, std::vector<size_t> indices, float compliance, float restPressure)
+    {
+        vc.indices.push_back(indices);
+        vc.restVolume.push_back(compute_polygon_area(p, indices) * restPressure);
+        vc.compliance.push_back(compliance);
+        vc.lambda.push_back(0);
+    }
+
+    void solve_volume_constraints(Particles &p, VolumeConstraints &vc, float dt)
+    {
+        for (size_t id = 0; id < vc.indices.size(); ++id)
+        {
+            std::vector<size_t> &indices = vc.indices[id];
+            size_t N = indices.size();
+
+            float volume = compute_polygon_area(p, indices);
+            float C = volume - vc.restVolume[id];
+
+            float denom = 0.0f;
+            std::vector<glm::vec2> grads(N);
+
+            for (size_t i = 0; i < N; ++i)
+            {
+                const glm::vec2 &pi_prev = p.pos[indices[(i + N - 1) % N]];
+                const glm::vec2 &pi_next = p.pos[indices[(i + 1) % N]];
+
+                glm::vec2 grad = 0.5f * utils::perp_2d(pi_next, pi_prev);
+                grads[i] = grad;
+
+                float wi = p.w[indices[i]];
+                denom += wi * glm::dot(grad, grad);
+            }
+
+            float alphaTilde = vc.compliance[id] / (dt * dt);
+            denom += alphaTilde;
+
+            if (denom < 1e-6f)
+                continue;
+
+            float deltaLambda = (-C - alphaTilde * vc.lambda[id]) / denom;
+            vc.lambda[id] += deltaLambda;
+
+            for (size_t i = 0; i < N; ++i)
+            {
+                uint32_t idx = indices[i];
+                float wi = p.w[idx];
+
+                p.pos[idx] += wi * deltaLambda * grads[i];
+            }
         }
     }
 
@@ -243,13 +318,13 @@ namespace xpbd
         size_t i_e1 = constraint.edge2;
 
         glm::vec2 &p_pos = p.pos[i_p];
-        glm::vec2 &p_prev = p.prevPos[i_p];
+        glm::vec2 &p_prev = p.prev[i_p];
         float w_p = p.w[i_p];
 
         glm::vec2 &e0_pos = p.pos[i_e0];
         glm::vec2 &e1_pos = p.pos[i_e1];
-        glm::vec2 &e0_prev = p.prevPos[i_e0];
-        glm::vec2 &e1_prev = p.prevPos[i_e1];
+        glm::vec2 &e0_prev = p.prev[i_e0];
+        glm::vec2 &e1_prev = p.prev[i_e1];
         float w_e0 = p.w[i_e0];
         float w_e1 = p.w[i_e1];
 
