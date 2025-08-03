@@ -1,6 +1,7 @@
 #include "xpbd.hpp"
 #include "utils.hpp"
 #include "cstdio"
+#include <algorithm>
 
 namespace xpbd
 {
@@ -96,6 +97,7 @@ namespace xpbd
             float denom = w1 + w2 + alphaTilde;
             if (denom < 1e-6f)
                 continue;
+
             float deltaLambda = (-C - alphaTilde * dc.lambda[i]) / denom;
             dc.lambda[i] += deltaLambda;
 
@@ -223,11 +225,6 @@ namespace xpbd
         return out;
     }
 
-    inline bool aabbs_intersect(const AABB &a, const AABB &b)
-    {
-        return !(a.r < b.l || a.l > b.r || a.t < b.b || a.b > b.t);
-    }
-
     void add_polygon_collider(xpbd::PolygonColliders &cc, std::vector<size_t> indices, float staticFriction, float kineticFriction, float compliance)
     {
         cc.indices.push_back(indices);
@@ -242,22 +239,76 @@ namespace xpbd
         pc.kineticFriction.push_back(kineticFriction);
         pc.compliance.push_back(compliance);
     }
+
+    inline bool aabbs_overlap(const AABB &a, const AABB &b)
+    {
+        return !(a.r < b.l || a.l > b.r || a.t < b.b || a.b > b.t);
+    }
     std::vector<AABBsIntersection> find_aabbs_intersections(const std::vector<AABB> &aabbs)
     {
         std::vector<AABBsIntersection> out;
+
+        std::vector<std::pair<AABB, size_t>> indexed;
         for (size_t i = 0; i < aabbs.size(); ++i)
-            for (size_t j = i + 1; j < aabbs.size(); ++j)
-                if (aabbs_intersect(aabbs[i], aabbs[j]))
-                    out.push_back({i, j});
+            indexed.emplace_back(aabbs[i], i);
+
+        std::sort(indexed.begin(), indexed.end(),
+                  [](const auto &a, const auto &b)
+                  {
+                      return a.first.l < b.first.l;
+                  });
+
+        for (size_t i = 0; i < indexed.size(); ++i)
+        {
+            const auto &[a1, i1] = indexed[i];
+
+            for (size_t j = i + 1; j < indexed.size(); ++j)
+            {
+                const auto &[a2, i2] = indexed[j];
+
+                if (a2.l > a1.r)
+                    break;
+
+                if (aabbs_overlap(a1, a2))
+                    out.push_back({i1, i2});
+            }
+        }
+
         return out;
     }
     std::vector<AABBsIntersection> find_aabbs_intersections(const std::vector<AABB> &aabbs1, const std::vector<AABB> &aabbs2)
     {
         std::vector<AABBsIntersection> out;
+
+        std::vector<std::pair<AABB, size_t>> indexed1, indexed2;
         for (size_t i = 0; i < aabbs1.size(); ++i)
-            for (size_t j = 0; j < aabbs2.size(); ++j)
-                if (aabbs_intersect(aabbs1[i], aabbs2[j]))
-                    out.push_back({i, j});
+            indexed1.emplace_back(aabbs1[i], i);
+        for (size_t j = 0; j < aabbs2.size(); ++j)
+            indexed2.emplace_back(aabbs2[j], j);
+
+        std::sort(indexed1.begin(), indexed1.end(), [](const auto &a, const auto &b)
+                  { return a.first.l < b.first.l; });
+        std::sort(indexed2.begin(), indexed2.end(), [](const auto &a, const auto &b)
+                  { return a.first.l < b.first.l; });
+
+        size_t j_start = 0;
+
+        for (const auto &[a1, i1] : indexed1)
+        {
+            while (j_start < indexed2.size() && indexed2[j_start].first.r < a1.l)
+                ++j_start;
+
+            for (size_t j = j_start; j < indexed2.size(); ++j)
+            {
+                const auto &[a2, i2] = indexed2[j];
+                if (a2.l > a1.r)
+                    break;
+
+                if (aabbs_overlap(a1, a2))
+                    out.push_back({i1, i2});
+            }
+        }
+
         return out;
     }
 
@@ -329,8 +380,8 @@ namespace xpbd
             }
 
             out.push_back({pid,
-                                  polygonIndices[nearestEdge],
-                                  polygonIndices[(nearestEdge + 1) % n]});
+                           polygonIndices[nearestEdge],
+                           polygonIndices[(nearestEdge + 1) % n]});
         }
 
         return out;

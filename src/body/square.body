@@ -7,11 +7,11 @@
     { "pos": [100, 0], "vel": [0, 0], "mass": 1 }
   ],
   "DistanceConstraints": [
-    {"i1": 0, "i2": 1, "restDistance": 100, "compliance": 0.002},
-    {"i1": 1, "i2": 2, "restDistance": 100, "compliance": 0.002},
-    {"i1": 2, "i2": 3, "restDistance": 100, "compliance": 0.002},
-    {"i1": 3, "i2": 0, "restDistance": 100, "compliance": 0.002},
-    {"i1": 0, "i2": 2, "restDistance": 141, "compliance": 0.01}
+    {"i1": 0, "i2": 1, "restDistance": 100, "compliance": 0.4},
+    {"i1": 1, "i2": 2, "restDistance": 100, "compliance": 0.4},
+    {"i1": 2, "i2": 3, "restDistance": 100, "compliance": 0.4},
+    {"i1": 3, "i2": 0, "restDistance": 100, "compliance": 0.4},
+    {"i1": 0, "i2": 2, "restDistance": 141, "compliance": 0.4}
   ],
   "VolumeConstraints": [
     {

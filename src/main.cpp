@@ -45,7 +45,6 @@ int main()
     bool paused = true;
     bool stepOnce = false;
     glm::vec2 gravity = {0, -9.8f};
-    // gravity = {0, 0};
     xpbd::Particles particles;
     xpbd::DistanceConstraints distanceConstraints;
     xpbd::VolumeConstraints volumeConstraints;
@@ -83,7 +82,15 @@ int main()
 
             if (event.type == sf::Event::Closed)
                 renderer::window.close();
+
+            if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left))
+            {
+                printf("mouse left button\n");
+            }
         }
+        sf::Vector2i pos = sf::Mouse::getPosition(renderer::window);
+        printf("mouse pos: %dddddddddddddd, %d\n", pos.x, pos.y);
+
         renderer::window.clear();
 
         ImGui::NewFrame();
@@ -97,6 +104,9 @@ int main()
         size_t max_value = 10;
         ImGui::SliderScalar("substeps", ImGuiDataType_U64, &substeps, &min_value, &max_value, "%zu", ImGuiSliderFlags_None);
         ImGui::SliderScalar("iterations", ImGuiDataType_U64, &iterations, &min_value, &max_value, "%zu", ImGuiSliderFlags_None);
+        ImGui::SliderFloat("gravity.x", &gravity.x, -20, 20);
+        ImGui::SliderFloat("gravity.y", &gravity.y, -20, 20);
+
         ImGui::End();
         ImGui::EndFrame();
 
