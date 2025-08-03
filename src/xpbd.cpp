@@ -56,6 +56,9 @@ namespace xpbd
         dc.restDist.push_back(restDist);
         dc.compliance.push_back(compliance);
         dc.lambda.push_back(0);
+
+        dc.compressionDamping.push_back(0.1f);
+        dc.extensionDamping.push_back(0.9f);
     }
     void add_distance_constraint_auto_restDist(DistanceConstraints &dc, size_t i1, size_t i2, float compliance, Particles &p)
     {
@@ -65,6 +68,9 @@ namespace xpbd
         dc.restDist.push_back(restDist);
         dc.compliance.push_back(compliance);
         dc.lambda.push_back(0);
+
+        dc.compressionDamping.push_back(0.5f);
+        dc.extensionDamping.push_back(0.5f);
     }
 
     void solve_distance_constraints(Particles &p, DistanceConstraints &dc, float dt)
@@ -79,8 +85,8 @@ namespace xpbd
                 continue;
             }
 
-            auto &p1 = p.pos[i1];
-            auto &p2 = p.pos[i2];
+            glm::vec2 &p1 = p.pos[i1];
+            glm::vec2 &p2 = p.pos[i2];
 
             float w1 = p.w[i1];
             float w2 = p.w[i2];
@@ -101,19 +107,56 @@ namespace xpbd
             float deltaLambda = (-C - alphaTilde * dc.lambda[i]) / denom;
             dc.lambda[i] += deltaLambda;
 
-            p1 += w1 * deltaLambda * grad;
-            p2 -= w2 * deltaLambda * grad;
+            glm::vec2 correction = deltaLambda * grad;
+            p1 += w1 * correction;
+            p2 -= w2 * correction;
+        }
+    }
+    void solve_distance_constraints_damping(Particles &p, DistanceConstraints &dc, float dt)
+    {
+        for (size_t i = 0; i < dc.i1.size(); ++i)
+        {
+            size_t i1 = dc.i1[i];
+            size_t i2 = dc.i2[i];
+            if (i1 >= p.pos.size() || i2 >= p.pos.size())
+                continue;
+
+            glm::vec2 delta = p.pos[i1] - p.pos[i2];
+            float len = glm::length(delta);
+            if (len < 1e-6f)
+                continue;
+
+            glm::vec2 dir = delta / len;
+            float rest = dc.restDist[i];
+            float C = len - rest;
+
+            float w1 = p.w[i1];
+            float w2 = p.w[i2];
+            float wSum = w1 + w2;
+            if (wSum < 1e-6f)
+                continue;
+
+            glm::vec2 relVel = p.vel[i1] - p.vel[i2];
+            float relVelAlongConstraint = glm::dot(relVel, dir);
+
+            float damping = (C < 0.0f) ? dc.compressionDamping[i] : dc.extensionDamping[i];
+
+            float impulseMag = -damping * relVelAlongConstraint;
+            glm::vec2 impulse = impulseMag * dir;
+
+            p.vel[i1] += w1 / wSum * impulse;
+            p.vel[i2] -= w2 / wSum * impulse;
         }
     }
 
-    float compute_polygon_area(const std::vector<glm::vec2> &p)
+    float compute_polygon_area(const std::vector<glm::vec2> &positions)
     {
         float area = 0.0f;
-        size_t N = p.size();
+        size_t N = positions.size();
         for (size_t i = 0; i < N; ++i)
         {
-            const glm::vec2 &p0 = p[i];
-            const glm::vec2 &p1 = p[(i + 1) % N];
+            const glm::vec2 &p0 = positions[i];
+            const glm::vec2 &p1 = positions[(i + 1) % N];
             area += utils::cross_2d(p0, p1);
         }
         return 0.5f * area;
@@ -497,7 +540,6 @@ namespace xpbd
                 return;
             n /= C;
 
-            // Gradients
             glm::vec2 grad_p = n;
             glm::vec2 grad_e0 = -n * (1.0f - t);
             glm::vec2 grad_e1 = -n * t;
@@ -510,12 +552,11 @@ namespace xpbd
             float deltaLambda = (-C - alpha * pecc.lambda[i]) / (w_sum + alpha);
             pecc.lambda[i] += deltaLambda;
 
-            // Apply position correction
             p_pos += w_p * deltaLambda * grad_p;
             e0_pos += w_e0 * deltaLambda * grad_e0;
             e1_pos += w_e1 * deltaLambda * grad_e1;
 
-            // --- Friction (static) ---
+            // --- Static friction ---
             glm::vec2 tangent(-n.y, n.x);
 
             glm::vec2 p_disp = p_pos - p_prev;
@@ -526,13 +567,82 @@ namespace xpbd
             glm::vec2 rel_disp = p_disp - edge_disp;
             float tangential_disp = glm::dot(rel_disp, tangent);
 
-            float max_friction = pecc.staticFriction[i] * fabs(deltaLambda);
-            float friction_correction = glm::clamp(-tangential_disp, -max_friction, max_friction);
+            if (fabs(tangential_disp) < pecc.staticFriction[i] * fabs(deltaLambda))
+            {
+                p_pos -= (w_p / w_sum) * tangential_disp * tangent;
+                e0_pos += (w_e0 * (1.0f - t) / w_sum) * tangential_disp * tangent;
+                e1_pos += (w_e1 * t / w_sum) * tangential_disp * tangent;
+            }
+        }
+    }
+    void apply_point_edge_collision_constraints_kinetic_friction(
+        Particles &p,
+        const PointEdgeCollisionConstraints &pecc,
+        float dt)
+    {
+        for (size_t i = 0; i < pecc.point.size(); ++i)
+        {
+            size_t i_p = pecc.point[i];
+            size_t i_e0 = pecc.edge1[i];
+            size_t i_e1 = pecc.edge2[i];
 
-            // Apply frictional correction
-            p_pos += (w_p / w_sum) * friction_correction * tangent;
-            e0_pos -= (w_e0 * (1.0f - t) / w_sum) * friction_correction * tangent;
-            e1_pos -= (w_e1 * t / w_sum) * friction_correction * tangent;
+            glm::vec2 &p_vel = p.vel[i_p];
+            glm::vec2 &e0_vel = p.vel[i_e0];
+            glm::vec2 &e1_vel = p.vel[i_e1];
+
+            float w_p = p.w[i_p];
+            float w_e0 = p.w[i_e0];
+            float w_e1 = p.w[i_e1];
+
+            // Положение в текущем кадре
+            glm::vec2 p_pos = p.pos[i_p];
+            glm::vec2 e0_pos = p.pos[i_e0];
+            glm::vec2 e1_pos = p.pos[i_e1];
+
+            glm::vec2 edge = e1_pos - e0_pos;
+            float edgeLengthSq = glm::dot(edge, edge);
+            if (edgeLengthSq < 1e-6f)
+                continue;
+
+            float t = glm::clamp(glm::dot(p_pos - e0_pos, edge) / edgeLengthSq, 0.0f, 1.0f);
+            glm::vec2 closest = e0_pos + t * edge;
+
+            glm::vec2 n = p_pos - closest;
+            float dist = glm::length(n);
+            if (dist < 1e-6f)
+                continue;
+
+            n /= dist;
+            glm::vec2 tangent(-n.y, n.x);
+
+            // относительная скорость точки к отрезку
+            glm::vec2 edge_vel = e0_vel * (1.0f - t) + e1_vel * t;
+            glm::vec2 rel_vel = p_vel - edge_vel;
+
+            float vn = glm::dot(rel_vel, n);
+            glm::vec2 vn_vec = vn * n;
+            glm::vec2 vt_vec = rel_vel - vn_vec;
+            float vt_len = glm::length(vt_vec);
+
+            if (vt_len < 1e-6f)
+                continue;
+
+            glm::vec2 vt_dir = vt_vec / vt_len;
+
+            float lambda_n = pecc.lambda[i];
+            float mu_k = pecc.kineticFriction[i];
+
+            float impulse_t = -mu_k * fabs(lambda_n / dt);
+            glm::vec2 delta_v = impulse_t * vt_dir;
+
+            float w_sum = w_p + w_e0 * (1.0f - t) * (1.0f - t) + w_e1 * t * t;
+            if (w_sum < 1e-6f)
+                continue;
+
+            // Распределение изменения скорости
+            p_vel += (w_p / w_sum) * delta_v;
+            e0_vel -= (w_e0 * (1.0f - t) / w_sum) * delta_v;
+            e1_vel -= (w_e1 * t / w_sum) * delta_v;
         }
     }
 

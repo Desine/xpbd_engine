@@ -2,14 +2,16 @@
   "position" : [0, -300],
   "Particles": [
     { "pos": [-1000, 0], "vel": [0, 0], "mass": 0 },
-    { "pos": [-1000, 100], "vel": [0, 0], "mass": 0 },
-    { "pos": [1000, 100], "vel": [0, 0], "mass": 0 },
-    { "pos": [1000, 0], "vel": [0, 0], "mass": 0 }
+    { "pos": [1000, 0], "vel": [0, 0], "mass": 0 },
+    { "pos": [1000, 1000], "vel": [0, 0], "mass": 0 },
+    { "pos": [500, 100], "vel": [0, 0], "mass": 0 },
+    { "pos": [-500, 100], "vel": [0, 0], "mass": 0 },
+    { "pos": [-1000, 1000], "vel": [0, 0], "mass": 0 }
   ],
   "PolygonColliders": [
     {
-      "indices": [0, 1, 2, 3],
-      "staticFriction": 1.0,
+      "indices": [0, 1, 2, 3, 4, 5],
+      "staticFriction": 0.0,
       "kineticFriction": 0.5,
       "compliance": 0.0
     }

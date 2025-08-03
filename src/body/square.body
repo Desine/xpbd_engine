@@ -2,16 +2,15 @@
   "position" : [-300, 0],
   "Particles": [
     { "pos": [0, 0], "vel": [0, 0], "mass": 1 },
-    { "pos": [0, 100], "vel": [0, 0], "mass": 1 },
-    { "pos": [100, 100], "vel": [0, 0], "mass": 1 },
-    { "pos": [100, 0], "vel": [0, 0], "mass": 1 }
+    { "pos": [0, 60], "vel": [0, 0], "mass": 1 },
+    { "pos": [60, 60], "vel": [0, 0], "mass": 1 },
+    { "pos": [60, 0], "vel": [0, 0], "mass": 1 }
   ],
   "DistanceConstraints": [
-    {"i1": 0, "i2": 1, "restDistance": 100, "compliance": 0.4},
-    {"i1": 1, "i2": 2, "restDistance": 100, "compliance": 0.4},
-    {"i1": 2, "i2": 3, "restDistance": 100, "compliance": 0.4},
-    {"i1": 3, "i2": 0, "restDistance": 100, "compliance": 0.4},
-    {"i1": 0, "i2": 2, "restDistance": 141, "compliance": 0.4}
+    {"i1": 0, "i2": 1, "restDistance": 60, "compliance": 0.4},
+    {"i1": 1, "i2": 2, "restDistance": 60, "compliance": 0.4},
+    {"i1": 2, "i2": 3, "restDistance": 60, "compliance": 0.4},
+    {"i1": 3, "i2": 0, "restDistance": 60, "compliance": 0.4}
   ],
   "VolumeConstraints": [
     {
@@ -23,7 +22,7 @@
   "PointColliders": [
     {
       "indices": [0, 1, 2, 3],
-      "staticFriction": 1.0,
+      "staticFriction": 0.0,
       "kineticFriction": 0.5,
       "compliance": 0.0
     }
