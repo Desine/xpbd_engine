@@ -567,11 +567,25 @@ namespace xpbd
             glm::vec2 rel_disp = p_disp - edge_disp;
             float tangential_disp = glm::dot(rel_disp, tangent);
 
+            // --- Static Friction ---
             if (fabs(tangential_disp) < pecc.staticFriction[i] * fabs(deltaLambda))
             {
+                // Static friction can cancel motion
                 p_pos -= (w_p / w_sum) * tangential_disp * tangent;
                 e0_pos += (w_e0 * (1.0f - t) / w_sum) * tangential_disp * tangent;
                 e1_pos += (w_e1 * t / w_sum) * tangential_disp * tangent;
+            }
+            else
+            {
+                // --- Kinetic Friction ---
+                float tangential_dir = (tangential_disp > 0.0f) ? 1.0f : -1.0f;
+                float kineticImpulse = pecc.kineticFriction[i] * fabs(deltaLambda);
+
+                glm::vec2 frictionImpulse = -tangential_dir * kineticImpulse * tangent;
+
+                p_pos += (w_p / w_sum) * frictionImpulse;
+                e0_pos -= (w_e0 * (1.0f - t) / w_sum) * frictionImpulse;
+                e1_pos -= (w_e1 * t / w_sum) * frictionImpulse;
             }
         }
     }
@@ -582,22 +596,20 @@ namespace xpbd
     {
         for (size_t i = 0; i < pecc.point.size(); ++i)
         {
-            size_t i_p = pecc.point[i];
-            size_t i_e0 = pecc.edge1[i];
-            size_t i_e1 = pecc.edge2[i];
+            size_t p_i = pecc.point[i];
+            size_t e0_i = pecc.edge1[i];
+            size_t e1_i = pecc.edge2[i];
 
-            glm::vec2 &p_vel = p.vel[i_p];
-            glm::vec2 &e0_vel = p.vel[i_e0];
-            glm::vec2 &e1_vel = p.vel[i_e1];
+            glm::vec2 p_pos = p.pos[p_i];
+            glm::vec2 &p_vel = p.vel[p_i];
+            float w_p = p.w[p_i];
 
-            float w_p = p.w[i_p];
-            float w_e0 = p.w[i_e0];
-            float w_e1 = p.w[i_e1];
-
-            // Положение в текущем кадре
-            glm::vec2 p_pos = p.pos[i_p];
-            glm::vec2 e0_pos = p.pos[i_e0];
-            glm::vec2 e1_pos = p.pos[i_e1];
+            glm::vec2 e0_pos = p.pos[e0_i];
+            glm::vec2 e1_pos = p.pos[e1_i];
+            glm::vec2 &e0_vel = p.vel[e0_i];
+            glm::vec2 &e1_vel = p.vel[e1_i];
+            float w_e0 = p.w[e0_i];
+            float w_e1 = p.w[e1_i];
 
             glm::vec2 edge = e1_pos - e0_pos;
             float edgeLengthSq = glm::dot(edge, edge);
@@ -607,42 +619,34 @@ namespace xpbd
             float t = glm::clamp(glm::dot(p_pos - e0_pos, edge) / edgeLengthSq, 0.0f, 1.0f);
             glm::vec2 closest = e0_pos + t * edge;
 
-            glm::vec2 n = p_pos - closest;
-            float dist = glm::length(n);
+            glm::vec2 normal = p_pos - closest;
+            float dist = glm::length(normal);
             if (dist < 1e-6f)
                 continue;
 
-            n /= dist;
-            glm::vec2 tangent(-n.y, n.x);
+            normal /= dist;
+            glm::vec2 tangent(-normal.y, normal.x);
 
-            // относительная скорость точки к отрезку
             glm::vec2 edge_vel = e0_vel * (1.0f - t) + e1_vel * t;
             glm::vec2 rel_vel = p_vel - edge_vel;
-
-            float vn = glm::dot(rel_vel, n);
-            glm::vec2 vn_vec = vn * n;
-            glm::vec2 vt_vec = rel_vel - vn_vec;
-            float vt_len = glm::length(vt_vec);
-
-            if (vt_len < 1e-6f)
+            float v_tangent = glm::dot(rel_vel, tangent);
+            if (fabs(v_tangent) < 1e-6f)
                 continue;
-
-            glm::vec2 vt_dir = vt_vec / vt_len;
-
-            float lambda_n = pecc.lambda[i];
-            float mu_k = pecc.kineticFriction[i];
-
-            float impulse_t = -mu_k * fabs(lambda_n / dt);
-            glm::vec2 delta_v = impulse_t * vt_dir;
 
             float w_sum = w_p + w_e0 * (1.0f - t) * (1.0f - t) + w_e1 * t * t;
             if (w_sum < 1e-6f)
                 continue;
 
-            // Распределение изменения скорости
-            p_vel += (w_p / w_sum) * delta_v;
-            e0_vel -= (w_e0 * (1.0f - t) / w_sum) * delta_v;
-            e1_vel -= (w_e1 * t / w_sum) * delta_v;
+            float maxFrictionImpulse = pecc.kineticFriction[i] * pecc.lambda[i];
+
+            float deltaImpulse = -v_tangent / (w_sum * dt);
+            deltaImpulse = glm::clamp(deltaImpulse, -maxFrictionImpulse, maxFrictionImpulse);
+
+            glm::vec2 frictionImpulse = deltaImpulse * tangent;
+
+            p.vel[p_i] += w_p * frictionImpulse;
+            p.vel[e0_i] -= w_e0 * frictionImpulse * (1.0f - t);
+            p.vel[e1_i] -= w_e1 * frictionImpulse * t;
         }
     }
 

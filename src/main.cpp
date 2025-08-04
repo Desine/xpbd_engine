@@ -77,8 +77,7 @@ int main()
     json_body_loader::load("2boxes", particles, distanceConstraints, volumeConstraints, polygonColliders, pointColliders);
 
     add_poligon(particles, distanceConstraints, volumeConstraints, {300, 300}, 70, 5, 5, 0.001f);
-    xpbd::add_distance_constraint(distanceConstraints, 7, 8, 0.1f, 0);
-    xpbd::add_polygon_collider(polygonColliders, {8, 9, 10, 11, 12}, 1, 0.5f, 0);
+    xpbd::add_polygon_collider(polygonColliders, {8, 9, 10, 11, 12}, 0.4f, 0.3f, 0);
 
     json_body_loader::load("square", particles, distanceConstraints, volumeConstraints, polygonColliders, pointColliders);
 
@@ -112,7 +111,7 @@ int main()
             }
         }
         sf::Vector2i pos = sf::Mouse::getPosition(renderer::window);
-        printf("mouse pos: %dddddddddddddd, %d\n", pos.x, pos.y);
+        // printf("mouse pos: %dddddddddddddd, %d\n", pos.x, pos.y);
 
         renderer::window.clear();
 

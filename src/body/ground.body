@@ -11,8 +11,8 @@
   "PolygonColliders": [
     {
       "indices": [0, 1, 2, 3, 4, 5],
-      "staticFriction": 0.0,
-      "kineticFriction": 0.5,
+      "staticFriction": 0.6,
+      "kineticFriction": 0.4,
       "compliance": 0.0
     }
   ]
