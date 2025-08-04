@@ -112,7 +112,7 @@ namespace xpbd
             p2 -= w2 * correction;
         }
     }
-    void solve_distance_constraints_damping(Particles &p, DistanceConstraints &dc, float dt)
+    void apply_distance_constraints_damping(Particles &p, DistanceConstraints &dc, float dt)
     {
         for (size_t i = 0; i < dc.i1.size(); ++i)
         {

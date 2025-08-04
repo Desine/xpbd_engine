@@ -82,7 +82,7 @@ namespace xpbd
     void add_distance_constraint(DistanceConstraints &dc, size_t i1, size_t i2, float compliance, float restDist);
     void add_distance_constraint_auto_restDist(DistanceConstraints &dc, size_t i1, size_t i2, float compliance, Particles &p);
     void solve_distance_constraints(Particles &p, DistanceConstraints &dc, float dt);
-    void solve_distance_constraints_damping(Particles &p, DistanceConstraints &dc, float dt);
+    void apply_distance_constraints_damping(Particles &p, DistanceConstraints &dc, float dt);
     
     float compute_polygon_area(const std::vector<glm::vec2> &positions);
     float compute_polygon_area(const Particles &p, std::vector<size_t> &indices);

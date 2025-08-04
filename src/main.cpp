@@ -9,7 +9,7 @@
 #include "xpbd.hpp"
 #include "json_body_loader.hpp"
 
-void add_poligon(xpbd::Particles &p, xpbd::DistanceConstraints &dc, xpbd::VolumeConstraints &vc, glm::vec2 pos, float radius, size_t segments, float mass, float compliance)
+void add_poligon(xpbd::Particles &p, xpbd::DistanceConstraints &dc, xpbd::VolumeConstraints &vc, xpbd::PolygonColliders &pc, glm::vec2 pos, float radius, size_t segments, float mass, float compliance)
 {
     if (segments < 3)
         segments = 3;
@@ -32,6 +32,8 @@ void add_poligon(xpbd::Particles &p, xpbd::DistanceConstraints &dc, xpbd::Volume
         xpbd::add_distance_constraint_auto_restDist(dc, start + i, start + (i + 1) % segments, compliance, p);
 
     xpbd::add_volume_constraint(p, vc, ids, compliance);
+
+    xpbd::add_polygon_collider(pc, ids, 0.4f, 0.3f, compliance);
 }
 void draw_aabbs(std::vector<xpbd::AABB> aabb)
 {
@@ -76,19 +78,16 @@ int main()
 
     json_body_loader::load("2boxes", particles, distanceConstraints, volumeConstraints, polygonColliders, pointColliders);
 
-    add_poligon(particles, distanceConstraints, volumeConstraints, {300, 300}, 70, 5, 5, 0.001f);
-    xpbd::add_polygon_collider(polygonColliders, {8, 9, 10, 11, 12}, 0.4f, 0.3f, 0);
-
-    json_body_loader::load("square", particles, distanceConstraints, volumeConstraints, polygonColliders, pointColliders);
+    add_poligon(particles, distanceConstraints, volumeConstraints, polygonColliders, {300, 300}, 70, 5, 5, 0.001f);
 
     json_body_loader::load("ground", particles, distanceConstraints, volumeConstraints, polygonColliders, pointColliders);
-    printf("w: %d\n", particles.w[particles.w.size() - 1]);
-
-    json_body_loader::load("square", particles, distanceConstraints, volumeConstraints, polygonColliders, pointColliders, {300, 600});
+    json_body_loader::load("square", particles, distanceConstraints, volumeConstraints, polygonColliders, pointColliders, {0, 500});
 
     renderer::setup_window();
     renderer::setup_view();
     renderer::setup_imgui();
+
+    sf::Vector2i mouseDrag;
 
     sf::Clock clock;
     while (renderer::window.isOpen())
@@ -105,13 +104,37 @@ int main()
             if (event.type == sf::Event::Closed)
                 renderer::window.close();
 
-            if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left))
+            // camera
+            sf::Vector2i mouseCurrent = sf::Mouse::getPosition(renderer::window);
+
+            const sf::Vector2f delta =
+                renderer::window.mapPixelToCoords(mouseCurrent) -
+                renderer::window.mapPixelToCoords(mouseDrag);
+            mouseDrag = mouseCurrent;
+            if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Right))
             {
-                printf("mouse left button\n");
+                renderer::view.move(-delta);
+                renderer::window.setView(renderer::view);
+            }
+            if (event.type == sf::Event::MouseWheelScrolled && event.mouseWheelScroll.wheel == sf::Mouse::VerticalWheel)
+            {
+                if (event.mouseWheelScroll.delta > 0)
+                    renderer::view.zoom(0.95);
+                else
+                    renderer::view.zoom(1.05);
+                renderer::window.setView(renderer::view);
+            }
+
+            // spawn
+            if (event.type == sf::Event::MouseButtonReleased && event.mouseButton.button == sf::Mouse::Left)
+            {
+                sf::Vector2i pixelPos = sf::Mouse::getPosition(renderer::window);
+                sf::Vector2f worldPos = renderer::window.mapPixelToCoords(pixelPos);
+                glm::vec2 position(worldPos.x, worldPos.y);
+                // json_body_loader::load("square", particles, distanceConstraints, volumeConstraints, polygonColliders, pointColliders, position);
+                add_poligon(particles, distanceConstraints, volumeConstraints, polygonColliders, position, 40, 6, 3, 0.005f);
             }
         }
-        sf::Vector2i pos = sf::Mouse::getPosition(renderer::window);
-        // printf("mouse pos: %dddddddddddddd, %d\n", pos.x, pos.y);
 
         renderer::window.clear();
 
@@ -141,7 +164,7 @@ int main()
 
                 xpbd::reset_constraints_lambdas(distanceConstraints.lambda);
                 xpbd::reset_constraints_lambdas(volumeConstraints.lambda);
-                
+
                 xpbd::PointEdgeCollisionConstraints pecc;
                 for (size_t i = 0; i < iterations; i++)
                 {
@@ -153,19 +176,19 @@ int main()
                     std::vector<xpbd::AABBsIntersection> aabbs_polygon_polygon_intersections = xpbd::find_aabbs_intersections(aabbs_polygons);
                     for (auto a : aabbs_polygon_polygon_intersections)
                         xpbd::add_point_edge_collision_constraints_of_polygon_to_polygon_colliders(particles, pecc, polygonColliders, a.i1, a.i2);
-    
+
                     // point/polygon collisions detection
                     std::vector<xpbd::AABB> aabbs_points = xpbd::generate_particles_aabbs(particles, pointColliders.indices);
                     std::vector<xpbd::AABBsIntersection> aabbs_point_polygon_intersections = xpbd::find_aabbs_intersections(aabbs_points, aabbs_polygons);
                     for (auto a : aabbs_point_polygon_intersections)
                         xpbd::add_point_edge_collision_constraints_of_point_to_polygon_colliders(particles, pecc, pointColliders, polygonColliders, a.i1, a.i2);
-                    
+
                     xpbd::solve_point_edge_collision_constraints(particles, pecc, substep_time);
                 }
 
                 xpbd::update_velocities(particles, substep_time);
                 // xpbd::apply_point_edge_collision_constraints_kinetic_friction(particles, pecc, substep_time);
-                // xpbd::solve_distance_constraints_damping(particles, distanceConstraints, substep_time);
+                // xpbd::apply_distance_constraints_damping(particles, distanceConstraints, substep_time);
             }
         }
 

@@ -2,15 +2,13 @@
 
 namespace renderer
 {
-
     sf::RenderWindow window;
     sf::View view;
     sf::Color color;
-    
 
     void setup_window()
     {
-        window.create(sf::VideoMode({WINDOW_WIDTH, WINDOW_HEIGHT}), "Soft Racing");
+        window.create(sf::VideoMode({WINDOW_WIDTH, WINDOW_HEIGHT}), "xpbd_engine");
         window.setFramerateLimit(60);
     }
 
@@ -19,9 +17,7 @@ namespace renderer
         view = window.getDefaultView();
         view.setSize(WINDOW_WIDTH, -WINDOW_HEIGHT);
         view.zoom(0.5f);
-        sf::Vector2f cameraCenter;
-        cameraCenter.x = 0;
-        cameraCenter.y = 0;
+        sf::Vector2f cameraCenter(0, 0);
         view.setCenter(cameraCenter);
         window.setView(view);
     }
@@ -51,9 +47,7 @@ namespace renderer
     void draw_segmented_line(const std::vector<glm::vec2> &points)
     {
         for (int d = 1; d < points.size(); d++)
-        {
             draw_line(points[d], points[d - 1]);
-        }
     }
     void draw_segmented_loop(const std::vector<glm::vec2> &points)
     {
