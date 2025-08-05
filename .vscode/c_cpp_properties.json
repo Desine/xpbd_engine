@@ -3,8 +3,9 @@
         {
             "name": "Linux",
             "includePath": [
-                "${workspaceFolder}/**",
                 "/usr/include/glm",
+                "${workspaceFolder}",
+                "${workspaceFolder}/**",
                 "${workspaceFolder}/include/imgui",
                 "${workspaceFolder}/include/imgui-sfml"
             ],

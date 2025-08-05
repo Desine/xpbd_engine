@@ -9,6 +9,8 @@
 #include "xpbd.hpp"
 #include "json_body_loader.hpp"
 
+#include "Remotery.h"
+
 void add_poligon(xpbd::Particles &p, xpbd::DistanceConstraints &dc, xpbd::VolumeConstraints &vc, xpbd::PolygonColliders &pc, glm::vec2 pos, float radius, size_t segments, float mass, float compliance)
 {
     if (segments < 3)
@@ -61,6 +63,11 @@ void draw_point_edge_collision_constraints(xpbd::Particles p, xpbd::PointEdgeCol
 
 int main()
 {
+    rmtSettings *settings = rmt_Settings();
+    settings->port = 17816;
+    Remotery *rmt;
+    rmt_CreateGlobalInstance(&rmt);
+
     size_t substeps = 10;
     size_t iterations = 1;
     float sec = 0.0f;
@@ -98,8 +105,9 @@ int main()
 
         sf::Event event;
         while (renderer::window.pollEvent(event))
-        {
-            ImGui::SFML::ProcessEvent(event);
+        {            
+            ImGui::SFML::ProcessEvent(renderer::window, event);
+
 
             if (event.type == sf::Event::Closed)
                 renderer::window.close();
@@ -140,6 +148,7 @@ int main()
 
         ImGui::NewFrame();
         ImGui::Begin("Main");
+        ImGui::Text("FPS: %.1f", 1.0f / deltaTime.asSeconds());
         if (ImGui::Button(paused ? "Play" : "Pause"))
             paused = !paused;
         if (ImGui::Button("stepOnce - todo"))
@@ -216,4 +225,6 @@ int main()
 
     ImGui::SFML::Shutdown();
     renderer::window.close();
+
+    rmt_DestroyGlobalInstance(rmt);
 }

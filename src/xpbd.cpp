@@ -3,6 +3,8 @@
 #include "cstdio"
 #include <algorithm>
 
+#include "Remotery.h"
+
 namespace xpbd
 {
     bool should_tick(float &sec, const float dt)
@@ -75,6 +77,8 @@ namespace xpbd
 
     void solve_distance_constraints(Particles &p, DistanceConstraints &dc, float dt)
     {
+        rmt_ScopedCPUSample(solve_distance_constraints, 0);
+
         for (size_t i = 0; i < dc.i1.size(); ++i)
         {
             size_t i1 = dc.i1[i];
@@ -241,6 +245,8 @@ namespace xpbd
 
     std::vector<AABB> generate_particles_aabbs(const Particles &particles, const std::vector<std::vector<size_t>> indices)
     {
+        rmt_ScopedCPUSample(generate_particles_aabbs, 0);
+        
         std::vector<AABB> out;
 
         for (size_t o = 0; o < indices.size(); o++)
@@ -289,6 +295,8 @@ namespace xpbd
     }
     std::vector<AABBsIntersection> find_aabbs_intersections(const std::vector<AABB> &aabbs)
     {
+        rmt_ScopedCPUSample(find_aabbs_intersections, 0);
+        
         std::vector<AABBsIntersection> out;
 
         std::vector<std::pair<AABB, size_t>> indexed;
@@ -321,6 +329,9 @@ namespace xpbd
     }
     std::vector<AABBsIntersection> find_aabbs_intersections(const std::vector<AABB> &aabbs1, const std::vector<AABB> &aabbs2)
     {
+        rmt_ScopedCPUSample(find_aabbs_intersections___2, 0);
+
+
         std::vector<AABBsIntersection> out;
 
         std::vector<std::pair<AABB, size_t>> indexed1, indexed2;
@@ -357,6 +368,8 @@ namespace xpbd
 
     bool point_in_polygon(const glm::vec2 point, const std::vector<glm::vec2> positions)
     {
+        rmt_ScopedCPUSample(point_in_polygon, 0);
+
         int windingNumber = 0;
         size_t n = positions.size();
         for (size_t i = 0; i < n; ++i)
@@ -399,6 +412,7 @@ namespace xpbd
 
             for (size_t i = 0; i < n; ++i)
             {
+                rmt_ScopedCPUSample(for_n_polygonIndices, 0);
                 size_t id1 = polygonIndices[i];
                 size_t id2 = polygonIndices[(i + 1) % n];
                 const glm::vec2 &e1 = p.pos[id1];
@@ -508,9 +522,10 @@ namespace xpbd
         PointEdgeCollisionConstraints &pecc,
         float dt)
     {
+        rmt_ScopedCPUSample(solve_point_edge_collision_constraints, 0);
+
         for (size_t i = 0; i < pecc.point.size(); ++i)
         {
-
             size_t i_p = pecc.point[i];
             size_t i_e0 = pecc.edge1[i];
             size_t i_e1 = pecc.edge2[i];
