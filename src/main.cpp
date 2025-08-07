@@ -64,7 +64,7 @@ void draw_point_edge_collision_constraints(xpbd::Particles p, xpbd::PointEdgeCol
 int main()
 {
     rmtSettings *settings = rmt_Settings();
-    settings->port = 17816;
+    settings->port = 17815; // default 17815
     Remotery *rmt;
     rmt_CreateGlobalInstance(&rmt);
 
@@ -140,8 +140,8 @@ int main()
                 sf::Vector2i pixelPos = sf::Mouse::getPosition(renderer::window);
                 sf::Vector2f worldPos = renderer::window.mapPixelToCoords(pixelPos);
                 glm::vec2 position(worldPos.x, worldPos.y);
-                // json_body_loader::load("square", particles, distanceConstraints, volumeConstraints, polygonColliders, pointColliders, position);
-                add_poligon(particles, distanceConstraints, volumeConstraints, polygonColliders, position, 40, 6, 3, 0.005f);
+                json_body_loader::load("balloon", particles, distanceConstraints, volumeConstraints, polygonColliders, pointColliders, position);
+                // add_poligon(particles, distanceConstraints, volumeConstraints, polygonColliders, position, 40, 6, 3, 0.005f);
             }
         }
 
@@ -175,24 +175,25 @@ int main()
                 xpbd::reset_constraints_lambdas(distanceConstraints.lambda);
                 xpbd::reset_constraints_lambdas(volumeConstraints.lambda);
 
-                xpbd::PointEdgeCollisionConstraints pecc;
+                
                 for (size_t i = 0; i < iterations; i++)
                 {
                     xpbd::solve_distance_constraints(particles, distanceConstraints, substep_time);
                     xpbd::solve_volume_constraints(particles, volumeConstraints, substep_time);
-
+                    
+                    xpbd::PointEdgeCollisionConstraints pecc;
                     // polygon/polygon collision detection
                     std::vector<xpbd::AABB> aabbs_polygons = xpbd::generate_particles_aabbs(particles, polygonColliders.indices);
                     std::vector<xpbd::AABBsOverlap> aabbs_polygon_polygon_intersections = xpbd::create_aabbs_intersections(aabbs_polygons);
                     for (auto a : aabbs_polygon_polygon_intersections)
                         xpbd::add_point_edge_collision_constraints_of_polygon_to_polygon_colliders(particles, pecc, polygonColliders, a);
-
+    
                     // point/polygon collisions detection
                     std::vector<xpbd::AABB> aabbs_points = xpbd::generate_particles_aabbs(particles, pointColliders.indices);
                     std::vector<xpbd::AABBsOverlap> aabbs_point_polygon_intersections = xpbd::create_aabbs_intersections(aabbs_points, aabbs_polygons);
                     for (auto a : aabbs_point_polygon_intersections)
                         xpbd::add_point_edge_collision_constraints_of_point_to_polygon_colliders(particles, pecc, pointColliders, polygonColliders, a);
-
+                        
                     xpbd::solve_point_edge_collision_constraints(particles, pecc, substep_time);
                 }
 

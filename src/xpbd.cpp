@@ -120,6 +120,7 @@ namespace xpbd
     }
     void apply_distance_constraints_damping(Particles &p, DistanceConstraints &dc, float dt)
     {
+        // does not work
         for (size_t i = 0; i < dc.i1.size(); ++i)
         {
             size_t i1 = dc.i1[i];
@@ -198,6 +199,8 @@ namespace xpbd
 
     void solve_volume_constraints(Particles &p, VolumeConstraints &vc, float dt)
     {
+        rmt_ScopedCPUSample(solve_volume_constraints, 0);
+
         for (size_t id = 0; id < vc.indices.size(); ++id)
         {
             std::vector<size_t> &indices = vc.indices[id];
@@ -247,8 +250,6 @@ namespace xpbd
 
     std::vector<AABB> generate_particles_aabbs(const Particles &particles, const std::vector<std::vector<size_t>> indices)
     {
-        rmt_ScopedCPUSample(generate_particles_aabbs, 0);
-
         std::vector<AABB> out;
 
         for (size_t o = 0; o < indices.size(); o++)
@@ -339,7 +340,7 @@ namespace xpbd
     }
     std::vector<AABBsOverlap> create_aabbs_intersections(const std::vector<AABB> &aabbs1, const std::vector<AABB> &aabbs2)
     {
-        rmt_ScopedCPUSample(find_aabbs_intersections___2, 0);
+        rmt_ScopedCPUSample(2create_aabbs_intersections, 0);
 
         std::vector<AABBsOverlap> out;
 
@@ -377,8 +378,6 @@ namespace xpbd
 
     bool point_in_polygon(const glm::vec2 point, const std::vector<glm::vec2> positions)
     {
-        rmt_ScopedCPUSample(point_in_polygon, 0);
-
         int windingNumber = 0;
         size_t n = positions.size();
         for (size_t i = 0; i < n; ++i)
@@ -403,6 +402,8 @@ namespace xpbd
         const std::vector<size_t> &pointIndices,
         const std::vector<size_t> &polygonIndices)
     {
+        rmt_ScopedCPUSample(get_point_edge_collisions_of_points_inside_polygon, 0);
+
         std::vector<PointEdgeCollision> out;
         std::vector<glm::vec2> polygonPositions;
         for (size_t pid : polygonIndices)
@@ -421,7 +422,6 @@ namespace xpbd
 
             for (size_t i = 0; i < n; ++i)
             {
-                rmt_ScopedCPUSample(for_n_polygonIndices, 0);
                 size_t id1 = polygonIndices[i];
                 size_t id2 = polygonIndices[(i + 1) % n];
                 const glm::vec2 &e1 = p.pos[id1];
@@ -483,6 +483,11 @@ namespace xpbd
         const ColliderPoints &polygonColliders,
         const AABBsOverlap &overlap)
     {
+        // draw overlap intersection box
+        // AABB b = overlap.box;
+        // renderer::set_color(sf::Color::White);
+        // renderer::draw_axis_aligned_bounding_box(b.l, b.r, b.b, b.t);
+
         if (overlap.i1 >= pointColliders.indices.size() || overlap.i2 >= polygonColliders.indices.size())
         {
             printf("Error point to polygon collision detection. ///if (overlap.i1 >= pointColliders.indices.size() || overlap.i2 >= polygonColliders.indices.size())\n");
@@ -576,7 +581,7 @@ namespace xpbd
             e0_pos += w_e0 * deltaLambda * grad_e0;
             e1_pos += w_e1 * deltaLambda * grad_e1;
 
-            // --- Static friction ---
+            // --- Friction ---
             glm::vec2 tangent(-n.y, n.x);
 
             glm::vec2 p_disp = p_pos - p_prev;
@@ -587,17 +592,16 @@ namespace xpbd
             glm::vec2 rel_disp = p_disp - edge_disp;
             float tangential_disp = glm::dot(rel_disp, tangent);
 
-            // --- Static Friction ---
             if (fabs(tangential_disp) < pecc.staticFriction[i] * fabs(deltaLambda))
             {
-                // Static friction can cancel motion
+                // static
                 p_pos -= (w_p / w_sum) * tangential_disp * tangent;
                 e0_pos += (w_e0 * (1.0f - t) / w_sum) * tangential_disp * tangent;
                 e1_pos += (w_e1 * t / w_sum) * tangential_disp * tangent;
             }
             else
             {
-                // --- Kinetic Friction ---
+                // kinetic
                 float tangential_dir = (tangential_disp > 0.0f) ? 1.0f : -1.0f;
                 float kineticImpulse = pecc.kineticFriction[i] * fabs(deltaLambda);
 
@@ -614,6 +618,7 @@ namespace xpbd
         const PointEdgeCollisionConstraints &pecc,
         float dt)
     {
+        // does not work
         for (size_t i = 0; i < pecc.point.size(); ++i)
         {
             size_t p_i = pecc.point[i];
