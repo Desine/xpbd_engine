@@ -3,6 +3,8 @@
 #include "cstdio"
 #include <algorithm>
 
+#include "renderer.hpp"
+
 #include "Remotery.h"
 
 namespace xpbd
@@ -246,7 +248,7 @@ namespace xpbd
     std::vector<AABB> generate_particles_aabbs(const Particles &particles, const std::vector<std::vector<size_t>> indices)
     {
         rmt_ScopedCPUSample(generate_particles_aabbs, 0);
-        
+
         std::vector<AABB> out;
 
         for (size_t o = 0; o < indices.size(); o++)
@@ -261,27 +263,27 @@ namespace xpbd
                 size_t id = indices[o][i];
                 glm::vec2 pos = particles.pos[id];
                 if (pos.x < current.l)
-                    current.l = particles.pos[id].x;
+                    current.l = pos.x;
                 if (pos.x > current.r)
-                    current.r = particles.pos[id].x;
+                    current.r = pos.x;
                 if (pos.y < current.b)
-                    current.b = particles.pos[id].y;
+                    current.b = pos.y;
                 if (pos.y > current.t)
-                    current.t = particles.pos[id].y;
+                    current.t = pos.y;
             }
             out.push_back(current);
         }
         return out;
     }
 
-    void add_polygon_collider(xpbd::PolygonColliders &cc, std::vector<size_t> indices, float staticFriction, float kineticFriction, float compliance)
+    void add_polygon_collider(xpbd::ColliderPoints &cc, std::vector<size_t> indices, float staticFriction, float kineticFriction, float compliance)
     {
         cc.indices.push_back(indices);
         cc.staticFriction.push_back(staticFriction);
         cc.kineticFriction.push_back(kineticFriction);
         cc.compliance.push_back(compliance);
     }
-    void add_point_collider(xpbd::PointColliders &pc, std::vector<size_t> indices, float staticFriction, float kineticFriction, float compliance)
+    void add_point_collider(xpbd::ColliderPoints &pc, std::vector<size_t> indices, float staticFriction, float kineticFriction, float compliance)
     {
         pc.indices.push_back(indices);
         pc.staticFriction.push_back(staticFriction);
@@ -293,11 +295,19 @@ namespace xpbd
     {
         return !(a.r < b.l || a.l > b.r || a.t < b.b || a.b > b.t);
     }
-    std::vector<AABBsIntersection> find_aabbs_intersections(const std::vector<AABB> &aabbs)
+    AABB create_aabb_intersection(const AABB &a, const AABB &b)
     {
-        rmt_ScopedCPUSample(find_aabbs_intersections, 0);
-        
-        std::vector<AABBsIntersection> out;
+        return {
+            std::max(a.l, b.l),
+            std::min(a.r, b.r),
+            std::max(a.b, b.b),
+            std::min(a.t, b.t)};
+    }
+    std::vector<AABBsOverlap> create_aabbs_intersections(const std::vector<AABB> &aabbs)
+    {
+        rmt_ScopedCPUSample(create_aabbs_intersections, 0);
+
+        std::vector<AABBsOverlap> out;
 
         std::vector<std::pair<AABB, size_t>> indexed;
         for (size_t i = 0; i < aabbs.size(); ++i)
@@ -321,18 +331,17 @@ namespace xpbd
                     break;
 
                 if (aabbs_overlap(a1, a2))
-                    out.push_back({i1, i2});
+                    out.push_back({i1, i2, create_aabb_intersection(a1, a2)});
             }
         }
 
         return out;
     }
-    std::vector<AABBsIntersection> find_aabbs_intersections(const std::vector<AABB> &aabbs1, const std::vector<AABB> &aabbs2)
+    std::vector<AABBsOverlap> create_aabbs_intersections(const std::vector<AABB> &aabbs1, const std::vector<AABB> &aabbs2)
     {
         rmt_ScopedCPUSample(find_aabbs_intersections___2, 0);
 
-
-        std::vector<AABBsIntersection> out;
+        std::vector<AABBsOverlap> out;
 
         std::vector<std::pair<AABB, size_t>> indexed1, indexed2;
         for (size_t i = 0; i < aabbs1.size(); ++i)
@@ -359,7 +368,7 @@ namespace xpbd
                     break;
 
                 if (aabbs_overlap(a1, a2))
-                    out.push_back({i1, i2});
+                    out.push_back({i1, i2, create_aabb_intersection(a1, a2)});
             }
         }
 
@@ -461,60 +470,75 @@ namespace xpbd
             pecc.lambda.push_back(0.0f);
         }
     }
-    void add_point_edge_collision_constraints_of_polygon_to_polygon_colliders(
-        Particles &p,
-        PointEdgeCollisionConstraints &pecc,
-        const PolygonColliders &cc,
-        const size_t cc_id1,
-        const size_t cc_id2)
+
+    inline bool point_in_aabb(const glm::vec2 &point, const AABB &aabb)
     {
-        if (cc.indices[cc_id1].size() < 2 || cc.indices[cc_id2].size() < 2)
-        {
-            printf("Error polygon to polygon collision detection. ///if (cc.indices[cc_id1].size() < 2 || cc.indices[cc_id2].size() < 2)");
-            return;
-        }
-
-        float avgStaticFriction = (cc.staticFriction[cc_id1] + cc.staticFriction[cc_id2]) * 0.5f;
-        float avgKineticFriction = (cc.kineticFriction[cc_id1] + cc.kineticFriction[cc_id2]) * 0.5f;
-        float avgCompliance = (cc.compliance[cc_id1] + cc.compliance[cc_id2]) * 0.5f;
-
-        std::vector<PointEdgeCollision> detections1 = get_point_edge_collisions_of_points_inside_polygon(p, cc.indices[cc_id1], cc.indices[cc_id2]);
-        std::vector<PointEdgeCollision> detections2 = get_point_edge_collisions_of_points_inside_polygon(p, cc.indices[cc_id2], cc.indices[cc_id1]);
-
-        populate_constraints_from_detections(detections1, pecc, avgStaticFriction, avgKineticFriction, avgCompliance);
-        populate_constraints_from_detections(detections2, pecc, avgStaticFriction, avgKineticFriction, avgCompliance);
+        return point.x >= aabb.l && point.x <= aabb.r &&
+               point.y >= aabb.b && point.y <= aabb.t;
     }
     void add_point_edge_collision_constraints_of_point_to_polygon_colliders(
         Particles &p,
         PointEdgeCollisionConstraints &pecc,
-        const PointColliders &pointColliders,
-        const PolygonColliders &polygonColliders,
-        const size_t pointColliderId,
-        const size_t polygonColliderId)
+        const ColliderPoints &pointColliders,
+        const ColliderPoints &polygonColliders,
+        const AABBsOverlap &overlap)
     {
-        if (pointColliderId >= pointColliders.indices.size() || polygonColliderId >= polygonColliders.indices.size())
+        if (overlap.i1 >= pointColliders.indices.size() || overlap.i2 >= polygonColliders.indices.size())
         {
-            printf("Error point to polygon collision detection. ///if (pointColliderId >= pointColliders.indices.size() || polygonColliderId >= polygonColliders.indices.size())");
+            printf("Error point to polygon collision detection. ///if (overlap.i1 >= pointColliders.indices.size() || overlap.i2 >= polygonColliders.indices.size())\n");
             return;
         }
 
-        const std::vector<size_t> &pointIndices = pointColliders.indices[pointColliderId];
-        const std::vector<size_t> &polygonIndices = polygonColliders.indices[polygonColliderId];
+        const std::vector<size_t> &pointIndices = pointColliders.indices[overlap.i1];
+        const std::vector<size_t> &polygonIndices = polygonColliders.indices[overlap.i2];
 
-        if (pointIndices.empty() || polygonIndices.size() < 3)
+        if (pointIndices.empty())
         {
-            printf("Error point to polygon collision detection. ///if (pointIndices.empty() || polygonIndices.size() < 3)");
+            printf("Error point to polygon collision detection. ///if (filteredPointIndices.empty())\n");
+            return;
+        }
+        if (polygonIndices.size() < 3)
+        {
+            printf("Error point to polygon collision detection. ///if (polygonIndices.size() < 3)\n");
             return;
         }
 
-        float avgStaticFriction = (pointColliders.staticFriction[pointColliderId] + polygonColliders.staticFriction[polygonColliderId]) * 0.5f;
-        float avgKineticFriction = (pointColliders.kineticFriction[pointColliderId] + polygonColliders.kineticFriction[polygonColliderId]) * 0.5f;
-        float avgCompliance = (pointColliders.compliance[pointColliderId] + polygonColliders.compliance[polygonColliderId]) * 0.5f;
+        std::vector<size_t> filteredPointIndices;
+        for (auto i : pointIndices)
+            if (point_in_aabb(p.pos[i], overlap.box))
+                filteredPointIndices.push_back(i);
+
+        float avgStaticFriction = (pointColliders.staticFriction[overlap.i1] + polygonColliders.staticFriction[overlap.i2]) * 0.5f;
+        float avgKineticFriction = (pointColliders.kineticFriction[overlap.i1] + polygonColliders.kineticFriction[overlap.i2]) * 0.5f;
+        float avgCompliance = (pointColliders.compliance[overlap.i1] + polygonColliders.compliance[overlap.i2]) * 0.5f;
 
         std::vector<PointEdgeCollision> detections =
-            get_point_edge_collisions_of_points_inside_polygon(p, pointIndices, polygonIndices);
+            get_point_edge_collisions_of_points_inside_polygon(p, filteredPointIndices, polygonIndices);
 
         populate_constraints_from_detections(detections, pecc, avgStaticFriction, avgKineticFriction, avgCompliance);
+    }
+    void add_point_edge_collision_constraints_of_polygon_to_polygon_colliders(
+        Particles &p,
+        PointEdgeCollisionConstraints &pecc,
+        const ColliderPoints &polygonColliders,
+        const AABBsOverlap &overlap)
+    {
+        ColliderPoints cp1;
+        cp1.indices.push_back(polygonColliders.indices[overlap.i1]);
+        cp1.staticFriction.push_back(polygonColliders.staticFriction[overlap.i1]);
+        cp1.kineticFriction.push_back(polygonColliders.kineticFriction[overlap.i1]);
+        cp1.compliance.push_back(polygonColliders.compliance[overlap.i1]);
+
+        ColliderPoints cp2;
+        cp2.indices.push_back(polygonColliders.indices[overlap.i2]);
+        cp2.staticFriction.push_back(polygonColliders.staticFriction[overlap.i2]);
+        cp2.kineticFriction.push_back(polygonColliders.kineticFriction[overlap.i2]);
+        cp2.compliance.push_back(polygonColliders.compliance[overlap.i2]);
+
+        AABBsOverlap o = {0, 0, overlap.box};
+
+        add_point_edge_collision_constraints_of_point_to_polygon_colliders(p, pecc, cp1, cp2, o);
+        add_point_edge_collision_constraints_of_point_to_polygon_colliders(p, pecc, cp2, cp1, o);
     }
 
     void solve_point_edge_collision_constraints(

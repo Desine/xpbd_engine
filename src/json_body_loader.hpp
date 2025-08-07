@@ -16,8 +16,8 @@ namespace json_body_loader
         xpbd::Particles &particles,
         xpbd::DistanceConstraints &distanceConstraints,
         xpbd::VolumeConstraints &volumeConstraints,
-        xpbd::PolygonColliders &polygonColliders,
-        xpbd::PointColliders &pointColliders,
+        xpbd::ColliderPoints &polygonColliders,
+        xpbd::ColliderPoints &pointColliders,
         glm::vec2 offset = {0, 0})
     {
         std::ifstream file(folder + filename + extension);
