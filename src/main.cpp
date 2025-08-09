@@ -4,6 +4,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <omp.h>
 
 #include "renderer.hpp"
 #include "xpbd.hpp"
@@ -183,23 +184,39 @@ int main()
                     std::vector<xpbd::PointEdgeCollisionConstraints> pecc;
                     // polygon/polygon collision detection
                     std::vector<xpbd::AABB> aabbs_polygons = xpbd::generate_particles_aabbs(particles, polygonColliders.indices);
-                    std::vector<xpbd::AABBsOverlap> aabbs_polygon_polygon_intersections = xpbd::create_aabbs_intersections(aabbs_polygons);
+                    std::vector<xpbd::AABBsOverlap> aabbs_polygon_polygon_overlaps = xpbd::create_aabbs_intersections(aabbs_polygons);
                     {
                         rmt_ScopedCPUSample(polygon_collision_detection, 0);
-                        for (auto a : aabbs_polygon_polygon_intersections)
+                        std::vector<std::vector<xpbd::PointEdgeCollisionConstraints>> pecc_local(omp_get_max_threads());
+#pragma omp parallel for
+                        for (size_t i = 0; i < aabbs_polygon_polygon_overlaps.size(); ++i)
                         {
-                            std::vector<xpbd::PointEdgeCollisionConstraints> insert = xpbd::get_point_edge_collision_constraints_of_polygon_to_polygon_colliders(particles, polygonColliders, a);
-                            pecc.insert(pecc.end(), insert.begin(), insert.end());
+                            auto insert = xpbd::get_point_edge_collision_constraints_of_polygon_to_polygon_colliders(
+                                particles, polygonColliders, aabbs_polygon_polygon_overlaps[i]);
+                            auto &local = pecc_local[omp_get_thread_num()];
+                            local.insert(local.end(), insert.begin(), insert.end());
                         }
+
+                        for (auto &v : pecc_local)
+                            pecc.insert(pecc.end(), v.begin(), v.end());
                     }
 
                     // point/polygon collisions detection
                     std::vector<xpbd::AABB> aabbs_points = xpbd::generate_particles_aabbs(particles, pointColliders.indices);
-                    std::vector<xpbd::AABBsOverlap> aabbs_point_polygon_intersections = xpbd::create_aabbs_intersections(aabbs_points, aabbs_polygons);
-                    for (auto a : aabbs_point_polygon_intersections)
+                    std::vector<xpbd::AABBsOverlap> aabbs_point_polygon_overlaps = xpbd::create_aabbs_intersections(aabbs_points, aabbs_polygons);
                     {
-                        std::vector<xpbd::PointEdgeCollisionConstraints> insert = xpbd::get_point_edge_collision_constraints_of_point_to_polygon_colliders(particles, pointColliders, polygonColliders, a);
-                        pecc.insert(pecc.end(), insert.begin(), insert.end());
+                        std::vector<std::vector<xpbd::PointEdgeCollisionConstraints>> pecc_local(omp_get_max_threads());
+#pragma omp parallel for
+                        for (size_t i = 0; i < aabbs_point_polygon_overlaps.size(); ++i)
+                        {
+                            auto insert = xpbd::get_point_edge_collision_constraints_of_point_to_polygon_colliders(
+                                particles, pointColliders, polygonColliders, aabbs_point_polygon_overlaps[i]);
+                            auto &local = pecc_local[omp_get_thread_num()];
+                            local.insert(local.end(), insert.begin(), insert.end());
+                        }
+
+                        for (auto &v : pecc_local)
+                            pecc.insert(pecc.end(), v.begin(), v.end());
                     }
 
                     xpbd::solve_point_edge_collision_constraints(particles, pecc, substep_time);

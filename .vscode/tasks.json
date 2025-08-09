@@ -21,7 +21,8 @@
                 "-lsfml-graphics",
                 "-lsfml-window",
                 "-lsfml-system",
-                "-lGL"
+                "-lGL",
+                "-fopenmp"
             ],
             "options": {
                 "cwd": "${fileDirname}"
