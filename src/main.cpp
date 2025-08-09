@@ -175,25 +175,24 @@ int main()
                 xpbd::reset_constraints_lambdas(distanceConstraints.lambda);
                 xpbd::reset_constraints_lambdas(volumeConstraints.lambda);
 
-                
                 for (size_t i = 0; i < iterations; i++)
                 {
                     xpbd::solve_distance_constraints(particles, distanceConstraints, substep_time);
                     xpbd::solve_volume_constraints(particles, volumeConstraints, substep_time);
-                    
+
                     xpbd::PointEdgeCollisionConstraints pecc;
                     // polygon/polygon collision detection
                     std::vector<xpbd::AABB> aabbs_polygons = xpbd::generate_particles_aabbs(particles, polygonColliders.indices);
                     std::vector<xpbd::AABBsOverlap> aabbs_polygon_polygon_intersections = xpbd::create_aabbs_intersections(aabbs_polygons);
                     for (auto a : aabbs_polygon_polygon_intersections)
                         xpbd::add_point_edge_collision_constraints_of_polygon_to_polygon_colliders(particles, pecc, polygonColliders, a);
-    
+
                     // point/polygon collisions detection
                     std::vector<xpbd::AABB> aabbs_points = xpbd::generate_particles_aabbs(particles, pointColliders.indices);
                     std::vector<xpbd::AABBsOverlap> aabbs_point_polygon_intersections = xpbd::create_aabbs_intersections(aabbs_points, aabbs_polygons);
                     for (auto a : aabbs_point_polygon_intersections)
                         xpbd::add_point_edge_collision_constraints_of_point_to_polygon_colliders(particles, pecc, pointColliders, polygonColliders, a);
-                        
+
                     xpbd::solve_point_edge_collision_constraints(particles, pecc, substep_time);
                 }
 
@@ -205,11 +204,11 @@ int main()
 
         renderer::set_color(sf::Color::Red);
         for (auto p : particles.pos)
-        renderer::draw_circle(p, 3);
-        
+            renderer::draw_circle(p, 3);
+
         for (size_t i = 0; i < distanceConstraints.i1.size(); ++i)
-        renderer::draw_line(particles.pos[distanceConstraints.i1[i]], particles.pos[distanceConstraints.i2[i]]);
-        
+            renderer::draw_line(particles.pos[distanceConstraints.i1[i]], particles.pos[distanceConstraints.i2[i]]);
+
         renderer::set_color(sf::Color::Green);
         for (size_t i = 0; i < polygonColliders.indices.size(); ++i)
         {

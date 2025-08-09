@@ -378,6 +378,7 @@ namespace xpbd
 
     bool point_in_polygon(const glm::vec2 &point, const std::vector<glm::vec2> &positions)
     {
+        // rmt_ScopedCPUSample(point_in_polygon, 0);
         int windingNumber = 0;
         const size_t n = positions.size();
 
@@ -405,8 +406,7 @@ namespace xpbd
         const std::vector<size_t> &pointIndices,
         const std::vector<size_t> &polygonIndices)
     {
-        rmt_ScopedCPUSample(get_point_edge_collisions_of_points_inside_polygon, 0);
-
+        // rmt_ScopedCPUSample(get_point_edge_collisions_of_points_inside_polygon, 0);
         std::vector<PointEdgeCollision> out;
         out.reserve(pointIndices.size());
 
@@ -416,6 +416,16 @@ namespace xpbd
             polygonPositions.push_back(p.pos[pid]);
 
         size_t n = polygonIndices.size();
+
+        std::vector<glm::vec2> edges(n);
+        std::vector<float> edgesLen2(n);
+        for (size_t i = 0, j = n - 1; i < n; j = i++)
+        {
+            glm::vec2 edge = polygonPositions[i] - polygonPositions[j];
+            edges[j] = edge;
+            edgesLen2[j] = glm::dot(edge, edge);
+        }
+
         for (size_t pid : pointIndices)
         {
             const glm::vec2 &point = p.pos[pid];
@@ -426,27 +436,21 @@ namespace xpbd
             float minDist = std::numeric_limits<float>::max();
             size_t nearestEdge = 0;
 
-            for (size_t i = 0, j = n - 1; i < n; j = i++)
+            for (size_t i = 0; i < n; ++i)
             {
-                size_t id1 = polygonIndices[j];
-                size_t id2 = polygonIndices[i];
-                const glm::vec2 &e1 = p.pos[id1];
-                const glm::vec2 &e2 = p.pos[id2];
+                if (edgesLen2[i] < 1e-12f)
+                    continue;
 
-                glm::vec2 edge = e2 - e1;
-                float len2 = glm::dot(edge, edge);
-                if (len2 < 1e-12f) continue;
-    
-                glm::vec2 toPoint = point - e1;
-                float t = glm::dot(toPoint, edge) / len2;
+                glm::vec2 toPoint = point - polygonPositions[i];
+                float t = glm::dot(toPoint, edges[i]) / edgesLen2[i];
                 t = glm::clamp(t, 0.0f, 1.0f);
-                glm::vec2 closest = e1 + edge * t;    
+                glm::vec2 closest = polygonPositions[i] + edges[i] * t;
 
                 float dist = glm::dot(point - closest, point - closest);
                 if (dist < minDist)
                 {
                     minDist = dist;
-                    nearestEdge = j;
+                    nearestEdge = i;
                 }
             }
 
@@ -456,24 +460,6 @@ namespace xpbd
         }
 
         return out;
-    }
-    void populate_constraints_from_detections(
-        const std::vector<PointEdgeCollision> &detections,
-        PointEdgeCollisionConstraints &pecc,
-        float staticFriction,
-        float kineticFriction,
-        float compliance)
-    {
-        for (const auto &c : detections)
-        {
-            pecc.point.push_back(c.point);
-            pecc.edge1.push_back(c.edge1);
-            pecc.edge2.push_back(c.edge2);
-            pecc.staticFriction.push_back(staticFriction);
-            pecc.kineticFriction.push_back(kineticFriction);
-            pecc.compliance.push_back(compliance);
-            pecc.lambda.push_back(0.0f);
-        }
     }
 
     inline bool point_in_aabb(const glm::vec2 &point, const AABB &aabb)
@@ -508,6 +494,7 @@ namespace xpbd
         }
 
         std::vector<size_t> filteredPointIndices;
+        filteredPointIndices.reserve(pointColliders.indices[overlap.i1].size());
         for (auto i : pointColliders.indices[overlap.i1])
             if (point_in_aabb(p.pos[i], overlap.box))
                 filteredPointIndices.push_back(i);
@@ -520,7 +507,17 @@ namespace xpbd
         float avgCompliance = (pointColliders.compliance[overlap.i1] + polygonColliders.compliance[overlap.i2]) * 0.5f;
 
         std::vector<PointEdgeCollision> detections = get_point_edge_collisions_of_points_inside_polygon(p, filteredPointIndices, polygonIndices);
-        populate_constraints_from_detections(detections, pecc, avgStaticFriction, avgKineticFriction, avgCompliance);
+
+        for (const auto &c : detections)
+        {
+            pecc.point.push_back(c.point);
+            pecc.edge1.push_back(c.edge1);
+            pecc.edge2.push_back(c.edge2);
+            pecc.staticFriction.push_back(avgStaticFriction);
+            pecc.kineticFriction.push_back(avgKineticFriction);
+            pecc.compliance.push_back(avgCompliance);
+            pecc.lambda.push_back(0.0f);
+        }
     }
     void add_point_edge_collision_constraints_of_polygon_to_polygon_colliders(
         Particles &p,
