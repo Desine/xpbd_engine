@@ -54,13 +54,13 @@ namespace xpbd
     };
     struct PointEdgeCollisionConstraints
     {
-        std::vector<size_t> point;
-        std::vector<size_t> edge1;
-        std::vector<size_t> edge2;
-        std::vector<float> staticFriction;
-        std::vector<float> kineticFriction;
-        std::vector<float> compliance;
-        std::vector<float> lambda;
+        size_t point;
+        size_t edge1;
+        size_t edge2;
+        float staticFriction;
+        float kineticFriction;
+        float compliance;
+        float lambda;
     };
 #endif // xpbd_define
 
@@ -91,8 +91,8 @@ namespace xpbd
     std::vector<AABBsOverlap> create_aabbs_intersections(const std::vector<AABB> &aabbs);
     std::vector<AABBsOverlap> create_aabbs_intersections(const std::vector<AABB> &aabbs1, const std::vector<AABB> &aabbs2);
 
-    void add_point_edge_collision_constraints_of_polygon_to_polygon_colliders(Particles &p, PointEdgeCollisionConstraints &pecc, const ColliderPoints &pc, const AABBsOverlap &overlap);
-    void add_point_edge_collision_constraints_of_point_to_polygon_colliders(Particles &p, PointEdgeCollisionConstraints &pecc, const ColliderPoints &pointColliders, const ColliderPoints &polygonColliders, const AABBsOverlap &overlap);
-    void solve_point_edge_collision_constraints(Particles &p, PointEdgeCollisionConstraints &pecc, float dt);
-    void apply_point_edge_collision_constraints_kinetic_friction(Particles &p, const PointEdgeCollisionConstraints &pecc, float dt);
+    std::vector<PointEdgeCollisionConstraints> get_point_edge_collision_constraints_of_polygon_to_polygon_colliders(Particles &p, const ColliderPoints &pc, const AABBsOverlap &overlap);
+    std::vector<PointEdgeCollisionConstraints> get_point_edge_collision_constraints_of_point_to_polygon_colliders(Particles &p, const ColliderPoints &pointColliders, const ColliderPoints &polygonColliders, const AABBsOverlap &overlap);
+    void solve_point_edge_collision_constraints(Particles &p, std::vector<PointEdgeCollisionConstraints> &pecc, float dt);
+    void apply_point_edge_collision_constraints_kinetic_friction(Particles &p, const std::vector<PointEdgeCollisionConstraints> &pecc, float dt);
 }

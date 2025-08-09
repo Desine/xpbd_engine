@@ -467,13 +467,13 @@ namespace xpbd
         return point.x >= aabb.l && point.x <= aabb.r &&
                point.y >= aabb.b && point.y <= aabb.t;
     }
-    void add_point_edge_collision_constraints_of_point_to_polygon_colliders(
+    std::vector<PointEdgeCollisionConstraints> get_point_edge_collision_constraints_of_point_to_polygon_colliders(
         Particles &p,
-        PointEdgeCollisionConstraints &pecc,
         const ColliderPoints &pointColliders,
         const ColliderPoints &polygonColliders,
         const AABBsOverlap &overlap)
     {
+        std::vector<PointEdgeCollisionConstraints> pecc;
         // draw overlap intersection box
         // AABB b = overlap.box;
         // renderer::set_color(sf::Color::White);
@@ -482,7 +482,7 @@ namespace xpbd
         if (overlap.i1 >= pointColliders.indices.size() || overlap.i2 >= polygonColliders.indices.size())
         {
             printf("Error point to polygon collision detection. ///if (overlap.i1 >= pointColliders.indices.size() || overlap.i2 >= polygonColliders.indices.size())\n");
-            return;
+            return pecc;
         }
 
         const std::vector<size_t> &polygonIndices = polygonColliders.indices[overlap.i2];
@@ -490,7 +490,7 @@ namespace xpbd
         if (polygonIndices.size() < 3)
         {
             printf("Error point to polygon collision detection. ///if (polygonIndices.size() < 3)\n");
-            return;
+            return pecc;
         }
 
         std::vector<size_t> filteredPointIndices;
@@ -500,7 +500,7 @@ namespace xpbd
                 filteredPointIndices.push_back(i);
 
         if (filteredPointIndices.empty())
-            return;
+            return pecc;
 
         float avgStaticFriction = (pointColliders.staticFriction[overlap.i1] + polygonColliders.staticFriction[overlap.i2]) * 0.5f;
         float avgKineticFriction = (pointColliders.kineticFriction[overlap.i1] + polygonColliders.kineticFriction[overlap.i2]) * 0.5f;
@@ -508,39 +508,34 @@ namespace xpbd
 
         std::vector<PointEdgeCollision> detections = get_point_edge_collisions_of_points_inside_polygon(p, filteredPointIndices, polygonIndices);
 
+        pecc.reserve(detections.size());
         for (const auto &c : detections)
-        {
-            pecc.point.push_back(c.point);
-            pecc.edge1.push_back(c.edge1);
-            pecc.edge2.push_back(c.edge2);
-            pecc.staticFriction.push_back(avgStaticFriction);
-            pecc.kineticFriction.push_back(avgKineticFriction);
-            pecc.compliance.push_back(avgCompliance);
-            pecc.lambda.push_back(0.0f);
-        }
+            pecc.push_back({c.point, c.edge1, c.edge2, avgStaticFriction, avgKineticFriction, avgCompliance, 0.0f});
+        return pecc;
     }
-    void add_point_edge_collision_constraints_of_polygon_to_polygon_colliders(
+    std::vector<PointEdgeCollisionConstraints> get_point_edge_collision_constraints_of_polygon_to_polygon_colliders(
         Particles &p,
-        PointEdgeCollisionConstraints &pecc,
         const ColliderPoints &polygonColliders,
         const AABBsOverlap &overlap)
     {
-        add_point_edge_collision_constraints_of_point_to_polygon_colliders(p, pecc, polygonColliders, polygonColliders, overlap);
-        add_point_edge_collision_constraints_of_point_to_polygon_colliders(p, pecc, polygonColliders, polygonColliders, {overlap.i2, overlap.i1, overlap.box});
+        std::vector<PointEdgeCollisionConstraints> pecc = get_point_edge_collision_constraints_of_point_to_polygon_colliders(p, polygonColliders, polygonColliders, overlap);
+        std::vector<PointEdgeCollisionConstraints> insert = get_point_edge_collision_constraints_of_point_to_polygon_colliders(p, polygonColliders, polygonColliders, {overlap.i2, overlap.i1, overlap.box});
+        pecc.insert(pecc.end(), insert.begin(), insert.end());
+        return pecc;
     }
 
     void solve_point_edge_collision_constraints(
         Particles &p,
-        PointEdgeCollisionConstraints &pecc,
+        std::vector<PointEdgeCollisionConstraints> &pecc,
         float dt)
     {
         rmt_ScopedCPUSample(solve_point_edge_collision_constraints, 0);
 
-        for (size_t i = 0; i < pecc.point.size(); ++i)
+        for (size_t i = 0; i < pecc.size(); ++i)
         {
-            size_t i_p = pecc.point[i];
-            size_t i_e0 = pecc.edge1[i];
-            size_t i_e1 = pecc.edge2[i];
+            size_t i_p = pecc[i].point;
+            size_t i_e0 = pecc[i].edge1;
+            size_t i_e1 = pecc[i].edge2;
 
             glm::vec2 &p_pos = p.pos[i_p];
             glm::vec2 &p_prev = p.prev[i_p];
@@ -575,9 +570,9 @@ namespace xpbd
             if (w_sum < 1e-6f)
                 return;
 
-            float alpha = pecc.compliance[i] / (dt * dt);
-            float deltaLambda = (-C - alpha * pecc.lambda[i]) / (w_sum + alpha);
-            pecc.lambda[i] += deltaLambda;
+            float alpha = pecc[i].compliance / (dt * dt);
+            float deltaLambda = (-C - alpha * pecc[i].lambda) / (w_sum + alpha);
+            pecc[i].lambda += deltaLambda;
 
             p_pos += w_p * deltaLambda * grad_p;
             e0_pos += w_e0 * deltaLambda * grad_e0;
@@ -594,7 +589,7 @@ namespace xpbd
             glm::vec2 rel_disp = p_disp - edge_disp;
             float tangential_disp = glm::dot(rel_disp, tangent);
 
-            if (fabs(tangential_disp) < pecc.staticFriction[i] * fabs(deltaLambda))
+            if (fabs(tangential_disp) < pecc[i].staticFriction * fabs(deltaLambda))
             {
                 // static
                 p_pos -= (w_p / w_sum) * tangential_disp * tangent;
@@ -605,7 +600,7 @@ namespace xpbd
             {
                 // kinetic
                 float tangential_dir = (tangential_disp > 0.0f) ? 1.0f : -1.0f;
-                float kineticImpulse = pecc.kineticFriction[i] * fabs(deltaLambda);
+                float kineticImpulse = pecc[i].kineticFriction * fabs(deltaLambda);
 
                 glm::vec2 frictionImpulse = -tangential_dir * kineticImpulse * tangent;
 
@@ -617,15 +612,15 @@ namespace xpbd
     }
     void apply_point_edge_collision_constraints_kinetic_friction(
         Particles &p,
-        const PointEdgeCollisionConstraints &pecc,
+        const std::vector<PointEdgeCollisionConstraints> &pecc,
         float dt)
     {
         // does not work
-        for (size_t i = 0; i < pecc.point.size(); ++i)
+        for (size_t i = 0; i < pecc.size(); ++i)
         {
-            size_t p_i = pecc.point[i];
-            size_t e0_i = pecc.edge1[i];
-            size_t e1_i = pecc.edge2[i];
+            size_t p_i = pecc[i].point;
+            size_t e0_i = pecc[i].edge1;
+            size_t e1_i = pecc[i].edge2;
 
             glm::vec2 p_pos = p.pos[p_i];
             glm::vec2 &p_vel = p.vel[p_i];
@@ -664,7 +659,7 @@ namespace xpbd
             if (w_sum < 1e-6f)
                 continue;
 
-            float maxFrictionImpulse = pecc.kineticFriction[i] * pecc.lambda[i];
+            float maxFrictionImpulse = pecc[i].kineticFriction * pecc[i].lambda;
 
             float deltaImpulse = -v_tangent / (w_sum * dt);
             deltaImpulse = glm::clamp(deltaImpulse, -maxFrictionImpulse, maxFrictionImpulse);

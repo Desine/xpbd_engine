@@ -50,21 +50,21 @@ void draw_aabbs_intersections(std::vector<xpbd::AABB> aabb, std::vector<xpbd::AA
         renderer::draw_axis_aligned_bounding_box(aabb[i.i2].l, aabb[i.i2].r, aabb[i.i2].b, aabb[i.i2].t);
     }
 }
-void draw_point_edge_collision_constraints(xpbd::Particles p, xpbd::PointEdgeCollisionConstraints pecc)
+void draw_point_edge_collision_constraints(xpbd::Particles p, std::vector<xpbd::PointEdgeCollisionConstraints> pecc)
 {
-    for (size_t i = 0; i < pecc.point.size(); ++i)
+    for (size_t i = 0; i < pecc.size(); ++i)
     {
         renderer::set_color(sf::Color::Red);
-        renderer::draw_circle(p.pos[pecc.point[i]], 5);
+        renderer::draw_circle(p.pos[pecc[i].point], 5);
         renderer::set_color(sf::Color::Magenta);
-        renderer::draw_line(p.pos[pecc.edge1[i]], p.pos[pecc.edge2[i]]);
+        renderer::draw_line(p.pos[pecc[i].edge1], p.pos[pecc[i].edge2]);
     }
 }
 
 int main()
 {
     rmtSettings *settings = rmt_Settings();
-    settings->port = 17815; // default 17815
+    settings->port = 17816; // default 17815
     Remotery *rmt;
     rmt_CreateGlobalInstance(&rmt);
 
@@ -156,7 +156,7 @@ int main()
             stepOnce = true;
         ImGui::SliderFloat("timeScale", &timeScale, 0.01f, 50, "%.3f");
         size_t min_value = 1;
-        size_t max_value = 10;
+        size_t max_value = 20;
         ImGui::SliderScalar("substeps", ImGuiDataType_U64, &substeps, &min_value, &max_value, "%zu", ImGuiSliderFlags_None);
         ImGui::SliderScalar("iterations", ImGuiDataType_U64, &iterations, &min_value, &max_value, "%zu", ImGuiSliderFlags_None);
         ImGui::SliderFloat("gravity.x", &gravity.x, -20, 20);
@@ -180,18 +180,27 @@ int main()
                     xpbd::solve_distance_constraints(particles, distanceConstraints, substep_time);
                     xpbd::solve_volume_constraints(particles, volumeConstraints, substep_time);
 
-                    xpbd::PointEdgeCollisionConstraints pecc;
+                    std::vector<xpbd::PointEdgeCollisionConstraints> pecc;
                     // polygon/polygon collision detection
                     std::vector<xpbd::AABB> aabbs_polygons = xpbd::generate_particles_aabbs(particles, polygonColliders.indices);
                     std::vector<xpbd::AABBsOverlap> aabbs_polygon_polygon_intersections = xpbd::create_aabbs_intersections(aabbs_polygons);
-                    for (auto a : aabbs_polygon_polygon_intersections)
-                        xpbd::add_point_edge_collision_constraints_of_polygon_to_polygon_colliders(particles, pecc, polygonColliders, a);
+                    {
+                        rmt_ScopedCPUSample(polygon_collision_detection, 0);
+                        for (auto a : aabbs_polygon_polygon_intersections)
+                        {
+                            std::vector<xpbd::PointEdgeCollisionConstraints> insert = xpbd::get_point_edge_collision_constraints_of_polygon_to_polygon_colliders(particles, polygonColliders, a);
+                            pecc.insert(pecc.end(), insert.begin(), insert.end());
+                        }
+                    }
 
                     // point/polygon collisions detection
                     std::vector<xpbd::AABB> aabbs_points = xpbd::generate_particles_aabbs(particles, pointColliders.indices);
                     std::vector<xpbd::AABBsOverlap> aabbs_point_polygon_intersections = xpbd::create_aabbs_intersections(aabbs_points, aabbs_polygons);
                     for (auto a : aabbs_point_polygon_intersections)
-                        xpbd::add_point_edge_collision_constraints_of_point_to_polygon_colliders(particles, pecc, pointColliders, polygonColliders, a);
+                    {
+                        std::vector<xpbd::PointEdgeCollisionConstraints> insert = xpbd::get_point_edge_collision_constraints_of_point_to_polygon_colliders(particles, pointColliders, polygonColliders, a);
+                        pecc.insert(pecc.end(), insert.begin(), insert.end());
+                    }
 
                     xpbd::solve_point_edge_collision_constraints(particles, pecc, substep_time);
                 }
