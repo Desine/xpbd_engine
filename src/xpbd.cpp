@@ -159,11 +159,11 @@ namespace xpbd
     float compute_polygon_area(const std::vector<glm::vec2> &positions)
     {
         float area = 0.0f;
-        size_t N = positions.size();
-        for (size_t i = 0; i < N; ++i)
+        const size_t n = positions.size();
+        for (size_t i = 0, j = n - 1; i < n; j = i++)
         {
-            const glm::vec2 &p0 = positions[i];
-            const glm::vec2 &p1 = positions[(i + 1) % N];
+            const glm::vec2 &p0 = positions[j];
+            const glm::vec2 &p1 = positions[i];
             area += utils::cross_2d(p0, p1);
         }
         return 0.5f * area;
@@ -171,11 +171,11 @@ namespace xpbd
     float compute_polygon_area(const Particles &p, std::vector<size_t> &indices)
     {
         float area = 0.0f;
-        size_t N = indices.size();
-        for (size_t i = 0; i < N; ++i)
+        const size_t n = indices.size();
+        for (size_t i = 0, j = n - 1; i < n; j = i++)
         {
-            const glm::vec2 &p0 = p.pos[indices[i]];
-            const glm::vec2 &p1 = p.pos[indices[(i + 1) % N]];
+            const glm::vec2 &p0 = p.pos[indices[j]];
+            const glm::vec2 &p1 = p.pos[indices[i]];
             area += utils::cross_2d(p0, p1);
         }
         return 0.5f * area;
@@ -376,22 +376,25 @@ namespace xpbd
         return out;
     }
 
-    bool point_in_polygon(const glm::vec2 point, const std::vector<glm::vec2> positions)
+    bool point_in_polygon(const glm::vec2 &point, const std::vector<glm::vec2> &positions)
     {
         int windingNumber = 0;
-        size_t n = positions.size();
-        for (size_t i = 0; i < n; ++i)
+        const size_t n = positions.size();
+
+        for (size_t i = 0, j = n - 1; i < n; j = i++)
         {
             const glm::vec2 &v1 = positions[i];
-            const glm::vec2 &v2 = positions[(i + 1) % n];
+            const glm::vec2 &v2 = positions[j];
+            float cross = utils::cross_2d(v2 - v1, point - v1);
+
             if (v1.y <= point.y)
             {
-                if (v2.y > point.y && utils::cross_2d(v2 - v1, point - v1) > 0)
+                if (v2.y > point.y && cross > 0)
                     ++windingNumber;
             }
             else
             {
-                if (v2.y <= point.y && utils::cross_2d(v2 - v1, point - v1) < 0)
+                if (v2.y <= point.y && cross < 0)
                     --windingNumber;
             }
         }
@@ -405,10 +408,14 @@ namespace xpbd
         rmt_ScopedCPUSample(get_point_edge_collisions_of_points_inside_polygon, 0);
 
         std::vector<PointEdgeCollision> out;
+        out.reserve(pointIndices.size());
+
         std::vector<glm::vec2> polygonPositions;
+        polygonPositions.reserve(polygonIndices.size());
         for (size_t pid : polygonIndices)
             polygonPositions.push_back(p.pos[pid]);
 
+        size_t n = polygonIndices.size();
         for (size_t pid : pointIndices)
         {
             const glm::vec2 &point = p.pos[pid];
@@ -418,30 +425,28 @@ namespace xpbd
 
             float minDist = std::numeric_limits<float>::max();
             size_t nearestEdge = 0;
-            size_t n = polygonIndices.size();
 
-            for (size_t i = 0; i < n; ++i)
+            for (size_t i = 0, j = n - 1; i < n; j = i++)
             {
-                size_t id1 = polygonIndices[i];
-                size_t id2 = polygonIndices[(i + 1) % n];
+                size_t id1 = polygonIndices[j];
+                size_t id2 = polygonIndices[i];
                 const glm::vec2 &e1 = p.pos[id1];
                 const glm::vec2 &e2 = p.pos[id2];
 
                 glm::vec2 edge = e2 - e1;
-                float len = glm::length(edge);
-                if (len < 1e-6f)
-                    continue;
-
-                glm::vec2 dir = edge / len;
+                float len2 = glm::dot(edge, edge);
+                if (len2 < 1e-12f) continue;
+    
                 glm::vec2 toPoint = point - e1;
-                float proj = glm::clamp(glm::dot(toPoint, dir), 0.0f, len);
-                glm::vec2 closest = e1 + dir * proj;
-                float dist = glm::length(point - closest);
+                float t = glm::dot(toPoint, edge) / len2;
+                t = glm::clamp(t, 0.0f, 1.0f);
+                glm::vec2 closest = e1 + edge * t;    
 
+                float dist = glm::dot(point - closest, point - closest);
                 if (dist < minDist)
                 {
                     minDist = dist;
-                    nearestEdge = i;
+                    nearestEdge = j;
                 }
             }
 

@@ -71,7 +71,7 @@ int main()
     size_t substeps = 10;
     size_t iterations = 1;
     float sec = 0.0f;
-    float rate = 60.0f;
+    float rate = 30.0f;
     float deltaTick = 1.0f / rate;
     float timeScale = 10;
     bool paused = true;
@@ -203,14 +203,14 @@ int main()
             }
         }
 
-        renderer::set_color(sf::Color::Green);
-        for (auto p : particles.pos)
-            renderer::draw_circle(p, 3);
-
-        for (size_t i = 0; i < distanceConstraints.i1.size(); ++i)
-            renderer::draw_line(particles.pos[distanceConstraints.i1[i]], particles.pos[distanceConstraints.i2[i]]);
-
         renderer::set_color(sf::Color::Red);
+        for (auto p : particles.pos)
+        renderer::draw_circle(p, 3);
+        
+        for (size_t i = 0; i < distanceConstraints.i1.size(); ++i)
+        renderer::draw_line(particles.pos[distanceConstraints.i1[i]], particles.pos[distanceConstraints.i2[i]]);
+        
+        renderer::set_color(sf::Color::Green);
         for (size_t i = 0; i < polygonColliders.indices.size(); ++i)
         {
             std::vector<glm::vec2> points;
