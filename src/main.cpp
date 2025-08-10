@@ -65,7 +65,7 @@ void draw_point_edge_collision_constraints(xpbd::Particles p, std::vector<xpbd::
 int main()
 {
     rmtSettings *settings = rmt_Settings();
-    settings->port = 17816; // default 17815
+    settings->port = 17817; // default 17815
     Remotery *rmt;
     rmt_CreateGlobalInstance(&rmt);
 
@@ -178,48 +178,91 @@ int main()
 
                 for (size_t i = 0; i < iterations; i++)
                 {
+                    rmt_BeginCPUSample(solve_distance_constraints, 0);
                     xpbd::solve_distance_constraints(particles, distanceConstraints, substep_time);
+                    rmt_EndCPUSample();
+                    rmt_BeginCPUSample(solve_volume_constraints, 0);
                     xpbd::solve_volume_constraints(particles, volumeConstraints, substep_time);
+                    rmt_EndCPUSample();
 
                     std::vector<xpbd::PointEdgeCollisionConstraints> pecc;
-                    // polygon/polygon collision detection
+                    rmt_BeginCPUSample(aabbs_overlaps, 0);
+                    // polygon/polygon
                     std::vector<xpbd::AABB> aabbs_polygons = xpbd::generate_particles_aabbs(particles, polygonColliders.indices);
-                    std::vector<xpbd::AABBsOverlap> aabbs_polygon_polygon_overlaps = xpbd::create_aabbs_intersections(aabbs_polygons);
-                    {
-                        rmt_ScopedCPUSample(polygon_collision_detection, 0);
-                        std::vector<std::vector<xpbd::PointEdgeCollisionConstraints>> pecc_local(omp_get_max_threads());
-#pragma omp parallel for
-                        for (size_t i = 0; i < aabbs_polygon_polygon_overlaps.size(); ++i)
-                        {
-                            auto insert = xpbd::get_point_edge_collision_constraints_of_polygon_to_polygon_colliders(
-                                particles, polygonColliders, aabbs_polygon_polygon_overlaps[i]);
-                            auto &local = pecc_local[omp_get_thread_num()];
-                            local.insert(local.end(), insert.begin(), insert.end());
-                        }
-
-                        for (auto &v : pecc_local)
-                            pecc.insert(pecc.end(), v.begin(), v.end());
-                    }
-
-                    // point/polygon collisions detection
+                    std::vector<xpbd::AABBsOverlap> aabbs_polygon_polygon_overlaps = xpbd::create_aabbs_overlaps(aabbs_polygons);
+                    // point/polygon
                     std::vector<xpbd::AABB> aabbs_points = xpbd::generate_particles_aabbs(particles, pointColliders.indices);
-                    std::vector<xpbd::AABBsOverlap> aabbs_point_polygon_overlaps = xpbd::create_aabbs_intersections(aabbs_points, aabbs_polygons);
-                    {
-                        std::vector<std::vector<xpbd::PointEdgeCollisionConstraints>> pecc_local(omp_get_max_threads());
-#pragma omp parallel for
-                        for (size_t i = 0; i < aabbs_point_polygon_overlaps.size(); ++i)
-                        {
-                            auto insert = xpbd::get_point_edge_collision_constraints_of_point_to_polygon_colliders(
-                                particles, pointColliders, polygonColliders, aabbs_point_polygon_overlaps[i]);
-                            auto &local = pecc_local[omp_get_thread_num()];
-                            local.insert(local.end(), insert.begin(), insert.end());
-                        }
+                    std::vector<xpbd::AABBsOverlap> aabbs_point_polygon_overlaps = xpbd::create_aabbs_overlaps(aabbs_points, aabbs_polygons);
+                    rmt_EndCPUSample();
 
-                        for (auto &v : pecc_local)
-                            pecc.insert(pecc.end(), v.begin(), v.end());
+                    std::vector<xpbd::PointPolygonCollision> collisions;
+                    collisions.reserve(aabbs_polygon_polygon_overlaps.size() * 2 + aabbs_point_polygon_overlaps.size());
+
+                    for (auto o : aabbs_polygon_polygon_overlaps)
+                    {
+                        if (o.i1 >= polygonColliders.indices.size() && o.i2 >= polygonColliders.indices.size())
+                        {
+                            printf("Error collision detection, polygon/polygon. ///o.i1 >= polygonColliders.indices.size() || o.i2 >= polygonColliders.indices.size()\n");
+                            continue;
+                        }
+                        float avgStaticFriction = (polygonColliders.staticFriction[o.i1] + polygonColliders.staticFriction[o.i2]) * 0.5f;
+                        float avgKineticFriction = (polygonColliders.kineticFriction[o.i1] + polygonColliders.kineticFriction[o.i2]) * 0.5f;
+                        float avgCompliance = (polygonColliders.compliance[o.i1] + polygonColliders.compliance[o.i2]) * 0.5f;
+                        collisions.push_back({
+                            polygonColliders.indices[o.i1],
+                            polygonColliders.indices[o.i2],
+                            avgStaticFriction,
+                            avgKineticFriction,
+                            avgCompliance,
+                            o.box,
+                        });
+                        collisions.push_back({
+                            polygonColliders.indices[o.i2],
+                            polygonColliders.indices[o.i1],
+                            avgStaticFriction,
+                            avgKineticFriction,
+                            avgCompliance,
+                            o.box,
+                        });
+                    }
+                    for (auto o : aabbs_point_polygon_overlaps)
+                    {
+                        if (o.i1 >= pointColliders.indices.size() && o.i2 >= polygonColliders.indices.size())
+                        {
+                            printf("Error collision detection. ///o.i1 >= pointColliders.indices.size() || o.i2 >= polygonColliders.indices.size()\n");
+                            continue;
+                        }
+                        float avgStaticFriction = (pointColliders.staticFriction[o.i1] + polygonColliders.staticFriction[o.i2]) * 0.5f;
+                        float avgKineticFriction = (pointColliders.kineticFriction[o.i1] + polygonColliders.kineticFriction[o.i2]) * 0.5f;
+                        float avgCompliance = (pointColliders.compliance[o.i1] + polygonColliders.compliance[o.i2]) * 0.5f;
+                        collisions.push_back({
+                            pointColliders.indices[o.i1],
+                            polygonColliders.indices[o.i2],
+                            avgStaticFriction,
+                            avgKineticFriction,
+                            avgCompliance,
+                            o.box,
+                        });
                     }
 
+                    rmt_BeginCPUSample(polygon_collision_detection, 0);
+                    std::vector<std::vector<xpbd::PointEdgeCollisionConstraints>> pecc_local(omp_get_max_threads());
+#pragma omp parallel for
+                    for (size_t c = 0; c < collisions.size(); ++c)
+                    {
+                        auto insert = xpbd::get_point_edge_collision_constraints_of_point_to_polygon_colliders(
+                            particles, collisions[c]);
+                        auto &local = pecc_local[omp_get_thread_num()];
+                        local.insert(local.end(), insert.begin(), insert.end());
+                    }
+
+                    for (auto &v : pecc_local)
+                        pecc.insert(pecc.end(), v.begin(), v.end());
+                    rmt_EndCPUSample();
+
+                    rmt_BeginCPUSample(solve_point_edge_collision_constraints, 0);
                     xpbd::solve_point_edge_collision_constraints(particles, pecc, substep_time);
+                    rmt_EndCPUSample();
                 }
 
                 xpbd::update_velocities(particles, substep_time);

@@ -79,8 +79,6 @@ namespace xpbd
 
     void solve_distance_constraints(Particles &p, DistanceConstraints &dc, float dt)
     {
-        rmt_ScopedCPUSample(solve_distance_constraints, 0);
-
         for (size_t i = 0; i < dc.i1.size(); ++i)
         {
             size_t i1 = dc.i1[i];
@@ -199,8 +197,6 @@ namespace xpbd
 
     void solve_volume_constraints(Particles &p, VolumeConstraints &vc, float dt)
     {
-        rmt_ScopedCPUSample(solve_volume_constraints, 0);
-
         for (size_t id = 0; id < vc.indices.size(); ++id)
         {
             std::vector<size_t> &indices = vc.indices[id];
@@ -304,10 +300,8 @@ namespace xpbd
             std::max(a.b, b.b),
             std::min(a.t, b.t)};
     }
-    std::vector<AABBsOverlap> create_aabbs_intersections(const std::vector<AABB> &aabbs)
+    std::vector<AABBsOverlap> create_aabbs_overlaps(const std::vector<AABB> &aabbs)
     {
-        rmt_ScopedCPUSample(create_aabbs_intersections, 0);
-
         std::vector<AABBsOverlap> out;
 
         std::vector<std::pair<AABB, size_t>> indexed;
@@ -338,10 +332,8 @@ namespace xpbd
 
         return out;
     }
-    std::vector<AABBsOverlap> create_aabbs_intersections(const std::vector<AABB> &aabbs1, const std::vector<AABB> &aabbs2)
+    std::vector<AABBsOverlap> create_aabbs_overlaps(const std::vector<AABB> &aabbs1, const std::vector<AABB> &aabbs2)
     {
-        rmt_ScopedCPUSample(2create_aabbs_intersections, 0);
-
         std::vector<AABBsOverlap> out;
 
         std::vector<std::pair<AABB, size_t>> indexed1, indexed2;
@@ -378,7 +370,6 @@ namespace xpbd
 
     bool point_in_polygon(const glm::vec2 &point, const std::vector<glm::vec2> &positions)
     {
-        // rmt_ScopedCPUSample(point_in_polygon, 0);
         int windingNumber = 0;
         const size_t n = positions.size();
 
@@ -406,7 +397,6 @@ namespace xpbd
         const std::vector<size_t> &pointIndices,
         const std::vector<size_t> &polygonIndices)
     {
-        // rmt_ScopedCPUSample(get_point_edge_collisions_of_points_inside_polygon, 0);
         std::vector<PointEdgeCollision> out;
         out.reserve(pointIndices.size());
 
@@ -469,9 +459,7 @@ namespace xpbd
     }
     std::vector<PointEdgeCollisionConstraints> get_point_edge_collision_constraints_of_point_to_polygon_colliders(
         Particles &p,
-        const ColliderPoints &pointColliders,
-        const ColliderPoints &polygonColliders,
-        const AABBsOverlap &overlap)
+        const PointPolygonCollision &collision)
     {
         std::vector<PointEdgeCollisionConstraints> pecc;
         // draw overlap intersection box
@@ -479,48 +467,20 @@ namespace xpbd
         // renderer::set_color(sf::Color::White);
         // renderer::draw_axis_aligned_bounding_box(b.l, b.r, b.b, b.t);
 
-        if (overlap.i1 >= pointColliders.indices.size() || overlap.i2 >= polygonColliders.indices.size())
-        {
-            printf("Error point to polygon collision detection. ///if (overlap.i1 >= pointColliders.indices.size() || overlap.i2 >= polygonColliders.indices.size())\n");
-            return pecc;
-        }
-
-        const std::vector<size_t> &polygonIndices = polygonColliders.indices[overlap.i2];
-
-        if (polygonIndices.size() < 3)
-        {
-            printf("Error point to polygon collision detection. ///if (polygonIndices.size() < 3)\n");
-            return pecc;
-        }
-
         std::vector<size_t> filteredPointIndices;
-        filteredPointIndices.reserve(pointColliders.indices[overlap.i1].size());
-        for (auto i : pointColliders.indices[overlap.i1])
-            if (point_in_aabb(p.pos[i], overlap.box))
+        filteredPointIndices.reserve(collision.points.size());
+        for (auto i : collision.points)
+            if (point_in_aabb(p.pos[i], collision.box))
                 filteredPointIndices.push_back(i);
 
         if (filteredPointIndices.empty())
             return pecc;
 
-        float avgStaticFriction = (pointColliders.staticFriction[overlap.i1] + polygonColliders.staticFriction[overlap.i2]) * 0.5f;
-        float avgKineticFriction = (pointColliders.kineticFriction[overlap.i1] + polygonColliders.kineticFriction[overlap.i2]) * 0.5f;
-        float avgCompliance = (pointColliders.compliance[overlap.i1] + polygonColliders.compliance[overlap.i2]) * 0.5f;
-
-        std::vector<PointEdgeCollision> detections = get_point_edge_collisions_of_points_inside_polygon(p, filteredPointIndices, polygonIndices);
+        std::vector<PointEdgeCollision> detections = get_point_edge_collisions_of_points_inside_polygon(p, filteredPointIndices, collision.polygon);
 
         pecc.reserve(detections.size());
         for (const auto &c : detections)
-            pecc.push_back({c.point, c.edge1, c.edge2, avgStaticFriction, avgKineticFriction, avgCompliance, 0.0f});
-        return pecc;
-    }
-    std::vector<PointEdgeCollisionConstraints> get_point_edge_collision_constraints_of_polygon_to_polygon_colliders(
-        Particles &p,
-        const ColliderPoints &polygonColliders,
-        const AABBsOverlap &overlap)
-    {
-        std::vector<PointEdgeCollisionConstraints> pecc = get_point_edge_collision_constraints_of_point_to_polygon_colliders(p, polygonColliders, polygonColliders, overlap);
-        std::vector<PointEdgeCollisionConstraints> insert = get_point_edge_collision_constraints_of_point_to_polygon_colliders(p, polygonColliders, polygonColliders, {overlap.i2, overlap.i1, overlap.box});
-        pecc.insert(pecc.end(), insert.begin(), insert.end());
+            pecc.push_back({c.point, c.edge1, c.edge2, collision.staticFriction, collision.kineticFriction, collision.compliance, 0.0f});
         return pecc;
     }
 
@@ -529,8 +489,6 @@ namespace xpbd
         std::vector<PointEdgeCollisionConstraints> &pecc,
         float dt)
     {
-        rmt_ScopedCPUSample(solve_point_edge_collision_constraints, 0);
-
         for (size_t i = 0; i < pecc.size(); ++i)
         {
             size_t i_p = pecc[i].point;

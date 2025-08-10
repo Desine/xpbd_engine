@@ -52,6 +52,15 @@ namespace xpbd
         size_t edge1;
         size_t edge2;
     };
+    struct PointPolygonCollision
+    {
+        std::vector<size_t> points;
+        std::vector<size_t> polygon;
+        float staticFriction;
+        float kineticFriction;
+        float compliance;
+        AABB box;
+    };
     struct PointEdgeCollisionConstraints
     {
         size_t point;
@@ -88,11 +97,10 @@ namespace xpbd
     void add_point_collider(xpbd::ColliderPoints &pc, std::vector<size_t> indices, float staticFriction, float kineticFriction, float compliance);
 
     std::vector<AABB> generate_particles_aabbs(const Particles &p, const std::vector<std::vector<size_t>> particles_ids);
-    std::vector<AABBsOverlap> create_aabbs_intersections(const std::vector<AABB> &aabbs);
-    std::vector<AABBsOverlap> create_aabbs_intersections(const std::vector<AABB> &aabbs1, const std::vector<AABB> &aabbs2);
+    std::vector<AABBsOverlap> create_aabbs_overlaps(const std::vector<AABB> &aabbs);
+    std::vector<AABBsOverlap> create_aabbs_overlaps(const std::vector<AABB> &aabbs1, const std::vector<AABB> &aabbs2);
 
-    std::vector<PointEdgeCollisionConstraints> get_point_edge_collision_constraints_of_polygon_to_polygon_colliders(Particles &p, const ColliderPoints &pc, const AABBsOverlap &overlap);
-    std::vector<PointEdgeCollisionConstraints> get_point_edge_collision_constraints_of_point_to_polygon_colliders(Particles &p, const ColliderPoints &pointColliders, const ColliderPoints &polygonColliders, const AABBsOverlap &overlap);
+    std::vector<PointEdgeCollisionConstraints> get_point_edge_collision_constraints_of_point_to_polygon_colliders(Particles &p, const PointPolygonCollision &collision);
     void solve_point_edge_collision_constraints(Particles &p, std::vector<PointEdgeCollisionConstraints> &pecc, float dt);
     void apply_point_edge_collision_constraints_kinetic_friction(Particles &p, const std::vector<PointEdgeCollisionConstraints> &pecc, float dt);
 }
