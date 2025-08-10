@@ -100,7 +100,7 @@ namespace xpbd
     std::vector<AABBsOverlap> create_aabbs_overlaps(const std::vector<AABB> &aabbs);
     std::vector<AABBsOverlap> create_aabbs_overlaps(const std::vector<AABB> &aabbs1, const std::vector<AABB> &aabbs2);
 
-    std::vector<PointEdgeCollisionConstraints> get_point_edge_collision_constraints_of_point_to_polygon_colliders(Particles &p, const PointPolygonCollision &collision);
+    std::vector<PointEdgeCollisionConstraints> get_point_edge_collision_constraints_of_point_to_polygon_colliders(const Particles &p, const PointPolygonCollision &collision);
     void solve_point_edge_collision_constraints(Particles &p, std::vector<PointEdgeCollisionConstraints> &pecc, float dt);
     void apply_point_edge_collision_constraints_kinetic_friction(Particles &p, const std::vector<PointEdgeCollisionConstraints> &pecc, float dt);
 }

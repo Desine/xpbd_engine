@@ -64,10 +64,14 @@ void draw_point_edge_collision_constraints(xpbd::Particles p, std::vector<xpbd::
 
 int main()
 {
+    renderer::setup_window();
+    renderer::setup_view();
+    renderer::setup_imgui();
+
     rmtSettings *settings = rmt_Settings();
-    settings->port = 17817; // default 17815
+    settings->port = 17815; // default 17815
     Remotery *rmt;
-    rmt_CreateGlobalInstance(&rmt);
+    // rmt_CreateGlobalInstance(&rmt);
 
     size_t substeps = 10;
     size_t iterations = 1;
@@ -84,21 +88,9 @@ int main()
     xpbd::ColliderPoints polygonColliders;
     xpbd::ColliderPoints pointColliders;
 
-    json_body_loader::load("2boxes", particles, distanceConstraints, volumeConstraints, polygonColliders, pointColliders);
-
-    add_poligon(particles, distanceConstraints, volumeConstraints, polygonColliders, {300, 300}, 70, 5, 5, 0.001f);
-
     json_body_loader::load("ground", particles, distanceConstraints, volumeConstraints, polygonColliders, pointColliders);
-    json_body_loader::load("square", particles, distanceConstraints, volumeConstraints, polygonColliders, pointColliders, {0, 400});
-
-    json_body_loader::load("balloon", particles, distanceConstraints, volumeConstraints, polygonColliders, pointColliders, {-150, 700});
-
-    renderer::setup_window();
-    renderer::setup_view();
-    renderer::setup_imgui();
 
     sf::Vector2i mouseDrag;
-
     sf::Clock clock;
     while (renderer::window.isOpen())
     {
@@ -136,13 +128,19 @@ int main()
             }
 
             // spawn
-            if (event.type == sf::Event::MouseButtonReleased && event.mouseButton.button == sf::Mouse::Left)
+            if (event.type == sf::Event::KeyReleased)
             {
                 sf::Vector2i pixelPos = sf::Mouse::getPosition(renderer::window);
                 sf::Vector2f worldPos = renderer::window.mapPixelToCoords(pixelPos);
                 glm::vec2 position(worldPos.x, worldPos.y);
-                json_body_loader::load("balloon", particles, distanceConstraints, volumeConstraints, polygonColliders, pointColliders, position);
-                // add_poligon(particles, distanceConstraints, volumeConstraints, polygonColliders, position, 40, 6, 3, 0.005f);
+                if (event.key.code == sf::Keyboard::A)
+                    json_body_loader::load("2boxes", particles, distanceConstraints, volumeConstraints, polygonColliders, pointColliders, position);
+                if (event.key.code == sf::Keyboard::S)
+                    json_body_loader::load("square", particles, distanceConstraints, volumeConstraints, polygonColliders, pointColliders, position);
+                if (event.key.code == sf::Keyboard::D)
+                    json_body_loader::load("balloon", particles, distanceConstraints, volumeConstraints, polygonColliders, pointColliders, position);
+                if (event.key.code == sf::Keyboard::F)
+                    add_poligon(particles, distanceConstraints, volumeConstraints, polygonColliders, position, 40, 6, 3, 0.005f);
             }
         }
 
@@ -166,6 +164,27 @@ int main()
         ImGui::End();
         ImGui::EndFrame();
 
+        renderer::set_color(sf::Color::Red);
+        for (auto p : particles.pos)
+            renderer::draw_circle(p, 3);
+
+        for (size_t i = 0; i < distanceConstraints.i1.size(); ++i)
+            renderer::draw_line(particles.pos[distanceConstraints.i1[i]], particles.pos[distanceConstraints.i2[i]]);
+
+        renderer::set_color(sf::Color::Green);
+        for (size_t i = 0; i < polygonColliders.indices.size(); ++i)
+        {
+            std::vector<glm::vec2> points;
+
+            for (auto id : polygonColliders.indices[i])
+                points.push_back(particles.pos[id]);
+
+            renderer::draw_segmented_loop(points);
+        }
+
+        ImGui::SFML::Render(renderer::window);
+        renderer::window.display();
+
         float substep_time = deltaTick * timeScale / substeps;
         while (!paused && xpbd::should_tick(sec, deltaTick))
         {
@@ -185,7 +204,6 @@ int main()
                     xpbd::solve_volume_constraints(particles, volumeConstraints, substep_time);
                     rmt_EndCPUSample();
 
-                    std::vector<xpbd::PointEdgeCollisionConstraints> pecc;
                     rmt_BeginCPUSample(aabbs_overlaps, 0);
                     // polygon/polygon
                     std::vector<xpbd::AABB> aabbs_polygons = xpbd::generate_particles_aabbs(particles, polygonColliders.indices);
@@ -200,11 +218,6 @@ int main()
 
                     for (auto o : aabbs_polygon_polygon_overlaps)
                     {
-                        if (o.i1 >= polygonColliders.indices.size() && o.i2 >= polygonColliders.indices.size())
-                        {
-                            printf("Error collision detection, polygon/polygon. ///o.i1 >= polygonColliders.indices.size() || o.i2 >= polygonColliders.indices.size()\n");
-                            continue;
-                        }
                         float avgStaticFriction = (polygonColliders.staticFriction[o.i1] + polygonColliders.staticFriction[o.i2]) * 0.5f;
                         float avgKineticFriction = (polygonColliders.kineticFriction[o.i1] + polygonColliders.kineticFriction[o.i2]) * 0.5f;
                         float avgCompliance = (polygonColliders.compliance[o.i1] + polygonColliders.compliance[o.i2]) * 0.5f;
@@ -227,11 +240,6 @@ int main()
                     }
                     for (auto o : aabbs_point_polygon_overlaps)
                     {
-                        if (o.i1 >= pointColliders.indices.size() && o.i2 >= polygonColliders.indices.size())
-                        {
-                            printf("Error collision detection. ///o.i1 >= pointColliders.indices.size() || o.i2 >= polygonColliders.indices.size()\n");
-                            continue;
-                        }
                         float avgStaticFriction = (pointColliders.staticFriction[o.i1] + polygonColliders.staticFriction[o.i2]) * 0.5f;
                         float avgKineticFriction = (pointColliders.kineticFriction[o.i1] + polygonColliders.kineticFriction[o.i2]) * 0.5f;
                         float avgCompliance = (pointColliders.compliance[o.i1] + polygonColliders.compliance[o.i2]) * 0.5f;
@@ -244,6 +252,7 @@ int main()
                             o.box,
                         });
                     }
+                    collisions.shrink_to_fit();
 
                     rmt_BeginCPUSample(polygon_collision_detection, 0);
                     std::vector<std::vector<xpbd::PointEdgeCollisionConstraints>> pecc_local(omp_get_max_threads());
@@ -255,6 +264,12 @@ int main()
                         auto &local = pecc_local[omp_get_thread_num()];
                         local.insert(local.end(), insert.begin(), insert.end());
                     }
+
+                    std::vector<xpbd::PointEdgeCollisionConstraints> pecc;
+                    size_t total_size = 0;
+                    for (auto &v : pecc_local)
+                        total_size += v.size();
+                    pecc.reserve(total_size);
 
                     for (auto &v : pecc_local)
                         pecc.insert(pecc.end(), v.begin(), v.end());
@@ -270,27 +285,6 @@ int main()
                 // xpbd::apply_distance_constraints_damping(particles, distanceConstraints, substep_time);
             }
         }
-
-        renderer::set_color(sf::Color::Red);
-        for (auto p : particles.pos)
-            renderer::draw_circle(p, 3);
-
-        for (size_t i = 0; i < distanceConstraints.i1.size(); ++i)
-            renderer::draw_line(particles.pos[distanceConstraints.i1[i]], particles.pos[distanceConstraints.i2[i]]);
-
-        renderer::set_color(sf::Color::Green);
-        for (size_t i = 0; i < polygonColliders.indices.size(); ++i)
-        {
-            std::vector<glm::vec2> points;
-
-            for (auto id : polygonColliders.indices[i])
-                points.push_back(particles.pos[id]);
-
-            renderer::draw_segmented_loop(points);
-        }
-
-        ImGui::SFML::Render(renderer::window);
-        renderer::window.display();
     }
 
     ImGui::SFML::Shutdown();

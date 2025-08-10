@@ -458,7 +458,7 @@ namespace xpbd
                point.y >= aabb.b && point.y <= aabb.t;
     }
     std::vector<PointEdgeCollisionConstraints> get_point_edge_collision_constraints_of_point_to_polygon_colliders(
-        Particles &p,
+        const Particles &p,
         const PointPolygonCollision &collision)
     {
         std::vector<PointEdgeCollisionConstraints> pecc;
