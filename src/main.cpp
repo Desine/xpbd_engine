@@ -79,7 +79,7 @@ int main()
     float rate = 30.0f;
     float deltaTick = 1.0f / rate;
     float timeScale = 10;
-    bool paused = true;
+    bool paused = false;
     bool stepOnce = false;
     glm::vec2 gravity = {0, -9.8f};
     xpbd::Particles particles;
@@ -255,24 +255,8 @@ int main()
                     collisions.shrink_to_fit();
 
                     rmt_BeginCPUSample(polygon_collision_detection, 0);
-                    std::vector<std::vector<xpbd::PointEdgeCollisionConstraints>> pecc_local(omp_get_max_threads());
-#pragma omp parallel for
-                    for (size_t c = 0; c < collisions.size(); ++c)
-                    {
-                        auto insert = xpbd::get_point_edge_collision_constraints_of_point_to_polygon_colliders(
-                            particles, collisions[c]);
-                        auto &local = pecc_local[omp_get_thread_num()];
-                        local.insert(local.end(), insert.begin(), insert.end());
-                    }
-
-                    std::vector<xpbd::PointEdgeCollisionConstraints> pecc;
-                    size_t total_size = 0;
-                    for (auto &v : pecc_local)
-                        total_size += v.size();
-                    pecc.reserve(total_size);
-
-                    for (auto &v : pecc_local)
-                        pecc.insert(pecc.end(), v.begin(), v.end());
+                    std::vector<xpbd::PointEdgeCollisionConstraints> pecc = xpbd::get_point_edge_collision_constraints_of_point_to_polygon_colliders_parallel(
+                        particles, collisions);
                     rmt_EndCPUSample();
 
                     rmt_BeginCPUSample(solve_point_edge_collision_constraints, 0);
@@ -289,6 +273,5 @@ int main()
 
     ImGui::SFML::Shutdown();
     renderer::window.close();
-
-    rmt_DestroyGlobalInstance(rmt);
+    // rmt_DestroyGlobalInstance(rmt);
 }

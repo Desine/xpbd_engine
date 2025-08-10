@@ -2,6 +2,7 @@
 #include "utils.hpp"
 #include "cstdio"
 #include <algorithm>
+#include <omp.h>
 
 #include "renderer.hpp"
 
@@ -9,7 +10,7 @@
 
 namespace xpbd
 {
-    bool should_tick(float &sec, const float dt)
+    bool should_tick(float &sec, const float &dt)
     {
         if (sec < dt)
             return false;
@@ -17,7 +18,7 @@ namespace xpbd
         return true;
     }
 
-    void iterate(Particles &p, float dt, glm::vec2 gravity)
+    void iterate(Particles &p, const float &dt, const glm::vec2 &gravity)
     {
         for (size_t i = 0; i < p.pos.size(); ++i)
         {
@@ -30,13 +31,13 @@ namespace xpbd
         }
     }
 
-    void update_velocities(Particles &p, float dt)
+    void update_velocities(Particles &p, const float &dt)
     {
         for (size_t i = 0; i < p.pos.size(); ++i)
             p.vel[i] = (p.pos[i] - p.prev[i]) / dt;
     }
 
-    void add_particle(Particles &p, glm::vec2 pos, float mass)
+    void add_particle(Particles &p, const glm::vec2 &pos, const float &mass)
     {
         p.pos.push_back(pos);
         p.prev.push_back(pos);
@@ -44,7 +45,7 @@ namespace xpbd
         float w = mass == 0 ? 0 : 1 / mass;
         p.w.push_back(w);
     }
-    void add_particle(Particles &p, glm::vec2 pos, float mass, glm::vec2 vel)
+    void add_particle(Particles &p, const glm::vec2 &pos, const float &mass, const glm::vec2 &vel)
     {
         p.pos.push_back(pos);
         p.prev.push_back(pos);
@@ -458,7 +459,7 @@ namespace xpbd
                point.y >= aabb.b && point.y <= aabb.t;
     }
     std::vector<PointEdgeCollisionConstraints> get_point_edge_collision_constraints_of_point_to_polygon_colliders(
-        const Particles &p,
+        const Particles &particles,
         const PointPolygonCollision &collision)
     {
         std::vector<PointEdgeCollisionConstraints> pecc;
@@ -470,17 +471,42 @@ namespace xpbd
         std::vector<size_t> filteredPointIndices;
         filteredPointIndices.reserve(collision.points.size());
         for (auto i : collision.points)
-            if (point_in_aabb(p.pos[i], collision.box))
+            if (point_in_aabb(particles.pos[i], collision.box))
                 filteredPointIndices.push_back(i);
 
         if (filteredPointIndices.empty())
             return pecc;
 
-        std::vector<PointEdgeCollision> detections = get_point_edge_collisions_of_points_inside_polygon(p, filteredPointIndices, collision.polygon);
+        std::vector<PointEdgeCollision> detections = get_point_edge_collisions_of_points_inside_polygon(particles, filteredPointIndices, collision.polygon);
 
         pecc.reserve(detections.size());
         for (const auto &c : detections)
             pecc.push_back({c.point, c.edge1, c.edge2, collision.staticFriction, collision.kineticFriction, collision.compliance, 0.0f});
+        return pecc;
+    }
+
+    std::vector<PointEdgeCollisionConstraints> get_point_edge_collision_constraints_of_point_to_polygon_colliders_parallel(
+        const Particles &particles,
+        const std::vector<PointPolygonCollision> &collisions)
+    {
+        std::vector<std::vector<PointEdgeCollisionConstraints>> pecc_thread(omp_get_max_threads());
+#pragma omp parallel for
+        for (size_t c = 0; c < collisions.size(); ++c)
+        {
+            auto insert = get_point_edge_collision_constraints_of_point_to_polygon_colliders(
+                particles, collisions[c]);
+            auto &local = pecc_thread[omp_get_thread_num()];
+            local.insert(local.end(), insert.begin(), insert.end());
+        }
+
+        size_t total_size = 0;
+        for (auto &v : pecc_thread)
+            total_size += v.size();
+        std::vector<PointEdgeCollisionConstraints> pecc;
+        pecc.reserve(total_size);
+
+        for (auto &v : pecc_thread)
+            pecc.insert(pecc.end(), v.begin(), v.end());
         return pecc;
     }
 
