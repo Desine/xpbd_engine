@@ -656,4 +656,140 @@ namespace xpbd
         }
     }
 
+    // Class World
+    void World::init()
+    {
+        particles = Particles();
+        distanceConstraints = DistanceConstraints();
+        volumeConstraints = VolumeConstraints();
+        polygonColliders = ColliderPoints();
+        pointColliders = ColliderPoints();
+
+        spawnFromJson("ground", {0, 0});
+    }
+
+    void World::spawnFromJson(const std::string &name, const glm::vec2 &position)
+    {
+        json_body_loader::load(*this, name, position);
+    }
+
+    void World::addPolygon(glm::vec2 pos, float radius, size_t segments, float mass, float compliance)
+    {
+        if (segments < 3)
+            segments = 3;
+
+        size_t start = particles.pos.size();
+        size_t end = start + segments;
+        std::vector<size_t> ids;
+
+        float angleStep = 2.0f * float(M_PI) / segments;
+        for (int i = 0; i < segments; ++i)
+        {
+            float angle = i * angleStep;
+            glm::vec2 dir = glm::vec2(cosf(angle), sinf(angle));
+            add_particle(particles, dir * radius + pos, mass / segments);
+
+            ids.push_back(start + i);
+        }
+
+        for (int i = 0; i < segments; ++i)
+            add_distance_constraint_auto_restDist(distanceConstraints, start + i, start + (i + 1) % segments, compliance, particles);
+
+        add_volume_constraint(particles, volumeConstraints, ids, compliance);
+
+        add_polygon_collider(polygonColliders, ids, 0.4f, 0.3f, compliance);
+    }
+
+    void World::update(float realDelta)
+    {
+        if (!paused)
+            sec += realDelta;
+
+        float substep_time = deltaTick * timeScale / substeps;
+        while (!paused && should_tick(sec, deltaTick))
+        {
+            for (size_t s = 0; s < substeps; s++)
+            {
+                iterate(particles, substep_time, gravity);
+
+                reset_constraints_lambdas(distanceConstraints.lambda);
+                reset_constraints_lambdas(volumeConstraints.lambda);
+
+                for (size_t i = 0; i < iterations; i++)
+                {
+                    rmt_BeginCPUSample(solve_distance_constraints, 0);
+                    solve_distance_constraints(particles, distanceConstraints, substep_time);
+                    rmt_EndCPUSample();
+                    rmt_BeginCPUSample(solve_volume_constraints, 0);
+                    solve_volume_constraints(particles, volumeConstraints, substep_time);
+                    rmt_EndCPUSample();
+
+                    rmt_BeginCPUSample(aabbs_overlaps, 0);
+                    // polygon/polygon
+                    std::vector<AABB> aabbs_polygons = generate_particles_aabbs(particles, polygonColliders.indices);
+                    std::vector<AABBsOverlap> aabbs_polygon_polygon_overlaps = create_aabbs_overlaps(aabbs_polygons);
+                    // point/polygon
+                    std::vector<AABB> aabbs_points = generate_particles_aabbs(particles, pointColliders.indices);
+                    std::vector<AABBsOverlap> aabbs_point_polygon_overlaps = create_aabbs_overlaps(aabbs_points, aabbs_polygons);
+                    rmt_EndCPUSample();
+
+                    std::vector<PointPolygonCollision> collisions;
+                    collisions.reserve(aabbs_polygon_polygon_overlaps.size() * 2 + aabbs_point_polygon_overlaps.size());
+
+                    for (auto o : aabbs_polygon_polygon_overlaps)
+                    {
+                        float avgStaticFriction = (polygonColliders.staticFriction[o.i1] + polygonColliders.staticFriction[o.i2]) * 0.5f;
+                        float avgKineticFriction = (polygonColliders.kineticFriction[o.i1] + polygonColliders.kineticFriction[o.i2]) * 0.5f;
+                        float avgCompliance = (polygonColliders.compliance[o.i1] + polygonColliders.compliance[o.i2]) * 0.5f;
+                        collisions.push_back({
+                            polygonColliders.indices[o.i1],
+                            polygonColliders.indices[o.i2],
+                            avgStaticFriction,
+                            avgKineticFriction,
+                            avgCompliance,
+                            o.box,
+                        });
+                        collisions.push_back({
+                            polygonColliders.indices[o.i2],
+                            polygonColliders.indices[o.i1],
+                            avgStaticFriction,
+                            avgKineticFriction,
+                            avgCompliance,
+                            o.box,
+                        });
+                    }
+                    for (auto o : aabbs_point_polygon_overlaps)
+                    {
+                        float avgStaticFriction = (pointColliders.staticFriction[o.i1] + polygonColliders.staticFriction[o.i2]) * 0.5f;
+                        float avgKineticFriction = (pointColliders.kineticFriction[o.i1] + polygonColliders.kineticFriction[o.i2]) * 0.5f;
+                        float avgCompliance = (pointColliders.compliance[o.i1] + polygonColliders.compliance[o.i2]) * 0.5f;
+                        collisions.push_back({
+                            pointColliders.indices[o.i1],
+                            polygonColliders.indices[o.i2],
+                            avgStaticFriction,
+                            avgKineticFriction,
+                            avgCompliance,
+                            o.box,
+                        });
+                    }
+
+                    this->collisions = collisions;
+
+                    rmt_BeginCPUSample(polygon_collision_detection, 0);
+                    std::vector<PointEdgeCollisionConstraints> pecc = get_point_edge_collision_constraints_of_point_to_polygon_colliders_parallel(
+                        particles, collisions);
+                    rmt_EndCPUSample();
+
+                    rmt_BeginCPUSample(solve_point_edge_collision_constraints, 0);
+                    solve_point_edge_collision_constraints(particles, pecc, substep_time);
+                    rmt_EndCPUSample();
+                }
+
+                update_velocities(particles, substep_time);
+                // apply_point_edge_collision_constraints_kinetic_friction(particles, pecc, substep_time);
+                // apply_distance_constraints_damping(particles, distanceConstraints, substep_time);
+            }
+        }
+    }
+
 }

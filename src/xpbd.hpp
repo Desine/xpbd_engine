@@ -1,11 +1,16 @@
+#ifndef define_xpbd
+#define define_xpbd
 #include "glm/glm.hpp"
 #include <vector>
 #include <stdio.h>
+#include <string>
+
+#include "json_body_loader.hpp"
+
+#include "Remotery.h"
 
 namespace xpbd
 {
-#ifndef xpbd_define
-#define xpbd_define
     struct Particles
     {
         std::vector<glm::vec2> pos;
@@ -71,7 +76,31 @@ namespace xpbd
         float compliance;
         float lambda;
     };
-#endif // xpbd_define
+
+    class World
+    {
+    public:
+        size_t substeps = 10;
+        size_t iterations = 1;
+        glm::vec2 gravity = {0, -9.8f};
+        float timeScale = 10.f;
+        float deltaTick = 1.f / 30.f;
+        float sec = 0.0f;
+        bool paused = false;
+        bool stepOnce = false;
+
+        Particles particles;
+        DistanceConstraints distanceConstraints;
+        VolumeConstraints volumeConstraints;
+        ColliderPoints polygonColliders;
+        ColliderPoints pointColliders;
+        std::vector<PointPolygonCollision> collisions;
+
+        void init();
+        void spawnFromJson(const std::string &name, const glm::vec2 &position);
+        void addPolygon(glm::vec2 pos, float radius, size_t segments, float mass, float compliance);
+        void update(float realDelta);
+    };
 
     bool should_tick(float &sec, const float &dt);
     void iterate(Particles &p, const float &dt, const glm::vec2 &gravity);
@@ -93,8 +122,8 @@ namespace xpbd
     void add_volume_constraint(Particles &p, VolumeConstraints &vc, std::vector<size_t> indices, float compliance, float restPressure);
     void solve_volume_constraints(Particles &p, VolumeConstraints &vc, float dt);
 
-    void add_polygon_collider(xpbd::ColliderPoints &cc, std::vector<size_t> indices, float staticFriction, float kineticFriction, float compliance);
-    void add_point_collider(xpbd::ColliderPoints &pc, std::vector<size_t> indices, float staticFriction, float kineticFriction, float compliance);
+    void add_polygon_collider(ColliderPoints &cc, std::vector<size_t> indices, float staticFriction, float kineticFriction, float compliance);
+    void add_point_collider(ColliderPoints &pc, std::vector<size_t> indices, float staticFriction, float kineticFriction, float compliance);
 
     std::vector<AABB> generate_particles_aabbs(const Particles &p, const std::vector<std::vector<size_t>> particles_ids);
     std::vector<AABBsOverlap> create_aabbs_overlaps(const std::vector<AABB> &aabbs);
@@ -105,3 +134,4 @@ namespace xpbd
     void solve_point_edge_collision_constraints(Particles &p, std::vector<PointEdgeCollisionConstraints> &pecc, float dt);
     void apply_point_edge_collision_constraints_kinetic_friction(Particles &p, const std::vector<PointEdgeCollisionConstraints> &pecc, float dt);
 }
+#endif // define_xpbd
