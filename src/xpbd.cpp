@@ -3,14 +3,14 @@
 #include "cstdio"
 #include <algorithm>
 #include <omp.h>
-
+#include <thread>
 #include "renderer.hpp"
 
 #include "Remotery.h"
 
 namespace xpbd
 {
-    bool should_tick(float &sec, const float &dt)
+    bool should_tick(float &sec, float dt)
     {
         if (sec < dt)
             return false;
@@ -18,7 +18,7 @@ namespace xpbd
         return true;
     }
 
-    void iterate(Particles &p, const float &dt, const glm::vec2 &gravity)
+    void iterate(Particles &p, float dt, const glm::vec2 &gravity)
     {
         for (size_t i = 0; i < p.pos.size(); ++i)
         {
@@ -31,13 +31,13 @@ namespace xpbd
         }
     }
 
-    void update_velocities(Particles &p, const float &dt)
+    void update_velocities(Particles &p, float dt)
     {
         for (size_t i = 0; i < p.pos.size(); ++i)
             p.vel[i] = (p.pos[i] - p.prev[i]) / dt;
     }
 
-    void add_particle(Particles &p, const glm::vec2 &pos, const float &mass)
+    void add_particle(Particles &p, const glm::vec2 &pos, float mass)
     {
         p.pos.push_back(pos);
         p.prev.push_back(pos);
@@ -45,7 +45,7 @@ namespace xpbd
         float w = mass == 0 ? 0 : 1 / mass;
         p.w.push_back(w);
     }
-    void add_particle(Particles &p, const glm::vec2 &pos, const float &mass, const glm::vec2 &vel)
+    void add_particle(Particles &p, const glm::vec2 &pos, float mass, const glm::vec2 &vel)
     {
         p.pos.push_back(pos);
         p.prev.push_back(pos);
@@ -54,76 +54,76 @@ namespace xpbd
         p.w.push_back(w);
     }
 
-    void add_distance_constraint(DistanceConstraints &dc, size_t i1, size_t i2, float compliance, float restDist)
+    void reset_distance_constraints_lambdas(std::vector<DistanceConstraint> &dc)
     {
-        dc.i1.push_back(i1);
-        dc.i2.push_back(i2);
-        dc.restDist.push_back(restDist);
-        dc.compliance.push_back(compliance);
-        dc.lambda.push_back(0);
-
-        dc.compressionDamping.push_back(0.1f);
-        dc.extensionDamping.push_back(0.9f);
+        for (auto &c : dc)
+            c.lambda = 0;
     }
-    void add_distance_constraint_auto_restDist(DistanceConstraints &dc, size_t i1, size_t i2, float compliance, Particles &p)
+    void reset_volume_constraints_lambdas(std::vector<VolumeConstraint> &vc)
     {
-        dc.i1.push_back(i1);
-        dc.i2.push_back(i2);
-        float restDist = glm::distance(p.pos[i1], p.pos[i2]);
-        dc.restDist.push_back(restDist);
-        dc.compliance.push_back(compliance);
-        dc.lambda.push_back(0);
-
-        dc.compressionDamping.push_back(0.5f);
-        dc.extensionDamping.push_back(0.5f);
+        for (auto &c : vc)
+            c.lambda = 0;
     }
 
-    void solve_distance_constraints(Particles &p, DistanceConstraints &dc, float dt)
+    void add_distance_constraint(std::vector<DistanceConstraint> &dc, size_t i1, size_t i2, float compliance, float restDist)
     {
-        for (size_t i = 0; i < dc.i1.size(); ++i)
+        const float compressionDamping = 0.5f;
+        const float extensionDamping = 0.5f;
+        dc.push_back({i1, i2, restDist, compressionDamping, extensionDamping, compliance, 0});
+    }
+    void add_distance_constraint_auto_restDist(std::vector<DistanceConstraint> &dc, size_t i1, size_t i2, float compliance, Particles &p)
+    {
+        const float restDist = glm::distance(p.pos[i1], p.pos[i2]);
+        const float compressionDamping = 0.5f;
+        const float extensionDamping = 0.5f;
+        dc.push_back({i1, i2, restDist, compressionDamping, extensionDamping, compliance, 0});
+    }
+
+    void solve_distance_constraint(Particles &p, DistanceConstraint &dc, float dt)
+    {
+        size_t i1 = dc.i1;
+        size_t i2 = dc.i2;
+
+        glm::vec2 &p1 = p.pos[i1];
+        glm::vec2 &p2 = p.pos[i2];
+
+        float w1 = p.w[i1];
+        float w2 = p.w[i2];
+
+        glm::vec2 delta = p1 - p2;
+        float len = glm::length(delta);
+        if (len < 1e-6f)
+            return;
+
+        float C = len - dc.restDist;
+        glm::vec2 grad = delta / len;
+
+        float alphaTilde = dc.compliance / (dt * dt);
+        float denom = w1 + w2 + alphaTilde;
+        if (denom < 1e-6f)
+            return;
+
+        float deltaLambda = (-C - alphaTilde * dc.lambda) / denom;
+        dc.lambda += deltaLambda;
+
+        glm::vec2 correction = deltaLambda * grad;
+        p1 += w1 * correction;
+        p2 -= w2 * correction;
+    }
+    void solve_distance_constraints(Particles &p, std::vector<DistanceConstraint> &dc, float dt)
+    {
+        for (size_t i = 0; i < dc.size(); ++i)
         {
-            size_t i1 = dc.i1[i];
-            size_t i2 = dc.i2[i];
-            if (i1 >= p.pos.size() || i2 >= p.pos.size())
-            {
-                printf("Warning: Invalid distance constraint indices %d or %d, max index %d\n", i1, i2, p.pos.size() - 1);
-                continue;
-            }
-
-            glm::vec2 &p1 = p.pos[i1];
-            glm::vec2 &p2 = p.pos[i2];
-
-            float w1 = p.w[i1];
-            float w2 = p.w[i2];
-
-            glm::vec2 delta = p1 - p2;
-            float len = glm::length(delta);
-            if (len < 1e-6f)
-                continue;
-
-            float C = len - dc.restDist[i];
-            glm::vec2 grad = delta / len;
-
-            float alphaTilde = dc.compliance[i] / (dt * dt);
-            float denom = w1 + w2 + alphaTilde;
-            if (denom < 1e-6f)
-                continue;
-
-            float deltaLambda = (-C - alphaTilde * dc.lambda[i]) / denom;
-            dc.lambda[i] += deltaLambda;
-
-            glm::vec2 correction = deltaLambda * grad;
-            p1 += w1 * correction;
-            p2 -= w2 * correction;
+            solve_distance_constraint(p, dc[i], dt);
         }
     }
-    void apply_distance_constraints_damping(Particles &p, DistanceConstraints &dc, float dt)
+    void apply_distance_constraints_damping(Particles &p, std::vector<DistanceConstraint> &dc, float dt)
     {
         // does not work
-        for (size_t i = 0; i < dc.i1.size(); ++i)
+        for (size_t i = 0; i < dc.size(); ++i)
         {
-            size_t i1 = dc.i1[i];
-            size_t i2 = dc.i2[i];
+            size_t i1 = dc[i].i1;
+            size_t i2 = dc[i].i2;
             if (i1 >= p.pos.size() || i2 >= p.pos.size())
                 continue;
 
@@ -133,11 +133,11 @@ namespace xpbd
                 continue;
 
             glm::vec2 dir = delta / len;
-            float rest = dc.restDist[i];
+            float rest = dc[i].restDist;
             float C = len - rest;
 
-            float w1 = p.w[i1];
-            float w2 = p.w[i2];
+            float w1 = p.w[i];
+            float w2 = p.w[i];
             float wSum = w1 + w2;
             if (wSum < 1e-6f)
                 continue;
@@ -145,7 +145,7 @@ namespace xpbd
             glm::vec2 relVel = p.vel[i1] - p.vel[i2];
             float relVelAlongConstraint = glm::dot(relVel, dir);
 
-            float damping = (C < 0.0f) ? dc.compressionDamping[i] : dc.extensionDamping[i];
+            float damping = (C < 0.0f) ? dc[i].compressionDamping : dc[i].extensionDamping;
 
             float impulseMag = -damping * relVelAlongConstraint;
             glm::vec2 impulse = impulseMag * dir;
@@ -167,10 +167,10 @@ namespace xpbd
         }
         return 0.5f * area;
     }
-    float compute_polygon_area(const Particles &p, std::vector<size_t> &indices)
+    float compute_polygon_area(const Particles &p, const std::vector<size_t> &indices)
     {
         float area = 0.0f;
-        const size_t n = indices.size();
+        size_t n = indices.size();
         for (size_t i = 0, j = n - 1; i < n; j = i++)
         {
             const glm::vec2 &p0 = p.pos[indices[j]];
@@ -180,69 +180,65 @@ namespace xpbd
         return 0.5f * area;
     }
 
-    void add_volume_constraint(Particles &p, VolumeConstraints &vc, std::vector<size_t> indices, float compliance)
+    void add_volume_constraint(Particles &p, std::vector<VolumeConstraint> &vc, const std::vector<size_t> &indices, float compliance)
     {
-        vc.indices.push_back(indices);
-        vc.restVolume.push_back(compute_polygon_area(p, indices));
-        vc.compliance.push_back(compliance);
-        vc.lambda.push_back(0);
+        float restVolume = compute_polygon_area(p, indices);
+        vc.push_back({indices, restVolume, compliance, 0});
     }
 
-    void add_volume_constraint(Particles &p, VolumeConstraints &vc, std::vector<size_t> indices, float compliance, float restPressure)
+    void add_volume_constraint(Particles &p, std::vector<VolumeConstraint> &vc, const std::vector<size_t> &indices, float compliance, float restPressure)
     {
-        vc.indices.push_back(indices);
-        vc.restVolume.push_back(compute_polygon_area(p, indices) * restPressure);
-        vc.compliance.push_back(compliance);
-        vc.lambda.push_back(0);
+        float restVolume = compute_polygon_area(p, indices);
+        vc.push_back({indices, restVolume * restPressure, compliance, 0});
     }
 
-    void solve_volume_constraints(Particles &p, VolumeConstraints &vc, float dt)
+    void solve_volume_constraint(Particles &p, VolumeConstraint &vc, float dt)
     {
-        for (size_t id = 0; id < vc.indices.size(); ++id)
+        std::vector<size_t> &indices = vc.indices;
+        size_t N = indices.size();
+
+        float volume = compute_polygon_area(p, indices);
+        float C = volume - vc.restVolume;
+
+        float denom = 0.0f;
+        std::vector<glm::vec2> grads(N);
+
+        for (size_t i = 0; i < N; ++i)
         {
-            std::vector<size_t> &indices = vc.indices[id];
-            size_t N = indices.size();
+            const glm::vec2 &pi_prev = p.pos[indices[(i + N - 1) % N]];
+            const glm::vec2 &pi_next = p.pos[indices[(i + 1) % N]];
 
-            float volume = compute_polygon_area(p, indices);
-            float C = volume - vc.restVolume[id];
+            glm::vec2 grad = 0.5f * utils::perp_2d(pi_next, pi_prev);
+            grads[i] = grad;
 
-            float denom = 0.0f;
-            std::vector<glm::vec2> grads(N);
+            float wi = p.w[indices[i]];
+            denom += wi * glm::dot(grad, grad);
+        }
 
-            for (size_t i = 0; i < N; ++i)
-            {
-                const glm::vec2 &pi_prev = p.pos[indices[(i + N - 1) % N]];
-                const glm::vec2 &pi_next = p.pos[indices[(i + 1) % N]];
+        float alphaTilde = vc.compliance / (dt * dt);
+        denom += alphaTilde;
 
-                glm::vec2 grad = 0.5f * utils::perp_2d(pi_next, pi_prev);
-                grads[i] = grad;
+        if (denom < 1e-6f)
+            return;
 
-                float wi = p.w[indices[i]];
-                denom += wi * glm::dot(grad, grad);
-            }
+        float deltaLambda = (-C - alphaTilde * vc.lambda) / denom;
+        vc.lambda += deltaLambda;
 
-            float alphaTilde = vc.compliance[id] / (dt * dt);
-            denom += alphaTilde;
+        for (size_t i = 0; i < N; ++i)
+        {
+            uint32_t idx = indices[i];
+            float wi = p.w[idx];
 
-            if (denom < 1e-6f)
-                continue;
-
-            float deltaLambda = (-C - alphaTilde * vc.lambda[id]) / denom;
-            vc.lambda[id] += deltaLambda;
-
-            for (size_t i = 0; i < N; ++i)
-            {
-                uint32_t idx = indices[i];
-                float wi = p.w[idx];
-
-                p.pos[idx] += wi * deltaLambda * grads[i];
-            }
+            p.pos[idx] += wi * deltaLambda * grads[i];
         }
     }
 
-    void reset_constraints_lambdas(std::vector<float> &lambdas)
+    void solve_volume_constraints(Particles &p, std::vector<VolumeConstraint> &vc, float dt)
     {
-        std::fill(lambdas.begin(), lambdas.end(), 0.0f);
+        for (size_t i = 0; i < vc.size(); ++i)
+        {
+            solve_volume_constraint(p, vc[i], dt);
+        }
     }
 
     std::vector<AABB> generate_particles_aabbs(const Particles &particles, const std::vector<std::vector<size_t>> indices)
@@ -485,20 +481,20 @@ namespace xpbd
         return pecc;
     }
 
-    std::vector<PointEdgeCollisionConstraints> get_point_edge_collision_constraints_of_point_to_polygon_colliders_parallel(
+    std::vector<PointEdgeCollisionConstraints> get_point_edge_collision_constraints_of_point_to_polygon_colliders(
         const Particles &particles,
         const std::vector<PointPolygonCollision> &collisions)
     {
         std::vector<std::vector<PointEdgeCollisionConstraints>> pecc_thread(omp_get_max_threads());
+        size_t collisions_size = collisions.size();
 #pragma omp parallel for
-        for (size_t c = 0; c < collisions.size(); ++c)
+        for (size_t c = 0; c < collisions_size; ++c)
         {
             auto insert = get_point_edge_collision_constraints_of_point_to_polygon_colliders(
                 particles, collisions[c]);
             auto &local = pecc_thread[omp_get_thread_num()];
             local.insert(local.end(), insert.begin(), insert.end());
         }
-
         size_t total_size = 0;
         for (auto &v : pecc_thread)
             total_size += v.size();
@@ -660,8 +656,8 @@ namespace xpbd
     void World::init()
     {
         particles = Particles();
-        distanceConstraints = DistanceConstraints();
-        volumeConstraints = VolumeConstraints();
+        distanceConstraints.clear();
+        volumeConstraints.clear();
         polygonColliders = ColliderPoints();
         pointColliders = ColliderPoints();
 
@@ -697,23 +693,34 @@ namespace xpbd
 
         add_volume_constraint(particles, volumeConstraints, ids, compliance);
 
-        add_polygon_collider(polygonColliders, ids, 0.4f, 0.3f, compliance);
+        float staticFriction = 0.4f;
+        float kineticFriction = 0.3f;
+        add_polygon_collider(polygonColliders, ids, staticFriction, kineticFriction, compliance);
+    }
+
+    void World::reset_constraints_lambdas()
+    {
+        reset_distance_constraints_lambdas(distanceConstraints);
+        reset_volume_constraints_lambdas(volumeConstraints);
     }
 
     void World::update(float realDelta)
     {
-        if (!paused)
-            sec += realDelta;
+        if (paused)
+            return;
+
+        sec += realDelta;
+        if (sec > 3 * deltaTick)
+            sec = 0;
 
         float substep_time = deltaTick * timeScale / substeps;
-        while (!paused && should_tick(sec, deltaTick))
+        while (should_tick(sec, deltaTick))
         {
             for (size_t s = 0; s < substeps; s++)
             {
                 iterate(particles, substep_time, gravity);
 
-                reset_constraints_lambdas(distanceConstraints.lambda);
-                reset_constraints_lambdas(volumeConstraints.lambda);
+                reset_constraints_lambdas();
 
                 for (size_t i = 0; i < iterations; i++)
                 {
@@ -736,7 +743,7 @@ namespace xpbd
                     std::vector<PointPolygonCollision> collisions;
                     collisions.reserve(aabbs_polygon_polygon_overlaps.size() * 2 + aabbs_point_polygon_overlaps.size());
 
-                    for (auto o : aabbs_polygon_polygon_overlaps)
+                    for (auto &o : aabbs_polygon_polygon_overlaps)
                     {
                         float avgStaticFriction = (polygonColliders.staticFriction[o.i1] + polygonColliders.staticFriction[o.i2]) * 0.5f;
                         float avgKineticFriction = (polygonColliders.kineticFriction[o.i1] + polygonColliders.kineticFriction[o.i2]) * 0.5f;
@@ -758,7 +765,7 @@ namespace xpbd
                             o.box,
                         });
                     }
-                    for (auto o : aabbs_point_polygon_overlaps)
+                    for (auto &o : aabbs_point_polygon_overlaps)
                     {
                         float avgStaticFriction = (pointColliders.staticFriction[o.i1] + polygonColliders.staticFriction[o.i2]) * 0.5f;
                         float avgKineticFriction = (pointColliders.kineticFriction[o.i1] + polygonColliders.kineticFriction[o.i2]) * 0.5f;
@@ -773,12 +780,11 @@ namespace xpbd
                         });
                     }
 
-                    this->collisions = collisions;
-
                     rmt_BeginCPUSample(polygon_collision_detection, 0);
-                    std::vector<PointEdgeCollisionConstraints> pecc = get_point_edge_collision_constraints_of_point_to_polygon_colliders_parallel(
-                        particles, collisions);
+                    std::vector<PointEdgeCollisionConstraints> pecc = get_point_edge_collision_constraints_of_point_to_polygon_colliders(particles, collisions);
                     rmt_EndCPUSample();
+
+                    // this->collisions = collisions;
 
                     rmt_BeginCPUSample(solve_point_edge_collision_constraints, 0);
                     solve_point_edge_collision_constraints(particles, pecc, substep_time);

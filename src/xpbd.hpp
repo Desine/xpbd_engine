@@ -18,22 +18,22 @@ namespace xpbd
         std::vector<glm::vec2> vel;
         std::vector<float> w;
     };
-    struct DistanceConstraints
+    struct DistanceConstraint
     {
-        std::vector<size_t> i1;
-        std::vector<size_t> i2;
-        std::vector<float> restDist;
-        std::vector<float> compressionDamping;
-        std::vector<float> extensionDamping;
-        std::vector<float> compliance;
-        std::vector<float> lambda;
+        size_t i1;
+        size_t i2;
+        float restDist;
+        float compressionDamping;
+        float extensionDamping;
+        float compliance;
+        float lambda;
     };
-    struct VolumeConstraints
+    struct VolumeConstraint
     {
-        std::vector<std::vector<size_t>> indices;
-        std::vector<float> restVolume;
-        std::vector<float> compliance;
-        std::vector<float> lambda;
+        std::vector<size_t> indices;
+        float restVolume;
+        float compliance;
+        float lambda;
     };
     struct AABB
     {
@@ -90,8 +90,8 @@ namespace xpbd
         bool stepOnce = false;
 
         Particles particles;
-        DistanceConstraints distanceConstraints;
-        VolumeConstraints volumeConstraints;
+        std::vector<DistanceConstraint> distanceConstraints;
+        std::vector<VolumeConstraint> volumeConstraints;
         ColliderPoints polygonColliders;
         ColliderPoints pointColliders;
         std::vector<PointPolygonCollision> collisions;
@@ -99,28 +99,32 @@ namespace xpbd
         void init();
         void spawnFromJson(const std::string &name, const glm::vec2 &position);
         void addPolygon(glm::vec2 pos, float radius, size_t segments, float mass, float compliance);
+        void reset_constraints_lambdas();
         void update(float realDelta);
     };
 
-    bool should_tick(float &sec, const float &dt);
-    void iterate(Particles &p, const float &dt, const glm::vec2 &gravity);
-    void update_velocities(Particles &p, const float &dt);
+    bool should_tick(float &sec, float dt);
+    void iterate(Particles &p, float dt, const glm::vec2 &gravity);
+    void update_velocities(Particles &p, float dt);
 
-    void add_particle(Particles &p, const glm::vec2 &pos, const float &mass);
-    void add_particle(Particles &p, const glm::vec2 &pos, const float &mass, const glm::vec2 &vel);
+    void add_particle(Particles &p, const glm::vec2 &pos, float mass);
+    void add_particle(Particles &p, const glm::vec2 &pos, float mass, const glm::vec2 &vel);
 
-    void reset_constraints_lambdas(std::vector<float> &lambdas);
+    void reset_distance_constraints_lambdas(std::vector<DistanceConstraint> &dc);
+    void reset_volume_constraints_lambdas(std::vector<VolumeConstraint> &vc);
 
-    void add_distance_constraint(DistanceConstraints &dc, size_t i1, size_t i2, float compliance, float restDist);
-    void add_distance_constraint_auto_restDist(DistanceConstraints &dc, size_t i1, size_t i2, float compliance, Particles &p);
-    void solve_distance_constraints(Particles &p, DistanceConstraints &dc, float dt);
-    void apply_distance_constraints_damping(Particles &p, DistanceConstraints &dc, float dt);
+    void add_distance_constraint(std::vector<DistanceConstraint> &dc, size_t i1, size_t i2, float compliance, float restDist);
+    void add_distance_constraint_auto_restDist(std::vector<DistanceConstraint> &dc, size_t i1, size_t i2, float compliance, const Particles &p);
+    void solve_distance_constraint(Particles &p, DistanceConstraint &dc, float dt);
+    void solve_distance_constraints(Particles &p, std::vector<DistanceConstraint> &dc, float dt);
+    void apply_distance_constraints_damping(Particles &p, std::vector<DistanceConstraint> &dc, float dt);
 
     float compute_polygon_area(const std::vector<glm::vec2> &positions);
-    float compute_polygon_area(const Particles &p, std::vector<size_t> &indices);
-    void add_volume_constraint(Particles &p, VolumeConstraints &vc, std::vector<size_t> indices, float compliance);
-    void add_volume_constraint(Particles &p, VolumeConstraints &vc, std::vector<size_t> indices, float compliance, float restPressure);
-    void solve_volume_constraints(Particles &p, VolumeConstraints &vc, float dt);
+    float compute_polygon_area(const Particles &p, const std::vector<size_t> &indices);
+    void add_volume_constraint(Particles &p, std::vector<VolumeConstraint> &vc, const std::vector<size_t>& indices, float compliance);
+    void add_volume_constraint(Particles &p, std::vector<VolumeConstraint> &vc, const std::vector<size_t>& indices, float compliance, float restPressure);
+    void solve_volume_constraint(Particles &p, VolumeConstraint &vc, float dt);
+    void solve_volume_constraints(Particles &p, std::vector<VolumeConstraint> &vc, float dt);
 
     void add_polygon_collider(ColliderPoints &cc, std::vector<size_t> indices, float staticFriction, float kineticFriction, float compliance);
     void add_point_collider(ColliderPoints &pc, std::vector<size_t> indices, float staticFriction, float kineticFriction, float compliance);
@@ -130,7 +134,7 @@ namespace xpbd
     std::vector<AABBsOverlap> create_aabbs_overlaps(const std::vector<AABB> &aabbs1, const std::vector<AABB> &aabbs2);
 
     std::vector<PointEdgeCollisionConstraints> get_point_edge_collision_constraints_of_point_to_polygon_colliders(const Particles &p, const PointPolygonCollision &collision);
-    std::vector<PointEdgeCollisionConstraints> get_point_edge_collision_constraints_of_point_to_polygon_colliders_parallel(const Particles &particles, const std::vector<PointPolygonCollision> &collisions);
+    std::vector<PointEdgeCollisionConstraints> get_point_edge_collision_constraints_of_point_to_polygon_colliders(const Particles &particles, const std::vector<PointPolygonCollision> &collisions);
     void solve_point_edge_collision_constraints(Particles &p, std::vector<PointEdgeCollisionConstraints> &pecc, float dt);
     void apply_point_edge_collision_constraints_kinetic_friction(Particles &p, const std::vector<PointEdgeCollisionConstraints> &pecc, float dt);
 }

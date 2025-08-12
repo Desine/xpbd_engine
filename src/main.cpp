@@ -4,7 +4,6 @@
 
 #include <stdio.h>
 #include <string.h>
-#include <omp.h>
 
 #include "renderer.hpp"
 #include "xpbd.hpp"
@@ -18,8 +17,8 @@ void draw_world(xpbd::World &world)
     for (auto p : world.particles.pos)
         renderer::draw_circle(p, 3);
 
-    for (size_t i = 0; i < world.distanceConstraints.i1.size(); ++i)
-        renderer::draw_line(world.particles.pos[world.distanceConstraints.i1[i]], world.particles.pos[world.distanceConstraints.i2[i]]);
+    for (size_t i = 0; i < world.distanceConstraints.size(); ++i)
+        renderer::draw_line(world.particles.pos[world.distanceConstraints[i].i1], world.particles.pos[world.distanceConstraints[i].i2]);
 
     renderer::set_color(sf::Color::Green);
     for (size_t i = 0; i < world.polygonColliders.indices.size(); ++i)
@@ -41,9 +40,6 @@ void draw_collisions(std::vector<xpbd::PointPolygonCollision> collisions)
 
 int main()
 {
-    renderer::setup_window();
-    renderer::setup_view();
-    renderer::setup_imgui();
 
     rmtSettings *settings = rmt_Settings();
     settings->port = 17815; // default 17815
@@ -52,6 +48,16 @@ int main()
 
     xpbd::World world;
     world.init();
+    // world.addPolygon({0, 300}, 40, 6, 3, 0.005f);
+
+    // while (true)
+    // {
+    //     world.update(0.01f);
+    // }
+
+    renderer::setup_window();
+    renderer::setup_view();
+    renderer::setup_imgui();
 
     sf::Vector2i mouseDrag;
     sf::Clock clock;
@@ -100,7 +106,13 @@ int main()
                 if (event.key.code == sf::Keyboard::D)
                     world.spawnFromJson("balloon", position);
                 if (event.key.code == sf::Keyboard::F)
-                    world.addPolygon(position, 40, 6, 3, 0.005f);
+                {
+                    const float radius = 40;
+                    const size_t segments = 6;
+                    const float mass = 5;
+                    const float compliance = 0.005f;
+                    world.addPolygon(position, radius, segments, mass, compliance);
+                }
 
                 if (event.key.code == sf::Keyboard::R)
                     world.init();
