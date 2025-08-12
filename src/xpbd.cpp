@@ -67,16 +67,18 @@ namespace xpbd
 
     void add_distance_constraint(std::vector<DistanceConstraint> &dc, size_t i1, size_t i2, float compliance, float restDist)
     {
-        const float compressionDamping = 0.5f;
-        const float extensionDamping = 0.5f;
-        dc.push_back({i1, i2, restDist, compressionDamping, extensionDamping, compliance, 0});
+        float compressionDamping = 0.5f;
+        float extensionDamping = 0.5f;
+        float lambda = 0;
+        dc.push_back({i1, i2, restDist, compressionDamping, extensionDamping, compliance, lambda});
     }
     void add_distance_constraint_auto_restDist(std::vector<DistanceConstraint> &dc, size_t i1, size_t i2, float compliance, Particles &p)
     {
-        const float restDist = glm::distance(p.pos[i1], p.pos[i2]);
-        const float compressionDamping = 0.5f;
-        const float extensionDamping = 0.5f;
-        dc.push_back({i1, i2, restDist, compressionDamping, extensionDamping, compliance, 0});
+        float restDist = glm::distance(p.pos[i1], p.pos[i2]);
+        float compressionDamping = 0.5f;
+        float extensionDamping = 0.5f;
+        float lambda = 0;
+        dc.push_back({i1, i2, restDist, compressionDamping, extensionDamping, compliance, lambda});
     }
 
     void solve_distance_constraint(Particles &p, DistanceConstraint &dc, float dt)
@@ -158,7 +160,7 @@ namespace xpbd
     float compute_polygon_area(const std::vector<glm::vec2> &positions)
     {
         float area = 0.0f;
-        const size_t n = positions.size();
+        size_t n = positions.size();
         for (size_t i = 0, j = n - 1; i < n; j = i++)
         {
             const glm::vec2 &p0 = positions[j];
@@ -183,13 +185,15 @@ namespace xpbd
     void add_volume_constraint(Particles &p, std::vector<VolumeConstraint> &vc, const std::vector<size_t> &indices, float compliance)
     {
         float restVolume = compute_polygon_area(p, indices);
-        vc.push_back({indices, restVolume, compliance, 0});
+        float lambda = 0;
+        vc.push_back({indices, restVolume, compliance, lambda});
     }
 
     void add_volume_constraint(Particles &p, std::vector<VolumeConstraint> &vc, const std::vector<size_t> &indices, float compliance, float restPressure)
     {
         float restVolume = compute_polygon_area(p, indices);
-        vc.push_back({indices, restVolume * restPressure, compliance, 0});
+        float lambda = 0;
+        vc.push_back({indices, restVolume * restPressure, compliance, lambda});
     }
 
     void solve_volume_constraint(Particles &p, VolumeConstraint &vc, float dt)
@@ -448,10 +452,6 @@ namespace xpbd
         const PointPolygonCollision &collision)
     {
         std::vector<PointEdgeCollisionConstraints> pecc;
-        // draw overlap intersection box
-        // AABB b = overlap.box;
-        // renderer::set_color(sf::Color::White);
-        // renderer::draw_axis_aligned_bounding_box(b.l, b.r, b.b, b.t);
 
         std::vector<size_t> filteredPointIndices;
         filteredPointIndices.reserve(collision.points.size());
@@ -727,7 +727,6 @@ namespace xpbd
                     // point/polygon
                     std::vector<AABB> aabbs_points = generate_collider_points_aabbs(particles, pointColliders);
                     std::vector<AABBsOverlap> aabbs_point_polygon_overlaps = create_aabbs_overlaps(aabbs_points, aabbs_polygons);
-                    rmt_EndCPUSample();
 
                     std::vector<PointPolygonCollision> collisions;
                     collisions.reserve(aabbs_polygon_polygon_overlaps.size() * 2 + aabbs_point_polygon_overlaps.size());
@@ -768,6 +767,7 @@ namespace xpbd
                             o.box,
                         });
                     }
+                    rmt_EndCPUSample();
 
                     rmt_BeginCPUSample(polygon_collision_detection, 0);
                     std::vector<PointEdgeCollisionConstraints> pecc = get_point_edge_collision_constraints_of_point_to_polygon_colliders(particles, collisions);
