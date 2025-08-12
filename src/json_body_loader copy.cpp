@@ -94,7 +94,7 @@ namespace json_body_loader
                 float kineticFriction = cc["kineticFriction"].get<float>();
                 float compliance = cc["compliance"].get<float>();
 
-                add_polygon_collider(world.polygonColliders, indices, staticFriction, kineticFriction, compliance);
+                add_collider_points(world.polygonColliders, indices, staticFriction, kineticFriction, compliance);
             }
         }
 
@@ -111,7 +111,7 @@ namespace json_body_loader
                 float kineticFriction = cc["kineticFriction"].get<float>();
                 float compliance = cc["compliance"].get<float>();
 
-                add_point_collider(world.pointColliders, indices, staticFriction, kineticFriction, compliance);
+                add_collider_points(world.pointColliders, indices, staticFriction, kineticFriction, compliance);
             }
         }
     }

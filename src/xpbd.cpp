@@ -241,21 +241,20 @@ namespace xpbd
         }
     }
 
-    std::vector<AABB> generate_particles_aabbs(const Particles &particles, const std::vector<std::vector<size_t>> indices)
+    std::vector<AABB> generate_collider_points_aabbs(const Particles &p, const std::vector<ColliderPoints> &colliderPoints)
     {
         std::vector<AABB> out;
 
-        for (size_t o = 0; o < indices.size(); o++)
+        for (auto &c : colliderPoints)
         {
             AABB current;
             current.l = std::numeric_limits<float>::max();
             current.r = -std::numeric_limits<float>::max();
             current.b = std::numeric_limits<float>::max();
             current.t = -std::numeric_limits<float>::max();
-            for (size_t i = 0; i < indices[o].size(); i++)
+            for (auto i : c.indices)
             {
-                size_t id = indices[o][i];
-                glm::vec2 pos = particles.pos[id];
+                glm::vec2 pos = p.pos[i];
                 if (pos.x < current.l)
                     current.l = pos.x;
                 if (pos.x > current.r)
@@ -270,19 +269,9 @@ namespace xpbd
         return out;
     }
 
-    void add_polygon_collider(xpbd::ColliderPoints &cc, std::vector<size_t> indices, float staticFriction, float kineticFriction, float compliance)
+    void add_collider_points(std::vector<ColliderPoints> &cp, std::vector<size_t> &indices, float staticFriction, float kineticFriction, float compliance)
     {
-        cc.indices.push_back(indices);
-        cc.staticFriction.push_back(staticFriction);
-        cc.kineticFriction.push_back(kineticFriction);
-        cc.compliance.push_back(compliance);
-    }
-    void add_point_collider(xpbd::ColliderPoints &pc, std::vector<size_t> indices, float staticFriction, float kineticFriction, float compliance)
-    {
-        pc.indices.push_back(indices);
-        pc.staticFriction.push_back(staticFriction);
-        pc.kineticFriction.push_back(kineticFriction);
-        pc.compliance.push_back(compliance);
+        cp.push_back({indices, staticFriction, kineticFriction, compliance});
     }
 
     inline bool aabbs_overlap(const AABB &a, const AABB &b)
@@ -658,8 +647,8 @@ namespace xpbd
         particles = Particles();
         distanceConstraints.clear();
         volumeConstraints.clear();
-        polygonColliders = ColliderPoints();
-        pointColliders = ColliderPoints();
+        polygonColliders.clear();
+        pointColliders.clear();
 
         spawnFromJson("ground", {0, 0});
     }
@@ -695,7 +684,7 @@ namespace xpbd
 
         float staticFriction = 0.4f;
         float kineticFriction = 0.3f;
-        add_polygon_collider(polygonColliders, ids, staticFriction, kineticFriction, compliance);
+        add_collider_points(polygonColliders, ids, staticFriction, kineticFriction, compliance);
     }
 
     void World::reset_constraints_lambdas()
@@ -733,10 +722,10 @@ namespace xpbd
 
                     rmt_BeginCPUSample(aabbs_overlaps, 0);
                     // polygon/polygon
-                    std::vector<AABB> aabbs_polygons = generate_particles_aabbs(particles, polygonColliders.indices);
+                    std::vector<AABB> aabbs_polygons = generate_collider_points_aabbs(particles, polygonColliders);
                     std::vector<AABBsOverlap> aabbs_polygon_polygon_overlaps = create_aabbs_overlaps(aabbs_polygons);
                     // point/polygon
-                    std::vector<AABB> aabbs_points = generate_particles_aabbs(particles, pointColliders.indices);
+                    std::vector<AABB> aabbs_points = generate_collider_points_aabbs(particles, pointColliders);
                     std::vector<AABBsOverlap> aabbs_point_polygon_overlaps = create_aabbs_overlaps(aabbs_points, aabbs_polygons);
                     rmt_EndCPUSample();
 
@@ -745,20 +734,20 @@ namespace xpbd
 
                     for (auto &o : aabbs_polygon_polygon_overlaps)
                     {
-                        float avgStaticFriction = (polygonColliders.staticFriction[o.i1] + polygonColliders.staticFriction[o.i2]) * 0.5f;
-                        float avgKineticFriction = (polygonColliders.kineticFriction[o.i1] + polygonColliders.kineticFriction[o.i2]) * 0.5f;
-                        float avgCompliance = (polygonColliders.compliance[o.i1] + polygonColliders.compliance[o.i2]) * 0.5f;
+                        float avgStaticFriction = (polygonColliders[o.i1].staticFriction + polygonColliders[o.i2].staticFriction) * 0.5f;
+                        float avgKineticFriction = (polygonColliders[o.i1].kineticFriction + polygonColliders[o.i2].kineticFriction) * 0.5f;
+                        float avgCompliance = (polygonColliders[o.i1].compliance + polygonColliders[o.i2].compliance) * 0.5f;
                         collisions.push_back({
-                            polygonColliders.indices[o.i1],
-                            polygonColliders.indices[o.i2],
+                            polygonColliders[o.i1].indices,
+                            polygonColliders[o.i2].indices,
                             avgStaticFriction,
                             avgKineticFriction,
                             avgCompliance,
                             o.box,
                         });
                         collisions.push_back({
-                            polygonColliders.indices[o.i2],
-                            polygonColliders.indices[o.i1],
+                            polygonColliders[o.i2].indices,
+                            polygonColliders[o.i1].indices,
                             avgStaticFriction,
                             avgKineticFriction,
                             avgCompliance,
@@ -767,12 +756,12 @@ namespace xpbd
                     }
                     for (auto &o : aabbs_point_polygon_overlaps)
                     {
-                        float avgStaticFriction = (pointColliders.staticFriction[o.i1] + polygonColliders.staticFriction[o.i2]) * 0.5f;
-                        float avgKineticFriction = (pointColliders.kineticFriction[o.i1] + polygonColliders.kineticFriction[o.i2]) * 0.5f;
-                        float avgCompliance = (pointColliders.compliance[o.i1] + polygonColliders.compliance[o.i2]) * 0.5f;
+                        float avgStaticFriction = (pointColliders[o.i1].staticFriction + polygonColliders[o.i2].staticFriction) * 0.5f;
+                        float avgKineticFriction = (pointColliders[o.i1].kineticFriction + polygonColliders[o.i2].kineticFriction) * 0.5f;
+                        float avgCompliance = (pointColliders[o.i1].compliance + polygonColliders[o.i2].compliance) * 0.5f;
                         collisions.push_back({
-                            pointColliders.indices[o.i1],
-                            polygonColliders.indices[o.i2],
+                            pointColliders[o.i1].indices,
+                            polygonColliders[o.i2].indices,
                             avgStaticFriction,
                             avgKineticFriction,
                             avgCompliance,

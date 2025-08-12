@@ -21,11 +21,11 @@ void draw_world(xpbd::World &world)
         renderer::draw_line(world.particles.pos[world.distanceConstraints[i].i1], world.particles.pos[world.distanceConstraints[i].i2]);
 
     renderer::set_color(sf::Color::Green);
-    for (size_t i = 0; i < world.polygonColliders.indices.size(); ++i)
+    for (auto &pc : world.polygonColliders)
     {
         std::vector<glm::vec2> points;
 
-        for (auto id : world.polygonColliders.indices[i])
+        for (auto id : pc.indices)
             points.push_back(world.particles.pos[id]);
 
         renderer::draw_segmented_loop(points);

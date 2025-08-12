@@ -46,10 +46,10 @@ namespace xpbd
     };
     struct ColliderPoints
     {
-        std::vector<std::vector<size_t>> indices;
-        std::vector<float> staticFriction;
-        std::vector<float> kineticFriction;
-        std::vector<float> compliance;
+        std::vector<size_t> indices;
+        float staticFriction;
+        float kineticFriction;
+        float compliance;
     };
     struct PointEdgeCollision
     {
@@ -92,8 +92,8 @@ namespace xpbd
         Particles particles;
         std::vector<DistanceConstraint> distanceConstraints;
         std::vector<VolumeConstraint> volumeConstraints;
-        ColliderPoints polygonColliders;
-        ColliderPoints pointColliders;
+        std::vector<ColliderPoints> polygonColliders;
+        std::vector<ColliderPoints> pointColliders;
         std::vector<PointPolygonCollision> collisions;
 
         void init();
@@ -126,10 +126,9 @@ namespace xpbd
     void solve_volume_constraint(Particles &p, VolumeConstraint &vc, float dt);
     void solve_volume_constraints(Particles &p, std::vector<VolumeConstraint> &vc, float dt);
 
-    void add_polygon_collider(ColliderPoints &cc, std::vector<size_t> indices, float staticFriction, float kineticFriction, float compliance);
-    void add_point_collider(ColliderPoints &pc, std::vector<size_t> indices, float staticFriction, float kineticFriction, float compliance);
+    void add_collider_points(std::vector<ColliderPoints> &cp, std::vector<size_t>& indices, float staticFriction, float kineticFriction, float compliance);
 
-    std::vector<AABB> generate_particles_aabbs(const Particles &p, const std::vector<std::vector<size_t>> particles_ids);
+    std::vector<AABB> generate_collider_points_aabbs(const Particles &p, const std::vector<std::vector<size_t>> &indices);
     std::vector<AABBsOverlap> create_aabbs_overlaps(const std::vector<AABB> &aabbs);
     std::vector<AABBsOverlap> create_aabbs_overlaps(const std::vector<AABB> &aabbs1, const std::vector<AABB> &aabbs2);
 
