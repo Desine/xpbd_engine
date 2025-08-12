@@ -6,6 +6,7 @@
 #include <string>
 
 #include "json_body_loader.hpp"
+#include "spatial_hashing.hpp"
 
 #include "Remotery.h"
 
@@ -34,27 +35,6 @@ namespace xpbd
         float restVolume;
         float compliance;
         float lambda;
-    };
-    struct AABB
-    {
-        float l, r, b, t;
-        bool intersects(const AABB &o) const
-        {
-            return !(r < o.l || l > o.r || t < o.b || b > o.t);
-        }
-        AABB get_intersection(const AABB &o) const
-        {
-            return {
-                std::max(l, o.l),
-                std::min(r, o.r),
-                std::max(b, o.b),
-                std::min(t, o.t)};
-        }
-    };
-    struct AABBsOverlap
-    {
-        size_t i1, i2;
-        AABB box;
     };
     struct ColliderPoints
     {
@@ -106,7 +86,9 @@ namespace xpbd
         std::vector<VolumeConstraint> volumeConstraints;
         std::vector<ColliderPoints> polygonColliders;
         std::vector<ColliderPoints> pointsColliders;
+        
         std::vector<PointPolygonCollision> collisions;
+        SpatialHashAABB spatialHashAABB;
 
         void init();
 
@@ -146,8 +128,6 @@ namespace xpbd
     void solve_volume_constraints(Particles &p, std::vector<VolumeConstraint> &vc, float dt);
 
     std::vector<AABB> generate_collider_points_aabbs(const Particles &p, const std::vector<std::vector<size_t>> &indices);
-    std::vector<AABBsOverlap> create_aabbs_overlaps(const std::vector<AABB> &aabbs);
-    std::vector<AABBsOverlap> create_aabbs_overlaps(const std::vector<AABB> &aabbs1, const std::vector<AABB> &aabbs2);
 
     std::vector<PointEdgeCollisionConstraints> get_point_edge_collision_constraints_of_point_to_polygon_colliders(const Particles &p, const PointPolygonCollision &collision);
     std::vector<PointEdgeCollisionConstraints> get_point_edge_collision_constraints_of_point_to_polygon_colliders(const Particles &particles, const std::vector<PointPolygonCollision> &collisions);

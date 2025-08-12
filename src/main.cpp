@@ -7,7 +7,6 @@
 
 #include "renderer.hpp"
 #include "xpbd.hpp"
-#include "json_body_loader.hpp"
 
 #include "Remotery.h"
 
@@ -133,13 +132,17 @@ int main()
         ImGui::SliderScalar("iterations", ImGuiDataType_U64, &world.iterations, &min_value, &max_value, "%zu", ImGuiSliderFlags_None);
         ImGui::SliderFloat("gravity.x", &world.gravity.x, -20, 20);
         ImGui::SliderFloat("gravity.y", &world.gravity.y, -20, 20);
+        int cellSize = world.spatialHashAABB.cellSize;
+        ImGui::SliderInt("spatialHashing_cellSize: ", &cellSize, 50, 2000);
+        world.spatialHashAABB.cellSize = cellSize;
+
         ImGui::End();
         ImGui::EndFrame();
 
         renderer::window.clear();
         draw_world(world);
-        renderer::set_color(sf::Color::White);
-        draw_collisions(world.collisions);
+        // renderer::set_color(sf::Color::White);
+        // draw_collisions(world.collisions);
         ImGui::SFML::Render(renderer::window);
         renderer::window.display();
 
