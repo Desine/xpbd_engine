@@ -10,14 +10,6 @@
 
 namespace xpbd
 {
-    bool should_tick(float &sec, float dt)
-    {
-        if (sec < dt)
-            return false;
-        sec -= dt;
-        return true;
-    }
-
     void iterate(Particles &p, float dt, const glm::vec2 &gravity)
     {
         for (size_t i = 0; i < p.pos.size(); ++i)
@@ -37,23 +29,6 @@ namespace xpbd
             p.vel[i] = (p.pos[i] - p.prev[i]) / dt;
     }
 
-    void add_particle(Particles &p, const glm::vec2 &pos, float mass)
-    {
-        p.pos.push_back(pos);
-        p.prev.push_back(pos);
-        p.vel.push_back({0, 0});
-        float w = mass == 0 ? 0 : 1 / mass;
-        p.w.push_back(w);
-    }
-    void add_particle(Particles &p, const glm::vec2 &pos, float mass, const glm::vec2 &vel)
-    {
-        p.pos.push_back(pos);
-        p.prev.push_back(pos);
-        p.vel.push_back(vel);
-        float w = mass == 0 ? 0 : 1 / mass;
-        p.w.push_back(w);
-    }
-
     void reset_distance_constraints_lambdas(std::vector<DistanceConstraint> &dc)
     {
         for (auto &c : dc)
@@ -63,22 +38,6 @@ namespace xpbd
     {
         for (auto &c : vc)
             c.lambda = 0;
-    }
-
-    void add_distance_constraint(std::vector<DistanceConstraint> &dc, size_t i1, size_t i2, float compliance, float restDist)
-    {
-        float compressionDamping = 0.5f;
-        float extensionDamping = 0.5f;
-        float lambda = 0;
-        dc.push_back({i1, i2, restDist, compressionDamping, extensionDamping, compliance, lambda});
-    }
-    void add_distance_constraint_auto_restDist(std::vector<DistanceConstraint> &dc, size_t i1, size_t i2, float compliance, Particles &p)
-    {
-        float restDist = glm::distance(p.pos[i1], p.pos[i2]);
-        float compressionDamping = 0.5f;
-        float extensionDamping = 0.5f;
-        float lambda = 0;
-        dc.push_back({i1, i2, restDist, compressionDamping, extensionDamping, compliance, lambda});
     }
 
     void solve_distance_constraint(Particles &p, DistanceConstraint &dc, float dt)
@@ -182,20 +141,6 @@ namespace xpbd
         return 0.5f * area;
     }
 
-    void add_volume_constraint(Particles &p, std::vector<VolumeConstraint> &vc, const std::vector<size_t> &indices, float compliance)
-    {
-        float restVolume = compute_polygon_area(p, indices);
-        float lambda = 0;
-        vc.push_back({indices, restVolume, compliance, lambda});
-    }
-
-    void add_volume_constraint(Particles &p, std::vector<VolumeConstraint> &vc, const std::vector<size_t> &indices, float compliance, float restPressure)
-    {
-        float restVolume = compute_polygon_area(p, indices);
-        float lambda = 0;
-        vc.push_back({indices, restVolume * restPressure, compliance, lambda});
-    }
-
     void solve_volume_constraint(Particles &p, VolumeConstraint &vc, float dt)
     {
         std::vector<size_t> &indices = vc.indices;
@@ -273,22 +218,9 @@ namespace xpbd
         return out;
     }
 
-    void add_collider_points(std::vector<ColliderPoints> &cp, std::vector<size_t> &indices, float staticFriction, float kineticFriction, float compliance)
-    {
-        cp.push_back({indices, staticFriction, kineticFriction, compliance});
-    }
-
-    inline bool aabbs_overlap(const AABB &a, const AABB &b)
+    bool aabbs_overlap(const AABB &a, const AABB &b)
     {
         return !(a.r < b.l || a.l > b.r || a.t < b.b || a.b > b.t);
-    }
-    AABB create_aabb_intersection(const AABB &a, const AABB &b)
-    {
-        return {
-            std::max(a.l, b.l),
-            std::min(a.r, b.r),
-            std::max(a.b, b.b),
-            std::min(a.t, b.t)};
     }
     std::vector<AABBsOverlap> create_aabbs_overlaps(const std::vector<AABB> &aabbs)
     {
@@ -315,8 +247,8 @@ namespace xpbd
                 if (a2.l > a1.r)
                     break;
 
-                if (aabbs_overlap(a1, a2))
-                    out.push_back({i1, i2, create_aabb_intersection(a1, a2)});
+                if (a1.intersects(a2))
+                    out.push_back({i1, i2, a1.get_intersection(a2)});
             }
         }
 
@@ -350,8 +282,8 @@ namespace xpbd
                 if (a2.l > a1.r)
                     break;
 
-                if (aabbs_overlap(a1, a2))
-                    out.push_back({i1, i2, create_aabb_intersection(a1, a2)});
+                if (a1.intersects(a2))
+                    out.push_back({i1, i2, a1.get_intersection(a2)});
             }
         }
 
@@ -648,9 +580,64 @@ namespace xpbd
         distanceConstraints.clear();
         volumeConstraints.clear();
         polygonColliders.clear();
-        pointColliders.clear();
+        pointsColliders.clear();
 
         spawnFromJson("ground", {0, 0});
+    }
+
+    void World::add_particle(const glm::vec2 &pos, float mass)
+    {
+        particles.pos.push_back(pos);
+        particles.prev.push_back(pos);
+        particles.vel.push_back({0, 0});
+        float w = mass == 0 ? 0 : 1 / mass;
+        particles.w.push_back(w);
+    }
+    void World::add_particle(const glm::vec2 &pos, float mass, const glm::vec2 &vel)
+    {
+        particles.pos.push_back(pos);
+        particles.prev.push_back(pos);
+        particles.vel.push_back(vel);
+        float w = mass == 0 ? 0 : 1 / mass;
+        particles.w.push_back(w);
+    }
+
+    void World::add_distance_constraint(size_t i1, size_t i2, float compliance, float restDist)
+    {
+        float compressionDamping = 0.5f;
+        float extensionDamping = 0.5f;
+        float lambda = 0;
+        distanceConstraints.push_back({i1, i2, restDist, compressionDamping, extensionDamping, compliance, lambda});
+    }
+    void World::add_distance_constraint_auto_restDist(size_t i1, size_t i2, float compliance, Particles &p)
+    {
+        float restDist = glm::distance(p.pos[i1], p.pos[i2]);
+        float compressionDamping = 0.5f;
+        float extensionDamping = 0.5f;
+        float lambda = 0;
+        distanceConstraints.push_back({i1, i2, restDist, compressionDamping, extensionDamping, compliance, lambda});
+    }
+
+    void World::add_volume_constraint(const std::vector<size_t> &indices, float compliance)
+    {
+        float restVolume = compute_polygon_area(particles, indices);
+        float lambda = 0;
+        volumeConstraints.push_back({indices, restVolume, compliance, lambda});
+    }
+    void World::add_volume_constraint(const std::vector<size_t> &indices, float compliance, float restPressure)
+    {
+        float restVolume = compute_polygon_area(particles, indices);
+        float lambda = 0;
+        volumeConstraints.push_back({indices, restVolume * restPressure, compliance, lambda});
+    }
+
+    void World::add_polygon_collider(std::vector<size_t> &indices, float staticFriction, float kineticFriction, float compliance)
+    {
+        polygonColliders.push_back({indices, staticFriction, kineticFriction, compliance});
+    }
+    void World::add_points_collider(std::vector<size_t> &indices, float staticFriction, float kineticFriction, float compliance)
+    {
+        pointsColliders.push_back({indices, staticFriction, kineticFriction, compliance});
     }
 
     void World::spawnFromJson(const std::string &name, const glm::vec2 &position)
@@ -672,19 +659,27 @@ namespace xpbd
         {
             float angle = i * angleStep;
             glm::vec2 dir = glm::vec2(cosf(angle), sinf(angle));
-            add_particle(particles, dir * radius + pos, mass / segments);
+            add_particle(dir * radius + pos, mass / segments);
 
             ids.push_back(start + i);
         }
 
         for (int i = 0; i < segments; ++i)
-            add_distance_constraint_auto_restDist(distanceConstraints, start + i, start + (i + 1) % segments, compliance, particles);
+            this->add_distance_constraint_auto_restDist(start + i, start + (i + 1) % segments, compliance, particles);
 
-        add_volume_constraint(particles, volumeConstraints, ids, compliance);
+        add_volume_constraint(ids, compliance);
 
         float staticFriction = 0.4f;
         float kineticFriction = 0.3f;
-        add_collider_points(polygonColliders, ids, staticFriction, kineticFriction, compliance);
+        add_polygon_collider(ids, staticFriction, kineticFriction, compliance);
+    }
+
+    bool World::should_tick(float &sec, float dt)
+    {
+        if (sec < dt)
+            return false;
+        sec -= dt;
+        return true;
     }
 
     void World::reset_constraints_lambdas()
@@ -725,7 +720,7 @@ namespace xpbd
                     std::vector<AABB> aabbs_polygons = generate_collider_points_aabbs(particles, polygonColliders);
                     std::vector<AABBsOverlap> aabbs_polygon_polygon_overlaps = create_aabbs_overlaps(aabbs_polygons);
                     // point/polygon
-                    std::vector<AABB> aabbs_points = generate_collider_points_aabbs(particles, pointColliders);
+                    std::vector<AABB> aabbs_points = generate_collider_points_aabbs(particles, pointsColliders);
                     std::vector<AABBsOverlap> aabbs_point_polygon_overlaps = create_aabbs_overlaps(aabbs_points, aabbs_polygons);
 
                     std::vector<PointPolygonCollision> collisions;
@@ -755,11 +750,11 @@ namespace xpbd
                     }
                     for (auto &o : aabbs_point_polygon_overlaps)
                     {
-                        float avgStaticFriction = (pointColliders[o.i1].staticFriction + polygonColliders[o.i2].staticFriction) * 0.5f;
-                        float avgKineticFriction = (pointColliders[o.i1].kineticFriction + polygonColliders[o.i2].kineticFriction) * 0.5f;
-                        float avgCompliance = (pointColliders[o.i1].compliance + polygonColliders[o.i2].compliance) * 0.5f;
+                        float avgStaticFriction = (pointsColliders[o.i1].staticFriction + polygonColliders[o.i2].staticFriction) * 0.5f;
+                        float avgKineticFriction = (pointsColliders[o.i1].kineticFriction + polygonColliders[o.i2].kineticFriction) * 0.5f;
+                        float avgCompliance = (pointsColliders[o.i1].compliance + polygonColliders[o.i2].compliance) * 0.5f;
                         collisions.push_back({
-                            pointColliders[o.i1].indices,
+                            pointsColliders[o.i1].indices,
                             polygonColliders[o.i2].indices,
                             avgStaticFriction,
                             avgKineticFriction,

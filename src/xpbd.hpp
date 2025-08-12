@@ -38,6 +38,18 @@ namespace xpbd
     struct AABB
     {
         float l, r, b, t;
+        bool intersects(const AABB &o) const
+        {
+            return !(r < o.l || l > o.r || t < o.b || b > o.t);
+        }
+        AABB get_intersection(const AABB &o) const
+        {
+            return {
+                std::max(l, o.l),
+                std::min(r, o.r),
+                std::max(b, o.b),
+                std::min(t, o.t)};
+        }
     };
     struct AABBsOverlap
     {
@@ -93,40 +105,45 @@ namespace xpbd
         std::vector<DistanceConstraint> distanceConstraints;
         std::vector<VolumeConstraint> volumeConstraints;
         std::vector<ColliderPoints> polygonColliders;
-        std::vector<ColliderPoints> pointColliders;
+        std::vector<ColliderPoints> pointsColliders;
         std::vector<PointPolygonCollision> collisions;
 
         void init();
+
+        void add_particle(const glm::vec2 &pos, float mass);
+        void add_particle(const glm::vec2 &pos, float mass, const glm::vec2 &vel);
+
+        void add_distance_constraint(size_t i1, size_t i2, float compliance, float restDist);
+        void add_distance_constraint_auto_restDist(size_t i1, size_t i2, float compliance, Particles &p);
+
+        void add_volume_constraint(const std::vector<size_t> &indices, float compliance);
+        void add_volume_constraint(const std::vector<size_t> &indices, float compliance, float restPressure);
+
+        void add_polygon_collider(std::vector<size_t> &indices, float staticFriction, float kineticFriction, float compliance);
+        void add_points_collider(std::vector<size_t> &indices, float staticFriction, float kineticFriction, float compliance);
+
         void spawnFromJson(const std::string &name, const glm::vec2 &position);
         void addPolygon(glm::vec2 pos, float radius, size_t segments, float mass, float compliance);
+
+        bool should_tick(float &sec, float dt);
         void reset_constraints_lambdas();
         void update(float realDelta);
     };
 
-    bool should_tick(float &sec, float dt);
     void iterate(Particles &p, float dt, const glm::vec2 &gravity);
     void update_velocities(Particles &p, float dt);
-
-    void add_particle(Particles &p, const glm::vec2 &pos, float mass);
-    void add_particle(Particles &p, const glm::vec2 &pos, float mass, const glm::vec2 &vel);
 
     void reset_distance_constraints_lambdas(std::vector<DistanceConstraint> &dc);
     void reset_volume_constraints_lambdas(std::vector<VolumeConstraint> &vc);
 
-    void add_distance_constraint(std::vector<DistanceConstraint> &dc, size_t i1, size_t i2, float compliance, float restDist);
-    void add_distance_constraint_auto_restDist(std::vector<DistanceConstraint> &dc, size_t i1, size_t i2, float compliance, const Particles &p);
     void solve_distance_constraint(Particles &p, DistanceConstraint &dc, float dt);
     void solve_distance_constraints(Particles &p, std::vector<DistanceConstraint> &dc, float dt);
     void apply_distance_constraints_damping(Particles &p, std::vector<DistanceConstraint> &dc, float dt);
 
     float compute_polygon_area(const std::vector<glm::vec2> &positions);
     float compute_polygon_area(const Particles &p, const std::vector<size_t> &indices);
-    void add_volume_constraint(Particles &p, std::vector<VolumeConstraint> &vc, const std::vector<size_t>& indices, float compliance);
-    void add_volume_constraint(Particles &p, std::vector<VolumeConstraint> &vc, const std::vector<size_t>& indices, float compliance, float restPressure);
     void solve_volume_constraint(Particles &p, VolumeConstraint &vc, float dt);
     void solve_volume_constraints(Particles &p, std::vector<VolumeConstraint> &vc, float dt);
-
-    void add_collider_points(std::vector<ColliderPoints> &cp, std::vector<size_t>& indices, float staticFriction, float kineticFriction, float compliance);
 
     std::vector<AABB> generate_collider_points_aabbs(const Particles &p, const std::vector<std::vector<size_t>> &indices);
     std::vector<AABBsOverlap> create_aabbs_overlaps(const std::vector<AABB> &aabbs);

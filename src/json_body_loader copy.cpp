@@ -49,7 +49,7 @@ namespace json_body_loader
                     vel = {p["vel"][0].get<float>(), p["vel"][1].get<float>()};
 
                 float mass = p["mass"].get<float>();
-                add_particle(world.particles, pos, mass, vel);
+                world.add_particle(pos, mass, vel);
             }
         }
 
@@ -62,7 +62,7 @@ namespace json_body_loader
                 size_t i2 = dc["i2"].get<size_t>() + base_index;
                 float restDist = dc["restDistance"].get<float>();
                 float compliance = dc["compliance"].get<float>();
-                add_distance_constraint(world.distanceConstraints, i1, i2, compliance, restDist);
+                world.add_distance_constraint(i1, i2, compliance, restDist);
             }
         }
 
@@ -77,7 +77,7 @@ namespace json_body_loader
 
                 float restPressure = vc["restPressure"].get<float>();
                 float compliance = vc["compliance"].get<float>();
-                add_volume_constraint(world.particles, world.volumeConstraints, indices, compliance, restPressure);
+                world.add_volume_constraint(indices, compliance, restPressure);
             }
         }
 
@@ -94,7 +94,7 @@ namespace json_body_loader
                 float kineticFriction = cc["kineticFriction"].get<float>();
                 float compliance = cc["compliance"].get<float>();
 
-                add_collider_points(world.polygonColliders, indices, staticFriction, kineticFriction, compliance);
+                world.add_polygon_collider(indices, staticFriction, kineticFriction, compliance);
             }
         }
 
@@ -111,7 +111,7 @@ namespace json_body_loader
                 float kineticFriction = cc["kineticFriction"].get<float>();
                 float compliance = cc["compliance"].get<float>();
 
-                add_collider_points(world.pointColliders, indices, staticFriction, kineticFriction, compliance);
+                world.add_points_collider(indices, staticFriction, kineticFriction, compliance);
             }
         }
     }
