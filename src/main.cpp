@@ -31,7 +31,7 @@ void draw_world(xpbd::World &world)
     }
 }
 
-void draw_collisions(std::vector<xpbd::PointPolygonCollision> collisions)
+void draw_collisions(std::vector<xpbd::PointsPolygonCollision> collisions)
 {
     for (auto c : collisions)
         renderer::draw_axis_aligned_bounding_box(c.box.l, c.box.r, c.box.b, c.box.t);
@@ -153,6 +153,26 @@ int main()
                         }
                     }
                 }
+                if (event.key.code == sf::Keyboard::W)
+                {
+                    size_t width = 10;
+                    size_t height = 10;
+                    float spacingX = 100;
+                    float spacingY = 100;
+                    for (size_t i = 0; i < width; ++i)
+                    {
+                        float x = position.x - width * spacingX * 0.5 + spacingX * i;
+                        for (size_t j = 0; j < height; ++j)
+                        {
+                            float y = position.y + spacingY * j;
+                            const float radius = 40;
+                            const size_t segments = 6;
+                            const float mass = 5;
+                            const float compliance = 0.005f;
+                            world.spawnPolygon({x, y}, radius, segments, mass, compliance);
+                        }
+                    }
+                }
 
                 if (event.key.code == sf::Keyboard::A)
                     world.spawnFromJson("2boxes", position);
@@ -166,7 +186,7 @@ int main()
                     const size_t segments = 6;
                     const float mass = 5;
                     const float compliance = 0.005f;
-                    world.addPolygon(position, radius, segments, mass, compliance);
+                    world.spawnPolygon(position, radius, segments, mass, compliance);
                 }
 
                 if (event.key.code == sf::Keyboard::R)
@@ -191,10 +211,6 @@ int main()
         int cellSize = world.spatialHashAABB.cellSize;
         ImGui::SliderInt("spatialHashing_cellSize: ", &cellSize, 30, 1000);
         world.spatialHashAABB.cellSize = cellSize;
-        if (ImGui::Button(world.threadHash ? "threadHash disable" : "threadHash enagle"))
-            world.threadHash = !world.threadHash;
-        if (ImGui::Button(world.threadGenerateConstraints ? "threadGenerateConstraints disable" : "threadGenerateConstraints enagle"))
-            world.threadGenerateConstraints = !world.threadGenerateConstraints;
 
         ImGui::End();
         ImGui::EndFrame();

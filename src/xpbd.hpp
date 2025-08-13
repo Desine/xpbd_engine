@@ -49,7 +49,7 @@ namespace xpbd
         size_t edge1;
         size_t edge2;
     };
-    struct PointPolygonCollision
+    struct PointsPolygonCollision
     {
         std::vector<size_t> points;
         std::vector<size_t> polygon;
@@ -92,7 +92,7 @@ namespace xpbd
         
         std::vector<AABB> aabbs_polygons;
         std::vector<AABB> aabbs_points;
-        std::vector<PointPolygonCollision> collisions;
+        std::vector<PointsPolygonCollision> collisions;
         SpatialHashAABB spatialHashAABB;
 
         void init();
@@ -110,7 +110,7 @@ namespace xpbd
         void add_points_collider(std::vector<size_t> &indices, float staticFriction, float kineticFriction, float compliance);
 
         void spawnFromJson(const std::string &name, const glm::vec2 &position);
-        void addPolygon(glm::vec2 pos, float radius, size_t segments, float mass, float compliance);
+        void spawnPolygon(glm::vec2 pos, float radius, size_t segments, float mass, float compliance);
 
         bool should_tick(float &sec, float dt);
         void reset_constraints_lambdas();
@@ -134,8 +134,7 @@ namespace xpbd
 
     std::vector<AABB> generate_collider_points_aabbs(const Particles &p, const std::vector<std::vector<size_t>> &indices);
 
-    std::vector<PointEdgeCollisionConstraints> get_point_edge_collision_constraints_of_point_to_polygon_colliders(const Particles &p, const PointPolygonCollision &collision);
-    std::vector<PointEdgeCollisionConstraints> get_point_edge_collision_constraints_of_point_to_polygon_colliders(const Particles &particles, const std::vector<PointPolygonCollision> &collisions);
+    std::vector<PointEdgeCollisionConstraints> get_PointEdgeCollisionConstraints_from_PointsPolygonCollision(const Particles &p, const PointsPolygonCollision &collision);
     void solve_point_edge_collision_constraints(Particles &p, std::vector<PointEdgeCollisionConstraints> &pecc, float dt);
     void apply_point_edge_collision_constraints_kinetic_friction(Particles &p, const std::vector<PointEdgeCollisionConstraints> &pecc, float dt);
 }

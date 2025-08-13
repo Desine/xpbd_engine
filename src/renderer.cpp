@@ -9,14 +9,14 @@ namespace renderer
     void setup_window()
     {
         window.create(sf::VideoMode({WINDOW_WIDTH, WINDOW_HEIGHT}), "xpbd_engine");
-        window.setFramerateLimit(60);
+        window.setFramerateLimit(144);
     }
 
     void setup_view()
     {
         view = window.getDefaultView();
         view.setSize(WINDOW_WIDTH, -WINDOW_HEIGHT);
-        view.zoom(0.5f);
+        // view.zoom(0.5f);
         sf::Vector2f cameraCenter(0, 0);
         view.setCenter(cameraCenter);
         window.setView(view);
