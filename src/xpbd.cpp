@@ -626,20 +626,17 @@ namespace xpbd
         if (sec > 3 * deltaTick)
             sec = 0;
 
-        std::vector<AABB> aabbs_polygons;
-        std::vector<AABB> aabbs_points;
-
         float substep_time = deltaTick * timeScale / substeps;
         while (should_tick(sec, deltaTick))
         {
 
-            for (size_t s = 0; s < substeps; s++)
+            for (size_t sub = 0; sub < substeps; ++sub)
             {
                 iterate(particles, substep_time, gravity);
 
                 reset_constraints_lambdas();
 
-                for (size_t i = 0; i < iterations; i++)
+                for (size_t iter = 0; iter < iterations; ++iter)
                 {
                     rmt_BeginCPUSample(solve_distance_constraints, 0);
                     solve_distance_constraints(particles, distanceConstraints, substep_time);
@@ -648,35 +645,90 @@ namespace xpbd
                     solve_volume_constraints(particles, volumeConstraints, substep_time);
                     rmt_EndCPUSample();
 
-                    rmt_BeginCPUSample(aabbs_overlaps, 0);
                     collisions.clear();
                     // polygon/polygon
                     aabbs_polygons = generate_collider_points_aabbs(particles, polygonColliders);
 
+                    rmt_BeginCPUSample(fill_hash, 0);
                     spatialHashAABB.clear();
-
-                    float aabbs_polygons_size = aabbs_polygons.size();
+                    size_t aabbs_polygons_size = aabbs_polygons.size();
                     for (size_t i = 0; i < aabbs_polygons_size; ++i)
                         spatialHashAABB.add_aabb(aabbs_polygons[i], i);
+                    rmt_EndCPUSample();
 
-                    for (size_t a = 0; a < aabbs_polygons_size; ++a)
+                    rmt_BeginCPUSample(aabbs_overlaps, 0);
+                    if (threadHash)
                     {
-                        auto possible_intersections_ids = spatialHashAABB.get_overlapping_aabb_ids_excludeId(aabbs_polygons[a], a);
-                        for (auto i : possible_intersections_ids)
+                        std::vector<std::vector<PointPolygonCollision>> collisions_thread(omp_get_max_threads());
+#pragma omp parallel for
+                        for (size_t a = 0; a < aabbs_polygons_size; ++a)
                         {
-                            if (!aabbs_polygons[a].intersects(aabbs_polygons[i]))
-                                continue;
-                            float avgStaticFriction = (polygonColliders[a].staticFriction + polygonColliders[i].staticFriction) * 0.5f;
-                            float avgKineticFriction = (polygonColliders[a].kineticFriction + polygonColliders[i].kineticFriction) * 0.5f;
-                            float avgCompliance = (polygonColliders[a].compliance + polygonColliders[i].compliance) * 0.5f;
-                            collisions.push_back({
-                                polygonColliders[a].indices,
-                                polygonColliders[i].indices,
-                                avgStaticFriction,
-                                avgKineticFriction,
-                                avgCompliance,
-                                aabbs_polygons[a].get_intersection(aabbs_polygons[i]),
-                            });
+                            auto &local = collisions_thread[omp_get_thread_num()];
+
+                            std::vector<size_t> possible_intersections_ids = spatialHashAABB.get_overlapping_aabb_ids_excludeId(aabbs_polygons[a], a);
+                            for (auto i : possible_intersections_ids)
+                            {
+                                if (!aabbs_polygons[a].intersects(aabbs_polygons[i]))
+                                    continue;
+                                float avgStaticFriction = (polygonColliders[a].staticFriction + polygonColliders[i].staticFriction) * 0.5f;
+                                float avgKineticFriction = (polygonColliders[a].kineticFriction + polygonColliders[i].kineticFriction) * 0.5f;
+                                float avgCompliance = (polygonColliders[a].compliance + polygonColliders[i].compliance) * 0.5f;
+                                local.push_back({
+                                    polygonColliders[a].indices,
+                                    polygonColliders[i].indices,
+                                    avgStaticFriction,
+                                    avgKineticFriction,
+                                    avgCompliance,
+                                    aabbs_polygons[a].get_intersection(aabbs_polygons[i]),
+                                });
+                            }
+                        }
+                        size_t total_size = 0;
+                        for (auto &v : collisions_thread)
+                            total_size += v.size();
+
+                        collisions.reserve(total_size);
+                        for (auto &v : collisions_thread)
+                            collisions.insert(collisions.end(), v.begin(), v.end());
+                    }
+                    else
+                    {
+                        for (size_t a = 0; a < aabbs_polygons_size; ++a)
+                        {
+                            std::vector<size_t> possible_intersections_ids = spatialHashAABB.get_overlapping_aabb_ids_excludeId(aabbs_polygons[a], a);
+                            for (auto i : possible_intersections_ids)
+                            {
+                                if (!aabbs_polygons[a].intersects(aabbs_polygons[i]))
+                                {
+                                    // if (a == 1)
+                                    // {
+                                    //     AABB box = aabbs_polygons[i];
+                                    //     renderer::set_color(sf::Color::White);
+                                    //     renderer::draw_axis_aligned_bounding_box(box.l, box.r, box.b, box.t);
+                                    // }
+                                    continue;
+                                }
+                                // else
+                                // {
+                                //     if (a == 1)
+                                //     {
+                                //         AABB box = aabbs_polygons[i];
+                                //         renderer::set_color(sf::Color::Red);
+                                //         renderer::draw_axis_aligned_bounding_box(box.l, box.r, box.b, box.t);
+                                //     }
+                                // }
+                                float avgStaticFriction = (polygonColliders[a].staticFriction + polygonColliders[i].staticFriction) * 0.5f;
+                                float avgKineticFriction = (polygonColliders[a].kineticFriction + polygonColliders[i].kineticFriction) * 0.5f;
+                                float avgCompliance = (polygonColliders[a].compliance + polygonColliders[i].compliance) * 0.5f;
+                                collisions.push_back({
+                                    polygonColliders[a].indices,
+                                    polygonColliders[i].indices,
+                                    avgStaticFriction,
+                                    avgKineticFriction,
+                                    avgCompliance,
+                                    aabbs_polygons[a].get_intersection(aabbs_polygons[i]),
+                                });
+                            }
                         }
                     }
 
@@ -702,11 +754,23 @@ namespace xpbd
                             });
                         }
                     }
-                    this->collisions = collisions;
                     rmt_EndCPUSample();
 
                     rmt_BeginCPUSample(polygon_collision_detection, 0);
-                    std::vector<PointEdgeCollisionConstraints> pecc = get_point_edge_collision_constraints_of_point_to_polygon_colliders(particles, collisions);
+                    std::vector<PointEdgeCollisionConstraints> pecc;
+
+                    if (threadGenerateConstraints)
+                    {
+                        pecc = get_point_edge_collision_constraints_of_point_to_polygon_colliders(particles, collisions);
+                    }
+                    else
+                    {
+                        for (size_t c = 0; c < collisions.size(); ++c)
+                        {
+                            auto local = get_point_edge_collision_constraints_of_point_to_polygon_colliders(particles, collisions);
+                            pecc.insert(pecc.end(), local.begin(), local.end());
+                        }
+                    }
                     rmt_EndCPUSample();
 
                     rmt_BeginCPUSample(solve_point_edge_collision_constraints, 0);

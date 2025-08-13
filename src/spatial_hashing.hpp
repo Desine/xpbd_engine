@@ -1,11 +1,13 @@
 #ifndef define_SpatialHashAABB
 #define define_SpatialHashAABB
-#include <unordered_map>
 #include <vector>
 #include <cmath>
 #include <cstddef>
-#include <utility>
 #include <algorithm>
+#include <ankerl/unordered_dense.h>
+
+#include <stdio.h>
+#include <string.h>
 
 struct AABB
 {
@@ -26,13 +28,25 @@ struct AABB
     }
 };
 
-struct PairHash
+struct CellCoord
 {
-    size_t operator()(const std::pair<int, int> &p) const noexcept
+    int x;
+    int y;
+
+    bool operator==(const CellCoord &other) const noexcept
     {
-        uint64_t x = static_cast<uint32_t>(p.first);
-        uint64_t y = static_cast<uint32_t>(p.second);
-        return (x * 73856093ull) ^ (y * 19349663ull);
+        return x == other.x && y == other.y;
+    }
+};
+
+struct CellCoordHash
+{
+    using is_avalanching = void;
+    size_t operator()(const CellCoord &c) const noexcept
+    {
+        return ankerl::unordered_dense::hash<uint64_t>{}(
+            (static_cast<uint64_t>(static_cast<uint32_t>(c.x)) << 32) |
+            static_cast<uint32_t>(c.y));
     }
 };
 
@@ -41,9 +55,10 @@ class SpatialHashAABB
 public:
     size_t cellSize;
     size_t tableReserve;
-    std::unordered_map<std::pair<int, int>, std::vector<size_t>, PairHash> table;
+    ankerl::unordered_dense::map<CellCoord, std::vector<size_t>, CellCoordHash> table;
 
-    explicit SpatialHashAABB(size_t cellSize = 500, size_t tableReserve = 1024) : cellSize(cellSize), tableReserve(tableReserve)
+    explicit SpatialHashAABB(size_t cellSize = 150, size_t tableReserve = 1024)
+        : cellSize(cellSize), tableReserve(tableReserve)
     {
         clear();
     }
@@ -51,9 +66,7 @@ public:
     void clear()
     {
         table.clear();
-        
-        if (table.max_size() != tableReserve)
-            table.reserve(tableReserve);
+        table.reserve(tableReserve);
     }
 
     void add_aabb(const AABB &aabb, size_t id)
@@ -65,7 +78,7 @@ public:
         {
             for (int cx = startX; cx <= endX; ++cx)
             {
-                auto &bucket = table.try_emplace({cx, cy}).first->second;
+                auto &bucket = table[CellCoord{cx, cy}];
                 bucket.push_back(id);
             }
         }
@@ -74,7 +87,6 @@ public:
     std::vector<size_t> get_overlapping_aabb_ids(const AABB &aabb) const
     {
         std::vector<size_t> out;
-
         int startX, endX, startY, endY;
         get_cell_range(aabb, startX, endX, startY, endY);
 
@@ -82,25 +94,20 @@ public:
         {
             for (int cx = startX; cx <= endX; ++cx)
             {
-                auto it = table.find({cx, cy});
+                auto it = table.find(CellCoord{cx, cy});
                 if (it != table.end())
                 {
-                    for (size_t id : it->second)
-                    {
-                        out.push_back(id);
-                    }
+                    out.insert(out.end(), it->second.begin(), it->second.end());
                 }
             }
         }
-        std::sort(out.begin(), out.end());
-        out.erase(std::unique(out.begin(), out.end()), out.end());
+        dedup_sort(out);
         return out;
     }
 
-    std::vector<size_t> get_overlapping_aabb_ids_excludeId(const AABB &aabb, int excludeId) const
+    std::vector<size_t> get_overlapping_aabb_ids_excludeId(const AABB &aabb, size_t excludeId) const
     {
         std::vector<size_t> out;
-        
         int startX, endX, startY, endY;
         get_cell_range(aabb, startX, endX, startY, endY);
 
@@ -108,29 +115,38 @@ public:
         {
             for (int cx = startX; cx <= endX; ++cx)
             {
-                auto it = table.find({cx, cy});
+                auto it = table.find(CellCoord{cx, cy});
                 if (it != table.end())
                 {
                     for (size_t id : it->second)
                     {
                         if (id != excludeId)
+                        {
                             out.push_back(id);
+                        }
                     }
                 }
             }
         }
-        std::sort(out.begin(), out.end());
-        out.erase(std::unique(out.begin(), out.end()), out.end());
+        dedup_sort(out);
         return out;
     }
 
 private:
-    inline void get_cell_range(const AABB &aabb, int &startX, int &endX, int &startY, int &endY) const noexcept
+    inline void get_cell_range(const AABB &aabb,
+                               int &startX, int &endX,
+                               int &startY, int &endY) const noexcept
     {
         startX = static_cast<int>(std::floor(aabb.l / cellSize));
         endX = static_cast<int>(std::floor(aabb.r / cellSize));
         startY = static_cast<int>(std::floor(aabb.b / cellSize));
         endY = static_cast<int>(std::floor(aabb.t / cellSize));
+    }
+
+    static inline void dedup_sort(std::vector<size_t> &vec)
+    {
+        std::sort(vec.begin(), vec.end());
+        vec.erase(std::unique(vec.begin(), vec.end()), vec.end());
     }
 };
 

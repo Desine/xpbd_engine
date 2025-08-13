@@ -81,12 +81,17 @@ namespace xpbd
         bool paused = false;
         bool stepOnce = false;
 
+        bool threadHash = true;
+        bool threadGenerateConstraints = true;
+
         Particles particles;
         std::vector<DistanceConstraint> distanceConstraints;
         std::vector<VolumeConstraint> volumeConstraints;
         std::vector<ColliderPoints> polygonColliders;
         std::vector<ColliderPoints> pointsColliders;
         
+        std::vector<AABB> aabbs_polygons;
+        std::vector<AABB> aabbs_points;
         std::vector<PointPolygonCollision> collisions;
         SpatialHashAABB spatialHashAABB;
 

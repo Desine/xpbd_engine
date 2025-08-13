@@ -37,13 +37,52 @@ void draw_collisions(std::vector<xpbd::PointPolygonCollision> collisions)
         renderer::draw_axis_aligned_bounding_box(c.box.l, c.box.r, c.box.b, c.box.t);
 }
 
+void ShowFpsGraph(float newFps)
+{
+    const size_t historyFrames = 120;
+    static float fpsHistory[historyFrames] = {0};
+    static int offset = 0;
+    offset = (offset + 1) % IM_ARRAYSIZE(fpsHistory);
+
+    fpsHistory[offset] = newFps;
+
+    float fpsHistoryToDraw[historyFrames];
+    std::copy(std::begin(fpsHistory), std::end(fpsHistory), std::begin(fpsHistoryToDraw));
+
+    float min = 0.0f;
+    float max = 144.0f;
+
+    static bool scroll = true;
+    float scrollFloat = offset;
+    if (!scroll)
+    {
+        scrollFloat = 0.0f;
+        fpsHistoryToDraw[offset] = max;
+        fpsHistoryToDraw[(offset + 1) % IM_ARRAYSIZE(fpsHistory)] = min;
+    }
+
+    ImVec2 size(0, 150);
+
+    ImGui::PlotLines(
+        "FPS",
+        fpsHistoryToDraw,
+        IM_ARRAYSIZE(fpsHistory),
+        scrollFloat,
+        nullptr,
+        min,
+        max,
+        size);
+    if (ImGui::Button("toggle fps scroll"))
+        scroll = !scroll;
+}
+
 int main()
 {
 
     rmtSettings *settings = rmt_Settings();
     settings->port = 17815; // default 17815
     Remotery *rmt;
-    // rmt_CreateGlobalInstance(&rmt);
+    rmt_CreateGlobalInstance(&rmt);
 
     xpbd::World world;
     world.init();
@@ -98,6 +137,23 @@ int main()
             {
                 sf::Vector2f worldPos = renderer::window.mapPixelToCoords(mouseCurrent);
                 glm::vec2 position(worldPos.x, worldPos.y);
+                if (event.key.code == sf::Keyboard::Q)
+                {
+                    size_t width = 5;
+                    size_t height = 5;
+                    float spacingX = 300;
+                    float spacingY = 200;
+                    for (size_t i = 0; i < width; ++i)
+                    {
+                        float x = position.x - width * spacingX * 0.5 + spacingX * i;
+                        for (size_t j = 0; j < height; ++j)
+                        {
+                            float y = position.y + spacingY * j;
+                            world.spawnFromJson("balloon", {x, y});
+                        }
+                    }
+                }
+
                 if (event.key.code == sf::Keyboard::A)
                     world.spawnFromJson("2boxes", position);
                 if (event.key.code == sf::Keyboard::S)
@@ -120,7 +176,7 @@ int main()
 
         ImGui::NewFrame();
         ImGui::Begin("Main");
-        ImGui::Text("FPS: %.1f", 1.0f / deltaTime.asSeconds());
+        ShowFpsGraph(1.0f / deltaTime.asSeconds());
         if (ImGui::Button(world.paused ? "Play" : "Pause"))
             world.paused = !world.paused;
         if (ImGui::Button("stepOnce - todo"))
@@ -133,8 +189,12 @@ int main()
         ImGui::SliderFloat("gravity.x", &world.gravity.x, -20, 20);
         ImGui::SliderFloat("gravity.y", &world.gravity.y, -20, 20);
         int cellSize = world.spatialHashAABB.cellSize;
-        ImGui::SliderInt("spatialHashing_cellSize: ", &cellSize, 50, 2000);
+        ImGui::SliderInt("spatialHashing_cellSize: ", &cellSize, 30, 1000);
         world.spatialHashAABB.cellSize = cellSize;
+        if (ImGui::Button(world.threadHash ? "threadHash disable" : "threadHash enagle"))
+            world.threadHash = !world.threadHash;
+        if (ImGui::Button(world.threadGenerateConstraints ? "threadGenerateConstraints disable" : "threadGenerateConstraints enagle"))
+            world.threadGenerateConstraints = !world.threadGenerateConstraints;
 
         ImGui::End();
         ImGui::EndFrame();
@@ -143,10 +203,11 @@ int main()
         draw_world(world);
         // renderer::set_color(sf::Color::White);
         // draw_collisions(world.collisions);
-        ImGui::SFML::Render(renderer::window);
-        renderer::window.display();
 
         world.update(deltaTime.asSeconds());
+
+        ImGui::SFML::Render(renderer::window);
+        renderer::window.display();
     }
 
     ImGui::SFML::Shutdown();
