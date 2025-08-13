@@ -670,7 +670,7 @@ namespace xpbd
                     for (auto &v : pecc_thread)
                         pecc.insert(pecc.end(), v.begin(), v.end());
 
-                    // point/polygon
+                    // points/polygon
                     aabbs_points = generate_collider_points_aabbs(particles, pointsColliders);
                     for (size_t a = 0; a < aabbs_points.size(); ++a)
                     {
@@ -682,14 +682,16 @@ namespace xpbd
                             float avgStaticFriction = (pointsColliders[a].staticFriction + polygonColliders[i].staticFriction) * 0.5f;
                             float avgKineticFriction = (pointsColliders[a].kineticFriction + polygonColliders[i].kineticFriction) * 0.5f;
                             float avgCompliance = (pointsColliders[a].compliance + polygonColliders[i].compliance) * 0.5f;
-                            collisions.push_back({
+                            PointsPolygonCollision pointPolygonCollision{
                                 pointsColliders[a].indices,
                                 polygonColliders[i].indices,
                                 avgStaticFriction,
                                 avgKineticFriction,
                                 avgCompliance,
                                 aabbs_points[a].get_intersection(aabbs_polygons[i]),
-                            });
+                            };
+                            auto constraints = get_PointEdgeCollisionConstraints_from_PointsPolygonCollision(particles, pointPolygonCollision);
+                            pecc.insert(pecc.end(), constraints.begin(), constraints.end());
                         }
                     }
                     rmt_EndCPUSample();
