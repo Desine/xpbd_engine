@@ -82,11 +82,11 @@ int main()
     rmtSettings *settings = rmt_Settings();
     settings->port = 17815; // default 17815
     Remotery *rmt;
-    rmt_CreateGlobalInstance(&rmt);
+    // rmt_CreateGlobalInstance(&rmt);
 
     xpbd::World world;
     world.init();
-    // world.addPolygon({0, 300}, 40, 6, 3, 0.005f);
+    // world.spawnPolygon({0, 0}, 40, 6, 3, 0.005f);
 
     // while (true)
     // {

@@ -92,8 +92,9 @@ namespace xpbd
         
         std::vector<AABB> aabbs_polygons;
         std::vector<AABB> aabbs_points;
-        std::vector<PointsPolygonCollision> collisions;
         SpatialHashAABB spatialHashAABB;
+        std::vector<PointsPolygonCollision> pointsPolygonCollisions;
+        std::vector<PointEdgeCollisionConstraints> pecc;
 
         void init();
 
