@@ -93,7 +93,6 @@ namespace xpbd
         std::vector<AABB> aabbs_polygons;
         std::vector<AABB> aabbs_points;
         SpatialHashAABB spatialHashAABB;
-        std::vector<PointsPolygonCollision> pointsPolygonCollisions;
         std::vector<PointEdgeCollisionConstraints> pecc;
 
         void init();
@@ -135,7 +134,7 @@ namespace xpbd
 
     std::vector<AABB> generate_collider_points_aabbs(const Particles &p, const std::vector<std::vector<size_t>> &indices);
 
-    std::vector<PointEdgeCollisionConstraints> get_PointEdgeCollisionConstraints_from_PointsPolygonCollision(const Particles &p, const PointsPolygonCollision &collision);
+    void add_PointEdgeCollisionConstraints_from_PointsPolygonCollision(std::vector<PointEdgeCollisionConstraints> &pecc, const Particles &p, const PointsPolygonCollision &collision);
     void solve_point_edge_collision_constraints(Particles &p, std::vector<PointEdgeCollisionConstraints> &pecc, float dt);
     void apply_point_edge_collision_constraints_kinetic_friction(Particles &p, const std::vector<PointEdgeCollisionConstraints> &pecc, float dt);
 }

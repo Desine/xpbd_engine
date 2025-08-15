@@ -13,18 +13,23 @@ struct AABB
 {
     float l, r, b, t;
 
-    bool intersects(const AABB &o) const noexcept
+    bool intersects(const AABB &o) const
     {
         return !(r < o.l || l > o.r || t < o.b || b > o.t);
     }
 
-    AABB get_intersection(const AABB &o) const noexcept
+    AABB get_intersection(const AABB &o) const
     {
         return {
             std::max(l, o.l),
             std::min(r, o.r),
             std::max(b, o.b),
             std::min(t, o.t)};
+    }
+
+    bool contains_point(const glm::vec2 &point) const
+    {
+        return point.x >= l && point.x <= r && point.y >= b && point.y <= t;
     }
 };
 
@@ -55,9 +60,11 @@ class SpatialHashAABB
 public:
     size_t cellSize;
     size_t tableReserve;
-    ankerl::unordered_dense::map<CellCoord, std::vector<size_t>, CellCoordHash> table;
+    size_t bucketReserve;
+    ankerl::unordered_dense::map<CellCoord, std::vector<size_t>, CellCoordHash> idTable;
+    ankerl::unordered_dense::map<size_t, AABB> aabbTable;
 
-    explicit SpatialHashAABB(size_t cellSize = 300, size_t tableReserve = 1024)
+    explicit SpatialHashAABB(size_t cellSize = 300, size_t tableReserve = 1024, size_t bucketReserve = 20)
         : cellSize(cellSize), tableReserve(tableReserve)
     {
         clear();
@@ -65,8 +72,11 @@ public:
 
     void clear()
     {
-        table.clear();
-        table.reserve(tableReserve);
+        idTable.clear();
+        idTable.reserve(tableReserve);
+
+        aabbTable.clear();
+        aabbTable.reserve(tableReserve);
     }
 
     void add_aabb(const AABB &aabb, size_t id)
@@ -78,10 +88,12 @@ public:
         {
             for (int cx = startX; cx <= endX; ++cx)
             {
-                auto &bucket = table[CellCoord{cx, cy}];
+                auto &bucket = idTable[CellCoord{cx, cy}];
+                bucket.reserve(bucketReserve);
                 bucket.push_back(id);
             }
         }
+        aabbTable.insert({id, aabb});
     }
 
     std::vector<size_t> get_overlapping_aabb_ids(const AABB &aabb) const
@@ -90,14 +102,18 @@ public:
         int startX, endX, startY, endY;
         get_cell_range(aabb, startX, endX, startY, endY);
 
-        for (int cy = startY; cy <= endY; ++cy)
+        for (int y = startY; y <= endY; ++y)
         {
-            for (int cx = startX; cx <= endX; ++cx)
+            for (int y = startX; y <= endX; ++y)
             {
-                auto it = table.find(CellCoord{cx, cy});
-                if (it != table.end())
+                auto idT = idTable.find(CellCoord{y, y});
+                for (size_t id : idT->second)
                 {
-                    out.insert(out.end(), it->second.begin(), it->second.end());
+                    auto aabbT = aabbTable.find(id);
+                    if (aabbT != aabbTable.end() && aabb.intersects(aabbT->second))
+                    {
+                        out.push_back(id);
+                    }
                 }
             }
         }
@@ -111,16 +127,19 @@ public:
         int startX, endX, startY, endY;
         get_cell_range(aabb, startX, endX, startY, endY);
 
-        for (int cy = startY; cy <= endY; ++cy)
+        for (int y = startY; y <= endY; ++y)
         {
-            for (int cx = startX; cx <= endX; ++cx)
+            for (int x = startX; x <= endX; ++x)
             {
-                auto it = table.find(CellCoord{cx, cy});
-                if (it != table.end())
+                auto idT = idTable.find(CellCoord{x, y});
+                if (idT != idTable.end())
                 {
-                    for (size_t id : it->second)
+                    for (size_t id : idT->second)
                     {
-                        if (id != excludeId)
+                        if (id == excludeId)
+                            continue;
+                        auto aabbT = aabbTable.find(id);
+                        if (aabbT != aabbTable.end() && aabb.intersects(aabbT->second))
                         {
                             out.push_back(id);
                         }

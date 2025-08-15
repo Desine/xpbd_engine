@@ -4,6 +4,8 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <omp.h>
+#include <thread>
 
 #include "renderer.hpp"
 #include "xpbd.hpp"
@@ -78,7 +80,6 @@ void ShowFpsGraph(float newFps)
 
 int main()
 {
-
     rmtSettings *settings = rmt_Settings();
     settings->port = 17815; // default 17815
     Remotery *rmt;
