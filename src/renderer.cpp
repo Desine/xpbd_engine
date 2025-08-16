@@ -8,17 +8,28 @@ namespace renderer
 
     void setup_window()
     {
-        window.create(sf::VideoMode({WINDOW_WIDTH, WINDOW_HEIGHT}), "xpbd_engine");
+        window.create(sf::VideoMode({static_cast<unsigned int>(width), static_cast<unsigned int>(height)}), "xpbd_engine");
         window.setFramerateLimit(144);
     }
 
     void setup_view()
     {
         view = window.getDefaultView();
-        view.setSize(WINDOW_WIDTH, -WINDOW_HEIGHT);
-        // view.zoom(0.5f);
+        view.setSize(width, -height);
         sf::Vector2f cameraCenter(0, 0);
         view.setCenter(cameraCenter);
+        window.setView(view);
+    }
+    
+    void zoom(float factor){
+        view.zoom(factor);
+        window.setView(view);
+    }
+    void resize(float w, float h)
+    {
+        width = w;
+        height = h;
+        view.setSize(width, -height);
         window.setView(view);
     }
 

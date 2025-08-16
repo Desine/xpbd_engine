@@ -3,7 +3,7 @@
 #include <SFML/Graphics.hpp>
 
 #include <stdio.h>
-#include <string.h>
+#include <string>
 #include <omp.h>
 #include <thread>
 
@@ -78,6 +78,27 @@ void ShowFpsGraph(float newFps)
         scroll = !scroll;
 }
 
+void spawn_many(
+    xpbd::World &world,
+    glm::vec2 &pos,
+    size_t amountX,
+    size_t amountY,
+    float spacingX,
+    float spacingY,
+    std::string name)
+{
+
+    for (size_t i = 0; i < amountX; ++i)
+    {
+        float x = pos.x - amountX * spacingX * 0.5 + spacingX * i;
+        for (size_t j = 0; j < amountY; ++j)
+        {
+            float y = pos.y + spacingY * j;
+            world.spawnFromJson(name, {x, y});
+        }
+    }
+}
+
 int main()
 {
     rmtSettings *settings = rmt_Settings();
@@ -112,6 +133,11 @@ int main()
             if (event.type == sf::Event::Closed)
                 renderer::window.close();
 
+            if (event.type == sf::Event::Resized)
+                renderer::resize(
+                    static_cast<float>(event.size.width),
+                    static_cast<float>(event.size.height));
+
             // camera
             sf::Vector2i mouseCurrent = sf::Mouse::getPosition(renderer::window);
 
@@ -125,13 +151,7 @@ int main()
                 renderer::window.setView(renderer::view);
             }
             if (event.type == sf::Event::MouseWheelScrolled && event.mouseWheelScroll.wheel == sf::Mouse::VerticalWheel)
-            {
-                if (event.mouseWheelScroll.delta > 0)
-                    renderer::view.zoom(0.95);
-                else
-                    renderer::view.zoom(1.05);
-                renderer::window.setView(renderer::view);
-            }
+                renderer::zoom(event.mouseWheelScroll.delta > 0 ? 0.95 : 1.05);
 
             // spawn
             if (event.type == sf::Event::KeyReleased)
@@ -140,35 +160,35 @@ int main()
                 glm::vec2 position(worldPos.x, worldPos.y);
                 if (event.key.code == sf::Keyboard::Q)
                 {
-                    size_t width = 5;
-                    size_t height = 5;
+                    size_t amountX = 5;
+                    size_t amountY = 5;
                     float spacingX = 300;
                     float spacingY = 200;
-                    for (size_t i = 0; i < width; ++i)
-                    {
-                        float x = position.x - width * spacingX * 0.5 + spacingX * i;
-                        for (size_t j = 0; j < height; ++j)
-                        {
-                            float y = position.y + spacingY * j;
-                            world.spawnFromJson("balloon", {x, y});
-                        }
-                    }
+                    spawn_many(world, position, amountX, amountY, spacingX, spacingY, "car");
                 }
                 if (event.key.code == sf::Keyboard::W)
                 {
-                    size_t width = 10;
-                    size_t height = 10;
+                    size_t amountX = 5;
+                    size_t amountY = 5;
+                    float spacingX = 300;
+                    float spacingY = 200;
+                    spawn_many(world, position, amountX, amountY, spacingX, spacingY, "balloon");
+                }
+                if (event.key.code == sf::Keyboard::E)
+                {
+                    size_t amountX = 10;
+                    size_t amountY = 10;
                     float spacingX = 100;
                     float spacingY = 100;
-                    for (size_t i = 0; i < width; ++i)
+                    for (size_t i = 0; i < amountX; ++i)
                     {
-                        float x = position.x - width * spacingX * 0.5 + spacingX * i;
-                        for (size_t j = 0; j < height; ++j)
+                        float x = position.x - amountX * spacingX * 0.5 + spacingX * i;
+                        for (size_t j = 0; j < amountY; ++j)
                         {
                             float y = position.y + spacingY * j;
                             const float radius = 40;
                             const size_t segments = 6;
-                            const float mass = 5;
+                            const float mass = 10;
                             const float compliance = 0.005f;
                             world.spawnPolygon({x, y}, radius, segments, mass, compliance);
                         }
@@ -176,12 +196,10 @@ int main()
                 }
 
                 if (event.key.code == sf::Keyboard::A)
-                    world.spawnFromJson("2boxes", position);
+                    world.spawnFromJson("car", position);
                 if (event.key.code == sf::Keyboard::S)
-                    world.spawnFromJson("square", position);
-                if (event.key.code == sf::Keyboard::D)
                     world.spawnFromJson("balloon", position);
-                if (event.key.code == sf::Keyboard::F)
+                if (event.key.code == sf::Keyboard::D)
                 {
                     const float radius = 40;
                     const size_t segments = 6;
@@ -189,6 +207,8 @@ int main()
                     const float compliance = 0.005f;
                     world.spawnPolygon(position, radius, segments, mass, compliance);
                 }
+                if (event.key.code == sf::Keyboard::F)
+                    world.spawnFromJson("person", position);
 
                 if (event.key.code == sf::Keyboard::R)
                     world.init();
@@ -200,8 +220,8 @@ int main()
         ShowFpsGraph(1.0f / deltaTime.asSeconds());
         if (ImGui::Button(world.paused ? "Play" : "Pause"))
             world.paused = !world.paused;
-        if (ImGui::Button("stepOnce - todo"))
-            world.stepOnce = true;
+        // if (ImGui::Button("stepOnce - todo"))
+        //     world.stepOnce = true;
         ImGui::SliderFloat("timeScale", &world.timeScale, 0.01f, 50, "%.3f");
         size_t min_value = 1;
         size_t max_value = 20;

@@ -60,9 +60,16 @@ namespace json_body_loader
             {
                 size_t i1 = dc["i1"].get<size_t>() + base_index;
                 size_t i2 = dc["i2"].get<size_t>() + base_index;
-                float restDist = dc["restDistance"].get<float>();
                 float compliance = dc["compliance"].get<float>();
-                world.add_distance_constraint(i1, i2, compliance, restDist);
+                if (dc.contains("restDistance"))
+                {
+                    float restDist = dc["restDistance"].get<float>();
+                    world.add_distance_constraint(i1, i2, compliance, restDist);
+                }
+                else
+                {
+                    world.add_distance_constraint_auto_restDist(i1, i2, compliance, world.particles);
+                }
             }
         }
 
@@ -99,9 +106,9 @@ namespace json_body_loader
         }
 
         // Load Point Colliders
-        if (j.contains("PointColliders") && j["PointColliders"].is_array())
+        if (j.contains("PointsColliders") && j["PointsColliders"].is_array())
         {
-            for (const auto &cc : j["PointColliders"])
+            for (const auto &cc : j["PointsColliders"])
             {
                 std::vector<size_t> indices;
                 for (const auto &idx : cc["indices"])

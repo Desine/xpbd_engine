@@ -1,0 +1,61 @@
+{
+  "position": [0, 0],
+  "Particles": [
+    { "pos": [-40.0, 0.0], "mass": 20.0 },
+    { "pos": [70.0, 0.0], "mass": 20.0 },
+    { "pos": [170.0, 0.0], "mass": 20.0 },
+    { "pos": [210.0, 20.0], "mass": 10.0 },
+    { "pos": [210.0, 60.0], "mass": 10.0 },
+
+    { "pos": [110.0, 80.0], "mass": 10.0 },
+    { "pos": [70.0, 130.0], "mass": 10.0 },
+    { "pos": [-20.0, 130.0], "mass": 10.0 },
+    { "pos": [-90.0, 70.0], "mass": 10.0 },
+    { "pos": [-80.0, 20.0], "mass": 10.0 },
+
+    { "pos": [10.0, 80.0], "mass": 10.0 }
+  ],
+
+  "DistanceConstraints": [
+    { "i1": 0, "i2": 1, "compliance": 0.0 },
+    { "i1": 1, "i2": 2, "compliance": 0.0 },
+    { "i1": 2, "i2": 3, "compliance": 0.0 },
+    { "i1": 3, "i2": 4, "compliance": 0.0 },
+    { "i1": 4, "i2": 5, "compliance": 0.0 },
+    { "i1": 5, "i2": 6, "compliance": 0.0 },
+    { "i1": 6, "i2": 7, "compliance": 0.0 },
+    { "i1": 7, "i2": 8, "compliance": 0.0 },
+    { "i1": 8, "i2": 9, "compliance": 0.0 },
+    { "i1": 9, "i2": 0, "compliance": 0.0 },
+
+    { "i1": 5, "i2": 1, "compliance": 0.0 },
+    { "i1": 5, "i2": 2, "compliance": 0.03 },
+    { "i1": 5, "i2": 3, "compliance": 0.03 },
+
+    { "i1": 0, "i2": 8, "compliance": 0.03 },
+    { "i1": 2, "i2": 4, "compliance": 0.03 },
+
+    { "i1": 10, "i2": 0, "compliance": 0.03 },
+    { "i1": 10, "i2": 1, "compliance": 0.0 },
+    { "i1": 10, "i2": 5, "compliance": 0.03 },
+    { "i1": 10, "i2": 6, "compliance": 0.03 },
+    { "i1": 10, "i2": 7, "compliance": 0.03 },
+    { "i1": 10, "i2": 8, "compliance": 0.03 },
+    { "i1": 10, "i2": 9, "compliance": 0.03 }
+  ],
+  "VolumeConstraints": [
+    {
+      "indices": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+      "restPressure": 1,
+      "compliance": 0.0
+    }
+  ],
+  "PolygonColliders": [
+    {
+      "indices": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+      "staticFriction": 0.5,
+      "kineticFriction": 0.4,
+      "compliance": 0.0
+    }
+  ]
+}

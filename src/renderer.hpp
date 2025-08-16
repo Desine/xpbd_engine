@@ -7,8 +7,8 @@
 
 namespace renderer
 {
-    const int WINDOW_WIDTH = 2000;
-    const int WINDOW_HEIGHT = 2000;
+    static int width = 2000;
+    static int height = 2000;
 
     extern sf::RenderWindow window;
     extern sf::View view;
@@ -24,5 +24,7 @@ namespace renderer
 
     void setup_window();
     void setup_view();
+    void zoom(float factor);
+    void resize(float width, float height);
     bool setup_imgui();
 };

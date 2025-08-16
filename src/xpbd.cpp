@@ -219,7 +219,7 @@ namespace xpbd
                     current.t = pos.y;
             }
 
-            out.push_back(current);
+            out.emplace_back(current);
         }
     }
 
@@ -500,19 +500,19 @@ namespace xpbd
 
     void World::add_particle(const glm::vec2 &pos, float mass)
     {
-        particles.pos.push_back(pos);
-        particles.prev.push_back(pos);
-        particles.vel.push_back({0, 0});
+        particles.pos.emplace_back(pos);
+        particles.prev.emplace_back(pos);
+        particles.vel.emplace_back(0, 0);
         float w = mass == 0 ? 0 : 1 / mass;
-        particles.w.push_back(w);
+        particles.w.emplace_back(w);
     }
     void World::add_particle(const glm::vec2 &pos, float mass, const glm::vec2 &vel)
     {
-        particles.pos.push_back(pos);
-        particles.prev.push_back(pos);
-        particles.vel.push_back(vel);
+        particles.pos.emplace_back(pos);
+        particles.prev.emplace_back(pos);
+        particles.vel.emplace_back(vel);
         float w = mass == 0 ? 0 : 1 / mass;
-        particles.w.push_back(w);
+        particles.w.emplace_back(w);
     }
 
     void World::add_distance_constraint(size_t i1, size_t i2, float compliance, float restDist)
@@ -520,7 +520,7 @@ namespace xpbd
         float compressionDamping = 0.5f;
         float extensionDamping = 0.5f;
         float lambda = 0;
-        distanceConstraints.push_back({i1, i2, restDist, compressionDamping, extensionDamping, compliance, lambda});
+        distanceConstraints.emplace_back(i1, i2, restDist, compressionDamping, extensionDamping, compliance, lambda);
     }
     void World::add_distance_constraint_auto_restDist(size_t i1, size_t i2, float compliance, Particles &p)
     {
@@ -528,29 +528,29 @@ namespace xpbd
         float compressionDamping = 0.5f;
         float extensionDamping = 0.5f;
         float lambda = 0;
-        distanceConstraints.push_back({i1, i2, restDist, compressionDamping, extensionDamping, compliance, lambda});
+        distanceConstraints.emplace_back(i1, i2, restDist, compressionDamping, extensionDamping, compliance, lambda);
     }
 
     void World::add_volume_constraint(const std::vector<size_t> &indices, float compliance)
     {
         float restVolume = compute_polygon_area(particles, indices);
         float lambda = 0;
-        volumeConstraints.push_back({indices, restVolume, compliance, lambda});
+        volumeConstraints.emplace_back(indices, restVolume, compliance, lambda);
     }
     void World::add_volume_constraint(const std::vector<size_t> &indices, float compliance, float restPressure)
     {
         float restVolume = compute_polygon_area(particles, indices);
         float lambda = 0;
-        volumeConstraints.push_back({indices, restVolume * restPressure, compliance, lambda});
+        volumeConstraints.emplace_back(indices, restVolume * restPressure, compliance, lambda);
     }
 
     void World::add_polygon_collider(std::vector<size_t> &indices, float staticFriction, float kineticFriction, float compliance)
     {
-        polygonColliders.push_back({indices, staticFriction, kineticFriction, compliance});
+        polygonColliders.emplace_back(indices, staticFriction, kineticFriction, compliance);
     }
     void World::add_points_collider(std::vector<size_t> &indices, float staticFriction, float kineticFriction, float compliance)
     {
-        pointsColliders.push_back({indices, staticFriction, kineticFriction, compliance});
+        pointsColliders.emplace_back(indices, staticFriction, kineticFriction, compliance);
     }
 
     void World::spawnFromJson(const std::string &name, const glm::vec2 &position)
@@ -574,7 +574,7 @@ namespace xpbd
             glm::vec2 dir = glm::vec2(cosf(angle), sinf(angle));
             add_particle(dir * radius + pos, mass / segments);
 
-            ids.push_back(start + i);
+            ids.emplace_back(start + i);
         }
 
         for (int i = 0; i < segments; ++i)
