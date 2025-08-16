@@ -190,9 +190,12 @@ namespace xpbd
         }
     }
 
-    std::vector<AABB> generate_collider_points_aabbs(const Particles &p, const std::vector<ColliderPoints> &colliderPoints)
+    void generate_collider_points_aabbs(
+        std::vector<AABB> &out,
+        const Particles &p,
+        const std::vector<ColliderPoints> &colliderPoints)
     {
-        std::vector<AABB> out;
+        out.clear();
         out.reserve(colliderPoints.size());
 
         for (auto &c : colliderPoints)
@@ -202,6 +205,7 @@ namespace xpbd
             current.r = -std::numeric_limits<float>::max();
             current.b = std::numeric_limits<float>::max();
             current.t = -std::numeric_limits<float>::max();
+
             for (auto i : c.indices)
             {
                 glm::vec2 pos = p.pos[i];
@@ -214,9 +218,9 @@ namespace xpbd
                 if (pos.y > current.t)
                     current.t = pos.y;
             }
+
             out.push_back(current);
         }
-        return out;
     }
 
     bool point_in_polygon(const glm::vec2 &point, const std::vector<glm::vec2> &positions)
@@ -244,12 +248,12 @@ namespace xpbd
         return windingNumber != 0;
     }
     std::vector<PointEdgeCollision> get_PointEdgeCollisions_of_points_inside_polygon(
+        std::vector<PointEdgeCollision> &out,
         const Particles &p,
         const std::vector<size_t> &pointIndices,
         const std::vector<size_t> &polygonIndices,
         const PolygonCache &cache)
     {
-        std::vector<PointEdgeCollision> out;
         out.reserve(pointIndices.size());
 
         const auto &polygonPositions = cache.positions;
@@ -306,7 +310,8 @@ namespace xpbd
         if (filteredPointIndices.empty())
             return;
 
-        std::vector<PointEdgeCollision> detections = get_PointEdgeCollisions_of_points_inside_polygon(particles, filteredPointIndices, collision.polygon, collision.cache);
+        std::vector<PointEdgeCollision> detections;
+        get_PointEdgeCollisions_of_points_inside_polygon(detections, particles, filteredPointIndices, collision.polygon, collision.cache);
 
         pecc.reserve(pecc.size() + detections.size());
         for (const auto &c : detections)
@@ -462,23 +467,33 @@ namespace xpbd
     // Class World
     void World::init()
     {
-        particles = Particles();
-        particles.pos.reserve(3000);
-        particles.prev.reserve(3000);
-        particles.vel.reserve(3000);
-        particles.w.reserve(3000);
+        particles.pos.clear();
+        particles.pos.reserve(5000);
+        particles.prev.clear();
+        particles.prev.reserve(5000);
+        particles.vel.clear();
+        particles.vel.reserve(5000);
+        particles.w.clear();
+        particles.w.reserve(5000);
 
         distanceConstraints.clear();
-        distanceConstraints.reserve(3000);
+        distanceConstraints.reserve(5000);
 
         volumeConstraints.clear();
-        volumeConstraints.reserve(3000);
+        volumeConstraints.reserve(1000);
 
         polygonColliders.clear();
-        polygonColliders.reserve(3000);
+        polygonColliders.reserve(1000);
 
         pointsColliders.clear();
-        pointsColliders.reserve(3000);
+        pointsColliders.reserve(1000);
+
+        polygonCollider_aabbs.reserve(1000);
+        pointsColliders_aabbs.reserve(1000);
+
+        polygonsHash.reserve(1000);
+
+        pecc.reserve(5000);
 
         spawnFromJson("ground", {0, -1000});
     }
@@ -615,12 +630,12 @@ namespace xpbd
                     solve_volume_constraints(particles, volumeConstraints, substep_time);
                     rmt_EndCPUSample();
 
-                    aabbs_polygons = generate_collider_points_aabbs(particles, polygonColliders);
+                    generate_collider_points_aabbs(polygonCollider_aabbs, particles, polygonColliders);
 
                     rmt_BeginCPUSample(fill_hash, 0);
                     spatialHashAABB.clear();
                     for (size_t i = 0; i < polygons_size; ++i)
-                        spatialHashAABB.add_aabb(aabbs_polygons[i], i);
+                        spatialHashAABB.add_aabb(polygonCollider_aabbs[i], i);
                     rmt_EndCPUSample();
 
                     // rmt_BeginCPUSample(generate_pecc, 0);
@@ -654,14 +669,15 @@ namespace xpbd
                     for (size_t a = 0; a < polygons_size; ++a)
                     {
                         rmt_BeginCPUSample(hash_get_ids, 0);
-                        std::vector<size_t> overlapping_ids = spatialHashAABB.get_overlapping_aabb_ids_excludeId(aabbs_polygons[a], a);
+                        std::vector<size_t> overlapping_aabb_ids;
+                        spatialHashAABB.get_overlapping_aabb_ids_excludeId(overlapping_aabb_ids, polygonCollider_aabbs[a], a);
                         rmt_EndCPUSample();
 
                         rmt_ScopedCPUSample(thread, 0);
                         auto &local_pecc = pecc_thread[omp_get_thread_num()];
-                        local_pecc.reserve(overlapping_ids.size() * 10);
+                        local_pecc.reserve(overlapping_aabb_ids.size() * 10);
 
-                        for (auto i : overlapping_ids)
+                        for (auto i : overlapping_aabb_ids)
                         {
                             float avgStaticFriction = (polygonColliders[a].staticFriction + polygonColliders[i].staticFriction) * 0.5f;
                             float avgKineticFriction = (polygonColliders[a].kineticFriction + polygonColliders[i].kineticFriction) * 0.5f;
@@ -673,7 +689,7 @@ namespace xpbd
                                 avgStaticFriction,
                                 avgKineticFriction,
                                 avgCompliance,
-                                aabbs_polygons[a].get_intersection(aabbs_polygons[i]),
+                                polygonCollider_aabbs[a].get_intersection(polygonCollider_aabbs[i]),
                                 polygonsHash[i],
                             };
                             add_PointEdgeCollisionConstraints_from_PointsPolygonCollision(local_pecc, particles, pointPolygonCollision);
@@ -689,10 +705,11 @@ namespace xpbd
                         pecc.insert(pecc.end(), v.begin(), v.end());
 
                     // points/polygon
-                    aabbs_points = generate_collider_points_aabbs(particles, pointsColliders);
-                    for (size_t a = 0; a < aabbs_points.size(); ++a)
+                    generate_collider_points_aabbs(pointsColliders_aabbs, particles, pointsColliders);
+                    for (size_t a = 0; a < pointsColliders_aabbs.size(); ++a)
                     {
-                        std::vector<size_t> overlapping_aabb_ids = spatialHashAABB.get_overlapping_aabb_ids(aabbs_points[a]);
+                        std::vector<size_t> overlapping_aabb_ids;
+                        spatialHashAABB.get_overlapping_aabb_ids(overlapping_aabb_ids, pointsColliders_aabbs[a]);
 
                         for (auto i : overlapping_aabb_ids)
                         {
@@ -705,7 +722,7 @@ namespace xpbd
                                 avgStaticFriction,
                                 avgKineticFriction,
                                 avgCompliance,
-                                aabbs_points[a].get_intersection(aabbs_polygons[i]),
+                                pointsColliders_aabbs[a].get_intersection(polygonCollider_aabbs[i]),
                                 polygonsHash[i],
                             };
                             add_PointEdgeCollisionConstraints_from_PointsPolygonCollision(pecc, particles, pointPolygonCollision);

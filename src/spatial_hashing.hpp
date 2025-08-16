@@ -61,11 +61,12 @@ public:
     size_t cellSize;
     size_t tableReserve;
     size_t bucketReserve;
+    size_t outIdsReserve;
     ankerl::unordered_dense::map<CellCoord, std::vector<size_t>, CellCoordHash> idTable;
     ankerl::unordered_dense::map<size_t, AABB> aabbTable;
 
-    explicit SpatialHashAABB(size_t cellSize = 300, size_t tableReserve = 1024, size_t bucketReserve = 20)
-        : cellSize(cellSize), tableReserve(tableReserve), bucketReserve(bucketReserve)
+    explicit SpatialHashAABB(size_t cellSize = 300, size_t tableReserve = 1024, size_t bucketReserve = 20, size_t outIdsReserve = 10)
+        : cellSize(cellSize), tableReserve(tableReserve), bucketReserve(bucketReserve), outIdsReserve(outIdsReserve)
     {
         clear();
     }
@@ -96,9 +97,10 @@ public:
         aabbTable.insert({id, aabb});
     }
 
-    std::vector<size_t> get_overlapping_aabb_ids(const AABB &aabb) const
+    void get_overlapping_aabb_ids(std::vector<size_t> &out, const AABB &aabb) const
     {
-        std::vector<size_t> out;
+        out.clear();
+        out.reserve(outIdsReserve);
         int startX, endX, startY, endY;
         get_cell_range(aabb, startX, endX, startY, endY);
 
@@ -112,18 +114,18 @@ public:
                     auto aabbT = aabbTable.find(id);
                     if (aabbT != aabbTable.end() && aabb.intersects(aabbT->second))
                     {
-                        out.push_back(id);
+                        out.emplace_back(id);
                     }
                 }
             }
         }
         dedup_sort(out);
-        return out;
     }
 
-    std::vector<size_t> get_overlapping_aabb_ids_excludeId(const AABB &aabb, size_t excludeId) const
+    void get_overlapping_aabb_ids_excludeId(std::vector<size_t> &out, const AABB &aabb, size_t excludeId) const
     {
-        std::vector<size_t> out;
+        out.clear();
+        out.reserve(outIdsReserve);
         int startX, endX, startY, endY;
         get_cell_range(aabb, startX, endX, startY, endY);
 
@@ -141,14 +143,13 @@ public:
                         auto aabbT = aabbTable.find(id);
                         if (aabbT != aabbTable.end() && aabb.intersects(aabbT->second))
                         {
-                            out.push_back(id);
+                            out.emplace_back(id);
                         }
                     }
                 }
             }
         }
         dedup_sort(out);
-        return out;
     }
 
 private:

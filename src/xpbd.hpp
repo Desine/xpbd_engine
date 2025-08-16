@@ -97,9 +97,9 @@ namespace xpbd
         std::vector<VolumeConstraint> volumeConstraints;
         std::vector<ColliderPoints> polygonColliders;
         std::vector<ColliderPoints> pointsColliders;
-        
-        std::vector<AABB> aabbs_polygons;
-        std::vector<AABB> aabbs_points;
+
+        std::vector<AABB> polygonCollider_aabbs;
+        std::vector<AABB> pointsColliders_aabbs;
         SpatialHashAABB spatialHashAABB;
         std::vector<PolygonCache> polygonsHash;
         std::vector<PointEdgeCollisionConstraints> pecc;
@@ -141,7 +141,7 @@ namespace xpbd
     void solve_volume_constraint(Particles &p, VolumeConstraint &vc, float dt);
     void solve_volume_constraints(Particles &p, std::vector<VolumeConstraint> &vc, float dt);
 
-    std::vector<AABB> generate_collider_points_aabbs(const Particles &p, const std::vector<std::vector<size_t>> &indices);
+    void generate_collider_points_aabbs(std::vector<AABB> &out, const Particles &p, const std::vector<ColliderPoints> &colliderPoints);
 
     void add_PointEdgeCollisionConstraints_from_PointsPolygonCollision(std::vector<PointEdgeCollisionConstraints> &pecc, const Particles &p, const PointsPolygonCollision &collision);
     void solve_point_edge_collision_constraints(Particles &p, std::vector<PointEdgeCollisionConstraints> &pecc, float dt);
