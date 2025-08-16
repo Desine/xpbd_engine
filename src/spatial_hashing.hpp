@@ -65,7 +65,7 @@ public:
     ankerl::unordered_dense::map<size_t, AABB> aabbTable;
 
     explicit SpatialHashAABB(size_t cellSize = 300, size_t tableReserve = 1024, size_t bucketReserve = 20)
-        : cellSize(cellSize), tableReserve(tableReserve)
+        : cellSize(cellSize), tableReserve(tableReserve), bucketReserve(bucketReserve)
     {
         clear();
     }

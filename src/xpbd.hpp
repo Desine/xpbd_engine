@@ -49,6 +49,13 @@ namespace xpbd
         size_t edge1;
         size_t edge2;
     };
+    struct PolygonCache
+    {
+        std::vector<glm::vec2> positions;
+        size_t positions_size;
+        std::vector<glm::vec2> edges;
+        std::vector<float> edgesLen2;
+    };
     struct PointsPolygonCollision
     {
         std::vector<size_t> points;
@@ -57,6 +64,7 @@ namespace xpbd
         float kineticFriction;
         float compliance;
         AABB box;
+        PolygonCache cache;
     };
     struct PointEdgeCollisionConstraints
     {
@@ -93,6 +101,7 @@ namespace xpbd
         std::vector<AABB> aabbs_polygons;
         std::vector<AABB> aabbs_points;
         SpatialHashAABB spatialHashAABB;
+        std::vector<PolygonCache> polygonsHash;
         std::vector<PointEdgeCollisionConstraints> pecc;
 
         void init();

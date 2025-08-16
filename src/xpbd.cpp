@@ -246,26 +246,16 @@ namespace xpbd
     std::vector<PointEdgeCollision> get_PointEdgeCollisions_of_points_inside_polygon(
         const Particles &p,
         const std::vector<size_t> &pointIndices,
-        const std::vector<size_t> &polygonIndices)
+        const std::vector<size_t> &polygonIndices,
+        const PolygonCache &cache)
     {
         std::vector<PointEdgeCollision> out;
         out.reserve(pointIndices.size());
 
-        std::vector<glm::vec2> polygonPositions;
-        polygonPositions.reserve(polygonIndices.size());
-        for (size_t pid : polygonIndices)
-            polygonPositions.push_back(p.pos[pid]);
-
-        size_t n = polygonIndices.size();
-
-        std::vector<glm::vec2> edges(n);
-        std::vector<float> edgesLen2(n);
-        for (size_t i = 0, j = n - 1; i < n; j = i++)
-        {
-            glm::vec2 edge = polygonPositions[i] - polygonPositions[j];
-            edges[j] = edge;
-            edgesLen2[j] = glm::dot(edge, edge);
-        }
+        const auto &polygonPositions = cache.positions;
+        const auto &edges = cache.edges;
+        const auto &edgesLen2 = cache.edgesLen2;
+        size_t n = cache.positions_size;
 
         for (size_t pid : pointIndices)
         {
@@ -279,7 +269,7 @@ namespace xpbd
 
             for (size_t i = 0; i < n; ++i)
             {
-                if (edgesLen2[i] < 1e-12f)
+                if (cache.edgesLen2[i] < 1e-12f)
                     continue;
 
                 glm::vec2 toPoint = point - polygonPositions[i];
@@ -316,7 +306,7 @@ namespace xpbd
         if (filteredPointIndices.empty())
             return;
 
-        std::vector<PointEdgeCollision> detections = get_PointEdgeCollisions_of_points_inside_polygon(particles, filteredPointIndices, collision.polygon);
+        std::vector<PointEdgeCollision> detections = get_PointEdgeCollisions_of_points_inside_polygon(particles, filteredPointIndices, collision.polygon, collision.cache);
 
         pecc.reserve(pecc.size() + detections.size());
         for (const auto &c : detections)
@@ -635,6 +625,29 @@ namespace xpbd
 
                     // rmt_BeginCPUSample(generate_pecc, 0);
                     pecc.clear();
+
+                    polygonsHash.resize(polygons_size);
+                    for (size_t polygonId = 0; polygonId < polygons_size; ++polygonId)
+                    {
+                        PolygonCache &hash = polygonsHash[polygonId];
+                        std::vector<size_t> &polygonIndices = polygonColliders[polygonId].indices;
+                        size_t n = polygonIndices.size();
+                        hash.positions_size = n;
+
+                        hash.positions.resize(polygonIndices.size());
+                        for (size_t i = 0; i < n; ++i)
+                            hash.positions[i] = particles.pos[polygonIndices[i]];
+
+                        hash.edges.resize(n);
+                        hash.edgesLen2.resize(n);
+                        for (size_t i = 0, j = n - 1; i < n; j = i++)
+                        {
+                            glm::vec2 edge = hash.positions[i] - hash.positions[j];
+                            hash.edges[j] = edge;
+                            hash.edgesLen2[j] = glm::dot(edge, edge);
+                        }
+                    }
+
                     // polygon/polygon
                     std::vector<std::vector<PointEdgeCollisionConstraints>> pecc_thread(omp_get_max_threads());
 #pragma omp parallel for
@@ -661,6 +674,7 @@ namespace xpbd
                                 avgKineticFriction,
                                 avgCompliance,
                                 aabbs_polygons[a].get_intersection(aabbs_polygons[i]),
+                                polygonsHash[i],
                             };
                             add_PointEdgeCollisionConstraints_from_PointsPolygonCollision(local_pecc, particles, pointPolygonCollision);
                         }
@@ -692,6 +706,7 @@ namespace xpbd
                                 avgKineticFriction,
                                 avgCompliance,
                                 aabbs_points[a].get_intersection(aabbs_polygons[i]),
+                                polygonsHash[i],
                             };
                             add_PointEdgeCollisionConstraints_from_PointsPolygonCollision(pecc, particles, pointPolygonCollision);
                         }
