@@ -91,7 +91,7 @@ public:
             {
                 auto &bucket = idTable[CellCoord{cx, cy}];
                 bucket.reserve(bucketReserve);
-                bucket.push_back(id);
+                bucket.emplace_back(id);
             }
         }
         aabbTable.insert({id, aabb});

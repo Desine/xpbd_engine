@@ -247,7 +247,7 @@ namespace xpbd
         }
         return windingNumber != 0;
     }
-    std::vector<PointEdgeCollision> get_PointEdgeCollisions_of_points_inside_polygon(
+    void get_PointEdgeCollisions_of_points_inside_polygon(
         std::vector<PointEdgeCollision> &out,
         const Particles &p,
         const std::vector<size_t> &pointIndices,
@@ -289,12 +289,10 @@ namespace xpbd
                 }
             }
 
-            out.push_back({pid,
-                           polygonIndices[nearestEdge],
-                           polygonIndices[(nearestEdge + 1) % n]});
+            out.emplace_back(pid,
+                             polygonIndices[nearestEdge],
+                             polygonIndices[(nearestEdge + 1) % n]);
         }
-
-        return out;
     }
     void add_PointEdgeCollisionConstraints_from_PointsPolygonCollision(
         std::vector<PointEdgeCollisionConstraints> &pecc,
@@ -305,7 +303,7 @@ namespace xpbd
         filteredPointIndices.reserve(collision.points.size());
         for (auto i : collision.points)
             if (collision.box.contains_point(particles.pos[i]))
-                filteredPointIndices.push_back(i);
+                filteredPointIndices.emplace_back(i);
 
         if (filteredPointIndices.empty())
             return;
@@ -315,7 +313,7 @@ namespace xpbd
 
         pecc.reserve(pecc.size() + detections.size());
         for (const auto &c : detections)
-            pecc.push_back({c.point, c.edge1, c.edge2, collision.staticFriction, collision.kineticFriction, collision.compliance, 0.0f});
+            pecc.emplace_back(c.point, c.edge1, c.edge2, collision.staticFriction, collision.kineticFriction, collision.compliance, 0.0f);
     }
 
     void solve_point_edge_collision_constraints(
@@ -683,7 +681,7 @@ namespace xpbd
                             float avgKineticFriction = (polygonColliders[a].kineticFriction + polygonColliders[i].kineticFriction) * 0.5f;
                             float avgCompliance = (polygonColliders[a].compliance + polygonColliders[i].compliance) * 0.5f;
 
-                            PointsPolygonCollision pointPolygonCollision{
+                            PointsPolygonCollision pointsPolygonCollision{
                                 polygonColliders[a].indices,
                                 polygonColliders[i].indices,
                                 avgStaticFriction,
@@ -692,7 +690,7 @@ namespace xpbd
                                 polygonCollider_aabbs[a].get_intersection(polygonCollider_aabbs[i]),
                                 polygonsHash[i],
                             };
-                            add_PointEdgeCollisionConstraints_from_PointsPolygonCollision(local_pecc, particles, pointPolygonCollision);
+                            add_PointEdgeCollisionConstraints_from_PointsPolygonCollision(local_pecc, particles, pointsPolygonCollision);
                         }
                     }
 
@@ -709,14 +707,16 @@ namespace xpbd
                     for (size_t a = 0; a < pointsColliders_aabbs.size(); ++a)
                     {
                         std::vector<size_t> overlapping_aabb_ids;
-                        spatialHashAABB.get_overlapping_aabb_ids(overlapping_aabb_ids, pointsColliders_aabbs[a]);
+                        // spatialHashAABB.get_overlapping_aabb_ids(overlapping_aabb_ids, pointsColliders_aabbs[a]);
+                        for (size_t i = 0; i < polygonColliders.size(); ++i)
+                            overlapping_aabb_ids.emplace_back();
 
                         for (auto i : overlapping_aabb_ids)
                         {
                             float avgStaticFriction = (pointsColliders[a].staticFriction + polygonColliders[i].staticFriction) * 0.5f;
                             float avgKineticFriction = (pointsColliders[a].kineticFriction + polygonColliders[i].kineticFriction) * 0.5f;
                             float avgCompliance = (pointsColliders[a].compliance + polygonColliders[i].compliance) * 0.5f;
-                            PointsPolygonCollision pointPolygonCollision{
+                            PointsPolygonCollision pointsPolygonCollision{
                                 pointsColliders[a].indices,
                                 polygonColliders[i].indices,
                                 avgStaticFriction,
@@ -725,7 +725,7 @@ namespace xpbd
                                 pointsColliders_aabbs[a].get_intersection(polygonCollider_aabbs[i]),
                                 polygonsHash[i],
                             };
-                            add_PointEdgeCollisionConstraints_from_PointsPolygonCollision(pecc, particles, pointPolygonCollision);
+                            add_PointEdgeCollisionConstraints_from_PointsPolygonCollision(pecc, particles, pointsPolygonCollision);
                         }
                     }
                     // rmt_EndCPUSample();

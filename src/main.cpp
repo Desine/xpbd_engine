@@ -16,7 +16,7 @@ void draw_world(xpbd::World &world)
 {
     renderer::set_color(sf::Color::Red);
     for (auto p : world.particles.pos)
-        renderer::draw_circle(p, 3);
+        renderer::draw_circle(p, 2);
 
     for (size_t i = 0; i < world.distanceConstraints.size(); ++i)
         renderer::draw_line(world.particles.pos[world.distanceConstraints[i].i1], world.particles.pos[world.distanceConstraints[i].i2]);
@@ -25,12 +25,18 @@ void draw_world(xpbd::World &world)
     for (auto &pc : world.polygonColliders)
     {
         std::vector<glm::vec2> points;
+        points.reserve(pc.indices.size());
 
         for (auto id : pc.indices)
-            points.push_back(world.particles.pos[id]);
+            points.emplace_back(world.particles.pos[id]);
 
         renderer::draw_segmented_loop(points);
     }
+
+    renderer::set_color(sf::Color::Green);
+    for (auto &pc : world.pointsColliders)
+        for (auto id : pc.indices)
+            renderer::draw_circle(world.particles.pos[id], 2);
 }
 
 void draw_collisions(std::vector<xpbd::PointsPolygonCollision> collisions)
@@ -209,6 +215,8 @@ int main()
                 }
                 if (event.key.code == sf::Keyboard::F)
                     world.spawnFromJson("person", position);
+                if (event.key.code == sf::Keyboard::G)
+                    world.spawnFromJson("square", position);
 
                 if (event.key.code == sf::Keyboard::R)
                     world.init();
