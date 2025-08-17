@@ -1,5 +1,5 @@
 {
-  "position": [0, 0],
+  "position": [-30, 0],
   "Particles": [
     { "pos": [-40.0, 0.0], "mass": 20.0 },
     { "pos": [70.0, 0.0], "mass": 20.0 },

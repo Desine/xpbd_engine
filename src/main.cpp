@@ -12,14 +12,14 @@
 
 #include "Remotery.h"
 
-void draw_world(xpbd::World &world)
+void draw_world(xpbd::World &world, glm::vec2 offset = {0.0f, 0.0f})
 {
     renderer::set_color(sf::Color::Red);
     for (auto p : world.particles.pos)
         renderer::draw_circle(p, 2);
 
     for (size_t i = 0; i < world.distanceConstraints.size(); ++i)
-        renderer::draw_line(world.particles.pos[world.distanceConstraints[i].i1], world.particles.pos[world.distanceConstraints[i].i2]);
+        renderer::draw_line(world.particles.pos[world.distanceConstraints[i].i1] + offset, world.particles.pos[world.distanceConstraints[i].i2] + offset);
 
     renderer::set_color(sf::Color::Green);
     for (auto &pc : world.polygonColliders)
@@ -28,7 +28,7 @@ void draw_world(xpbd::World &world)
         points.reserve(pc.indices.size());
 
         for (auto id : pc.indices)
-            points.emplace_back(world.particles.pos[id]);
+            points.emplace_back(world.particles.pos[id] + offset);
 
         renderer::draw_segmented_loop(points);
     }
@@ -200,6 +200,26 @@ int main()
                         }
                     }
                 }
+                if (event.key.code == sf::Keyboard::C)
+                {
+                    size_t amountX = 30;
+                    size_t amountY = 1;
+                    float spacingX = 100;
+                    float spacingY = 100;
+                    for (size_t i = 0; i < amountX; ++i)
+                    {
+                        float x = position.x - amountX * spacingX * 0.5 + spacingX * i;
+                        for (size_t j = 0; j < amountY; ++j)
+                        {
+                            float y = position.y + spacingY * j;
+                            const float radius = 40;
+                            const size_t segments = 6;
+                            const float mass = 10;
+                            const float compliance = 0.005f;
+                            world.spawnPolygon({x, y}, radius, segments, mass, compliance);
+                        }
+                    }
+                }
 
                 if (event.key.code == sf::Keyboard::A)
                     world.spawnFromJson("car", position);
@@ -226,6 +246,10 @@ int main()
         ImGui::NewFrame();
         ImGui::Begin("Main");
         ShowFpsGraph(1.0f / deltaTime.asSeconds());
+        static bool draw_thick = true;
+        if (ImGui::Button(draw_thick ? "turn off: draw_thick" : "turn on: draw_thick"))
+            draw_thick = !draw_thick;
+
         if (ImGui::Button(world.paused ? "Play" : "Pause"))
             world.paused = !world.paused;
         // if (ImGui::Button("stepOnce - todo"))
@@ -246,6 +270,16 @@ int main()
 
         renderer::window.clear();
         draw_world(world);
+        if (draw_thick)
+        {
+            draw_world(world, {0.0f, 0.5f});
+            draw_world(world, {0.0f, 1.0f});
+            draw_world(world, {0.5f, 0.0f});
+            draw_world(world, {1.0f, 0.0f});
+            draw_world(world, {1.0f, 0.5f});
+            draw_world(world, {0.5f, 1.0f});
+            draw_world(world, {1.0f, 1.0f});
+        }
         // renderer::set_color(sf::Color::White);
         // draw_collisions(world.collisions);
 
