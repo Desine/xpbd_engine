@@ -2,10 +2,7 @@
 #include "imgui-SFML.h"
 #include <SFML/Graphics.hpp>
 
-#include <stdio.h>
-#include <string>
-#include <omp.h>
-#include <thread>
+#include <print>
 
 #include "renderer.hpp"
 #include "xpbd.hpp"
@@ -107,10 +104,12 @@ void spawn_many(
 
 int main()
 {
+    std::println("<print> reminder {}", 123);
+
     rmtSettings *settings = rmt_Settings();
-    settings->port = 17815; // default 17815
+    settings->port = 17816; // default 17815
     Remotery *rmt;
-    // rmt_CreateGlobalInstance(&rmt);
+    rmt_CreateGlobalInstance(&rmt);
 
     xpbd::World world;
     world.init();

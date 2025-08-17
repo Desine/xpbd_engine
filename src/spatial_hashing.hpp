@@ -6,9 +6,6 @@
 #include <algorithm>
 #include <ankerl/unordered_dense.h>
 
-#include <stdio.h>
-#include <string.h>
-
 struct AABB
 {
     float l, r, b, t;

@@ -638,7 +638,7 @@ namespace xpbd
                     generate_collider_points_aabbs(pointsColliders_aabbs, particles, pointsColliders);
 
                     rmt_BeginCPUSample(fill_hash, 0);
-                    SpatialHashAABB spatialHashAABB;
+                    spatialHashAABB.clear();
                     for (size_t i = 0; i < polygons_size; ++i)
                         spatialHashAABB.add_aabb(polygonColliders_aabbs[i], i);
                     rmt_EndCPUSample();

@@ -2,8 +2,6 @@
 #define define_xpbd
 #include "glm/glm.hpp"
 #include <vector>
-#include <stdio.h>
-#include <string>
 
 #include "json_body_loader.hpp"
 #include "spatial_hashing.hpp"
@@ -100,7 +98,7 @@ namespace xpbd
 
         // std::vector<AABB> polygonColliders_aabbs;
         // std::vector<AABB> pointsColliders_aabbs;
-        // SpatialHashAABB spatialHashAABB;
+        SpatialHashAABB spatialHashAABB;
         // std::vector<PolygonCache> polygonsHash;
         // std::vector<ColliderPoints> combinedColliderPoints;
         // std::vector<AABB> combinedAABB;
