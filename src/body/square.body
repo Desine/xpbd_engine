@@ -24,7 +24,7 @@
       "indices": [0, 1, 2, 3],
       "staticFriction": 0.0,
       "kineticFriction": 0.9,
-      "compliance": 0.0
+      "compliance": 0.001
     }
   ]
 }

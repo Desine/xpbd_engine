@@ -22,6 +22,7 @@ namespace renderer
     }
     
     void zoom(float factor){
+        scale *= factor;
         view.zoom(factor);
         window.setView(view);
     }
@@ -30,6 +31,7 @@ namespace renderer
         width = w;
         height = h;
         view.setSize(width, -height);
+        view.zoom(scale);
         window.setView(view);
     }
 

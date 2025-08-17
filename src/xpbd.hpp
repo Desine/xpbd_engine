@@ -98,11 +98,13 @@ namespace xpbd
         std::vector<ColliderPoints> polygonColliders;
         std::vector<ColliderPoints> pointsColliders;
 
-        std::vector<AABB> polygonCollider_aabbs;
-        std::vector<AABB> pointsColliders_aabbs;
-        SpatialHashAABB spatialHashAABB;
-        std::vector<PolygonCache> polygonsHash;
-        std::vector<PointEdgeCollisionConstraints> pecc;
+        // std::vector<AABB> polygonColliders_aabbs;
+        // std::vector<AABB> pointsColliders_aabbs;
+        // SpatialHashAABB spatialHashAABB;
+        // std::vector<PolygonCache> polygonsHash;
+        // std::vector<ColliderPoints> combinedColliderPoints;
+        // std::vector<AABB> combinedAABB;
+        // std::vector<PointEdgeCollisionConstraints> pecc;
 
         void init();
 

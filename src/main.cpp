@@ -237,9 +237,9 @@ int main()
         ImGui::SliderScalar("iterations", ImGuiDataType_U64, &world.iterations, &min_value, &max_value, "%zu", ImGuiSliderFlags_None);
         ImGui::SliderFloat("gravity.x", &world.gravity.x, -20, 20);
         ImGui::SliderFloat("gravity.y", &world.gravity.y, -20, 20);
-        int cellSize = world.spatialHashAABB.cellSize;
-        ImGui::SliderInt("spatialHashing_cellSize: ", &cellSize, 30, 1000);
-        world.spatialHashAABB.cellSize = cellSize;
+        // int cellSize = world.spatialHashAABB.cellSize;
+        // ImGui::SliderInt("spatialHashing_cellSize: ", &cellSize, 30, 1000);
+        // world.spatialHashAABB.cellSize = cellSize;
 
         ImGui::End();
         ImGui::EndFrame();

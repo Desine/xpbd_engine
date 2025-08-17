@@ -41,7 +41,7 @@
       "indices": [0, 1, 2, 3, 4],
       "staticFriction": 0.4,
       "kineticFriction": 0.3,
-      "compliance": 0.0
+      "compliance": 0.001
     }
   ]
 }
