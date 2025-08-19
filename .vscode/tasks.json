@@ -19,11 +19,14 @@
                 "-I${workspaceFolder}/include/imgui-sfml",
                 "-I${workspaceFolder}/include/glm",
                 "-I${workspaceFolder}/include/nlohmann",
+                "-I${workspaceFolder}/tracy/public",
                 "-lsfml-graphics",
                 "-lsfml-window",
                 "-lsfml-system",
                 "-lGL",
-                "-fopenmp"
+                "-fopenmp",
+                "-lpthread",
+                "-ldl"
             ],
             "options": {
                 "cwd": "${fileDirname}"

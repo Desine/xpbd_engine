@@ -78,6 +78,9 @@
         "set": "cpp",
         "future": "cpp",
         "latch": "cpp",
-        "syncstream": "cpp"
+        "syncstream": "cpp",
+        "csignal": "cpp",
+        "print": "cpp",
+        "cfenv": "cpp"
     }
 }

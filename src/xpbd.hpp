@@ -2,6 +2,9 @@
 #define define_xpbd
 #include "glm/glm.hpp"
 #include <vector>
+#include <thread>
+#include <condition_variable>
+#include <chrono>
 
 #include "json_body_loader.hpp"
 #include "spatial_hashing.hpp"
@@ -75,6 +78,15 @@ namespace xpbd
         float lambda;
     };
 
+    struct WorldDraw
+    {
+        Particles particles;
+        std::vector<DistanceConstraint> distanceConstraints;
+        std::vector<VolumeConstraint> volumeConstraints;
+        std::vector<ColliderPoints> polygonColliders;
+        std::vector<ColliderPoints> pointsColliders;
+    };
+
     class World
     {
     public:
@@ -82,13 +94,8 @@ namespace xpbd
         size_t iterations = 1;
         glm::vec2 gravity = {0, -9.8f};
         float timeScale = 10.f;
-        float deltaTick = 1.f / 30.f;
-        float sec = 0.0f;
-        bool paused = false;
-        bool stepOnce = false;
-
-        bool threadHash = true;
-        bool threadGenerateConstraints = true;
+        float tickRate = 30.f;
+        std::chrono::duration<double> deltaTick;
 
         Particles particles;
         std::vector<DistanceConstraint> distanceConstraints;
@@ -104,7 +111,38 @@ namespace xpbd
         // std::vector<AABB> combinedAABB;
         // std::vector<PointEdgeCollisionConstraints> pecc;
 
+        std::mutex drawMutex;
+        WorldDraw draw;
+
+        enum class UpdateState
+        {
+            Running,
+            Paused,
+            StepOnce,
+            Stopped
+        };
+        std::thread updateThread;
+        std::mutex updateMutex;
+        std::condition_variable updateCv;
+        bool stopUpdate = false;
+        UpdateState updateState = UpdateState::Paused;
+        std::chrono::time_point<std::chrono::_V2::steady_clock, std::chrono::duration<double, std::chrono::_V2::system_clock::period>>
+            nextUpdateTimePoint;
+
+        World();
+        ~World();
+
         void init();
+
+        void step();
+        void update_loop();
+        void pause_update();
+        void resume_update();
+        void step_once_update();
+
+        void set_tickRate(size_t tickRate);
+
+        void submit_draw();
 
         void add_particle(const glm::vec2 &pos, float mass);
         void add_particle(const glm::vec2 &pos, float mass, const glm::vec2 &vel);
@@ -120,10 +158,6 @@ namespace xpbd
 
         void spawnFromJson(const std::string &name, const glm::vec2 &position);
         void spawnPolygon(glm::vec2 pos, float radius, size_t segments, float mass, float compliance);
-
-        bool should_tick(float &sec, float dt);
-        void reset_constraints_lambdas();
-        void update(float realDelta);
     };
 
     void iterate(Particles &p, float dt, const glm::vec2 &gravity);

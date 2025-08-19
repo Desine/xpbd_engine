@@ -9,31 +9,41 @@
 
 #include "Remotery.h"
 
+// #include "tracy/Tracy.hpp"
+// #define TRACY_ENABLE
+
 void draw_world(xpbd::World &world, glm::vec2 offset = {0.0f, 0.0f})
 {
+    xpbd::WorldDraw worldDraw;
+    {
+        std::lock_guard<std::mutex> lk(world.drawMutex);
+        worldDraw = world.draw;
+    }
+
+    // ZoneScoped;
     renderer::set_color(sf::Color::Red);
-    for (auto p : world.particles.pos)
+    for (auto p : worldDraw.particles.pos)
         renderer::draw_circle(p, 2);
 
-    for (size_t i = 0; i < world.distanceConstraints.size(); ++i)
-        renderer::draw_line(world.particles.pos[world.distanceConstraints[i].i1] + offset, world.particles.pos[world.distanceConstraints[i].i2] + offset);
+    for (size_t i = 0; i < worldDraw.distanceConstraints.size(); ++i)
+        renderer::draw_line(worldDraw.particles.pos[worldDraw.distanceConstraints[i].i1] + offset, worldDraw.particles.pos[worldDraw.distanceConstraints[i].i2] + offset);
 
     renderer::set_color(sf::Color::Green);
-    for (auto &pc : world.polygonColliders)
+    for (auto &pc : worldDraw.polygonColliders)
     {
         std::vector<glm::vec2> points;
         points.reserve(pc.indices.size());
 
         for (auto id : pc.indices)
-            points.emplace_back(world.particles.pos[id] + offset);
+            points.emplace_back(worldDraw.particles.pos[id] + offset);
 
         renderer::draw_segmented_loop(points);
     }
 
     renderer::set_color(sf::Color::Green);
-    for (auto &pc : world.pointsColliders)
+    for (auto &pc : worldDraw.pointsColliders)
         for (auto id : pc.indices)
-            renderer::draw_circle(world.particles.pos[id], 2);
+            renderer::draw_circle(worldDraw.particles.pos[id], 2);
 }
 
 void draw_collisions(std::vector<xpbd::PointsPolygonCollision> collisions)
@@ -107,9 +117,9 @@ int main()
     std::println("<print> reminder {}", 123);
 
     rmtSettings *settings = rmt_Settings();
-    settings->port = 17816; // default 17815
+    settings->port = 17815; // default 17815
     Remotery *rmt;
-    rmt_CreateGlobalInstance(&rmt);
+    // rmt_CreateGlobalInstance(&rmt);
 
     xpbd::World world;
     world.init();
@@ -117,7 +127,7 @@ int main()
 
     // while (true)
     // {
-    //     world.update(0.01f);
+    //     world.step(0.01f);
     // }
 
     renderer::setup_window();
@@ -245,14 +255,20 @@ int main()
         ImGui::NewFrame();
         ImGui::Begin("Main");
         ShowFpsGraph(1.0f / deltaTime.asSeconds());
+        static bool draw = true;
+        if (ImGui::Button(draw ? "turn off: draw" : "turn on: draw"))
+            draw = !draw;
         static bool draw_thick = true;
         if (ImGui::Button(draw_thick ? "turn off: draw_thick" : "turn on: draw_thick"))
             draw_thick = !draw_thick;
 
-        if (ImGui::Button(world.paused ? "Play" : "Pause"))
-            world.paused = !world.paused;
-        // if (ImGui::Button("stepOnce - todo"))
-        //     world.stepOnce = true;
+        if (ImGui::Button(world.updateState == xpbd::World::UpdateState::Paused ? "Resume" : "Pause"))
+            if (world.updateState == xpbd::World::UpdateState::Paused)
+                world.resume_update();
+            else
+                world.pause_update();
+        if (ImGui::Button("Step once"))
+            world.step_once_update();
         ImGui::SliderFloat("timeScale", &world.timeScale, 0.01f, 50, "%.3f");
         size_t min_value = 1;
         size_t max_value = 20;
@@ -268,21 +284,22 @@ int main()
         ImGui::EndFrame();
 
         renderer::window.clear();
-        draw_world(world);
-        if (draw_thick)
+        if (draw)
         {
-            draw_world(world, {0.0f, 0.5f});
-            draw_world(world, {0.0f, 1.0f});
-            draw_world(world, {0.5f, 0.0f});
-            draw_world(world, {1.0f, 0.0f});
-            draw_world(world, {1.0f, 0.5f});
-            draw_world(world, {0.5f, 1.0f});
-            draw_world(world, {1.0f, 1.0f});
+            draw_world(world);
+            if (draw_thick)
+            {
+                draw_world(world, {0.0f, 0.5f});
+                draw_world(world, {0.0f, 1.0f});
+                draw_world(world, {0.5f, 0.0f});
+                draw_world(world, {1.0f, 0.0f});
+                draw_world(world, {1.0f, 0.5f});
+                draw_world(world, {0.5f, 1.0f});
+                draw_world(world, {1.0f, 1.0f});
+            }
         }
         // renderer::set_color(sf::Color::White);
         // draw_collisions(world.collisions);
-
-        world.update(deltaTime.asSeconds());
 
         ImGui::SFML::Render(renderer::window);
         renderer::window.display();
