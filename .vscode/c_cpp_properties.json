@@ -8,7 +8,8 @@
                 "${workspaceFolder}/**",
                 "${workspaceFolder}/include/imgui",
                 "${workspaceFolder}/include/imgui-sfml",
-                "${workspaceFolder}/Remotery/lib"
+                "${workspaceFolder}/Remotery/lib",
+                "${workspaceFolder}/tracy/public/tracy"
             ],
             "defines": [],
             "compilerPath": "/usr/bin/gcc",

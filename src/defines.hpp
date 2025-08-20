@@ -1,0 +1,1 @@
+#define FLOAT_DEFAULT __FLT_MAX__

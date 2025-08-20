@@ -4,8 +4,9 @@
 #include <algorithm>
 #include <omp.h>
 #include <thread>
-#include "renderer.hpp"
 
+#include "defines.hpp"
+#include "renderer.hpp"
 #include "Remotery.h"
 
 namespace xpbd
@@ -481,44 +482,6 @@ namespace xpbd
             updateThread.join();
     }
 
-    void World::init()
-    {
-        particles.pos.clear();
-        particles.pos.reserve(5000);
-        particles.prev.clear();
-        particles.prev.reserve(5000);
-        particles.vel.clear();
-        particles.vel.reserve(5000);
-        particles.w.clear();
-        particles.w.reserve(5000);
-
-        distanceConstraints.clear();
-        distanceConstraints.reserve(5000);
-
-        volumeConstraints.clear();
-        volumeConstraints.reserve(1000);
-
-        polygonColliders.clear();
-        polygonColliders.reserve(1000);
-
-        pointsColliders.clear();
-        pointsColliders.reserve(1000);
-
-        // polygonColliders_aabbs.reserve(1000);
-        // pointsColliders_aabbs.reserve(1000);
-
-        // polygonsHash.reserve(1000);
-
-        // combinedColliderPoints.reserve(2000);
-        // combinedAABB.reserve(2000);
-
-        // pecc.reserve(5000);
-
-        spawnFromJson("ground", {0, -1000});
-
-        submit_draw();
-    }
-
     void World::pause_update()
     {
         std::lock_guard<std::mutex> lk(updateMutex);
@@ -530,6 +493,7 @@ namespace xpbd
         {
             std::lock_guard<std::mutex> lk(updateMutex);
             updateState = UpdateState::Running;
+            nextUpdateTimePoint = std::chrono::steady_clock::now();
         }
         updateCv.notify_all();
     }
@@ -539,27 +503,28 @@ namespace xpbd
         {
             std::lock_guard<std::mutex> lk(updateMutex);
             updateState = UpdateState::StepOnce;
+            nextUpdateTimePoint = std::chrono::steady_clock::now();
         }
         updateCv.notify_all();
     }
 
     void World::update_loop()
     {
-        using clock = std::chrono::steady_clock;
-
-        std::unique_lock<std::mutex> lk(updateMutex);
+        std::unique_lock<std::mutex> update_lk(updateMutex);
 
         while (updateState != UpdateState::Stopped)
         {
-            updateCv.wait(lk, [this]
+            updateCv.wait(update_lk, [this]
                           { return updateState != UpdateState::Paused &&
                                    updateState != UpdateState::Stopped; });
             if (updateState == UpdateState::Stopped)
                 break;
 
-            lk.unlock();
+            update_lk.unlock();
             step();
-            lk.lock();
+            submit_draw();
+            execute_enqueued_functions();
+            update_lk.lock();
 
             if (updateState == UpdateState::StepOnce)
             {
@@ -568,14 +533,9 @@ namespace xpbd
             }
 
             nextUpdateTimePoint += deltaTick;
-            updateCv.wait_until(lk, nextUpdateTimePoint, [this]
+            updateCv.wait_until(update_lk, nextUpdateTimePoint, [this]
                                 { return updateState != UpdateState::Running &&
                                          updateState != UpdateState::Stopped; });
-
-            if (updateState != UpdateState::Running)
-            {
-                nextUpdateTimePoint = clock::now();
-            }
         }
     }
 
@@ -708,34 +668,88 @@ namespace xpbd
             // apply_point_edge_collision_constraints_kinetic_friction(particles, pecc, substep_time);
             // apply_distance_constraints_damping(particles, distanceConstraints, substep_time);
         }
-
-        submit_draw();
     }
 
-    void World::set_tickRate(size_t tickRate)
+    void World::enqueue_function(std::function<void()> f)
     {
-        std::lock_guard<std::mutex> lk(updateMutex);
-        deltaTick = std::chrono::duration<double>(1.0 / tickRate);
+        std::lock_guard<std::mutex> lk(functionQueueMutex);
+        queue.push(std::move(f));
+    }
+    void World::execute_enqueued_functions()
+    {
+        std::queue<std::function<void()>> local;
+        {
+            std::lock_guard<std::mutex> lk(functionQueueMutex);
+            std::swap(local, queue);
+        }
+        while (!local.empty())
+        {
+            local.front()();
+            local.pop();
+        }
     }
 
-    void World::submit_draw(){
-        std::lock_guard<std::mutex> lk(drawMutex);
+    void World::init()
+    {
+        particles.pos.clear();
+        particles.pos.reserve(5000);
+        particles.prev.clear();
+        particles.prev.reserve(5000);
+        particles.vel.clear();
+        particles.vel.reserve(5000);
+        particles.w.clear();
+        particles.w.reserve(5000);
+
+        distanceConstraints.clear();
+        distanceConstraints.reserve(5000);
+
+        volumeConstraints.clear();
+        volumeConstraints.reserve(1000);
+
+        polygonColliders.clear();
+        polygonColliders.reserve(1000);
+
+        pointsColliders.clear();
+        pointsColliders.reserve(1000);
+
+        // polygonColliders_aabbs.reserve(1000);
+        // pointsColliders_aabbs.reserve(1000);
+
+        // polygonsHash.reserve(1000);
+
+        // combinedColliderPoints.reserve(2000);
+        // combinedAABB.reserve(2000);
+
+        // pecc.reserve(5000);
+    }
+    void World::enqueue_init()
+    {
+        enqueue_function([this]
+                         { init(); });
+    }
+
+    void World::submit_draw()
+    {
+        std::lock_guard<std::mutex> draw_lk(drawMutex);
         draw.particles = particles;
         draw.distanceConstraints = distanceConstraints;
         draw.volumeConstraints = volumeConstraints;
         draw.polygonColliders = polygonColliders;
         draw.pointsColliders = pointsColliders;
+        newFrame = true;
     }
 
-    void World::add_particle(const glm::vec2 &pos, float mass)
+    void World::set_tickRate(size_t tickRate)
     {
-        particles.pos.emplace_back(pos);
-        particles.prev.emplace_back(pos);
-        particles.vel.emplace_back(0, 0);
-        float w = mass == 0 ? 0 : 1 / mass;
-        particles.w.emplace_back(w);
+        deltaTick = std::chrono::duration<double>(1.0 / tickRate);
     }
-    void World::add_particle(const glm::vec2 &pos, float mass, const glm::vec2 &vel)
+    void World::enqueue_set_tickRate(size_t tickRate)
+    {
+        enqueue_function([this, tickRate]
+                         { set_tickRate(tickRate); });
+    }
+
+    void World::add_particle(const glm::vec2 &pos, float mass, const glm::vec2 &vel = {0.0f, 0.0f})
     {
         particles.pos.emplace_back(pos);
         particles.prev.emplace_back(pos);
@@ -743,51 +757,72 @@ namespace xpbd
         float w = mass == 0 ? 0 : 1 / mass;
         particles.w.emplace_back(w);
     }
-
-    void World::add_distance_constraint(size_t i1, size_t i2, float compliance, float restDist)
+    void World::enqueue_add_particle(const glm::vec2 &pos, float mass, const glm::vec2 &vel = {0.0f, 0.0f})
     {
+        enqueue_function([this, pos, mass, vel]
+                         { add_particle(pos, mass, vel); });
+    }
+
+    void World::add_distance_constraint(size_t i1, size_t i2, float compliance, float restDist = FLOAT_DEFAULT)
+    {
+        if (restDist == FLOAT_DEFAULT)
+            restDist = glm::distance(particles.pos[i1], particles.pos[i2]);
         float compressionDamping = 0.5f;
         float extensionDamping = 0.5f;
         float lambda = 0;
         distanceConstraints.emplace_back(i1, i2, restDist, compressionDamping, extensionDamping, compliance, lambda);
     }
-    void World::add_distance_constraint_auto_restDist(size_t i1, size_t i2, float compliance, Particles &p)
+    void World::enqueue_add_distance_constraint(size_t i1, size_t i2, float compliance, float restDist = FLOAT_DEFAULT)
     {
-        float restDist = glm::distance(p.pos[i1], p.pos[i2]);
-        float compressionDamping = 0.5f;
-        float extensionDamping = 0.5f;
-        float lambda = 0;
-        distanceConstraints.emplace_back(i1, i2, restDist, compressionDamping, extensionDamping, compliance, lambda);
+        enqueue_function([this, i1, i2, compliance, restDist]
+                         { add_distance_constraint(i1, i2, compliance, restDist); });
     }
 
-    void World::add_volume_constraint(const std::vector<size_t> &indices, float compliance)
+    void World::add_volume_constraint(const std::vector<size_t> &indices, float compliance, float restPressure = FLOAT_DEFAULT)
     {
         float restVolume = compute_polygon_area(particles, indices);
+        if (restPressure != FLOAT_DEFAULT)
+            restVolume *= restPressure;
         float lambda = 0;
         volumeConstraints.emplace_back(indices, restVolume, compliance, lambda);
     }
-    void World::add_volume_constraint(const std::vector<size_t> &indices, float compliance, float restPressure)
+    void World::enqueue_add_volume_constraint(std::vector<size_t> indices, float compliance, float restPressure = FLOAT_DEFAULT)
     {
-        float restVolume = compute_polygon_area(particles, indices);
-        float lambda = 0;
-        volumeConstraints.emplace_back(indices, restVolume * restPressure, compliance, lambda);
+        enqueue_function([this, indices = std::move(indices), compliance, restPressure]
+                         { add_volume_constraint(indices, compliance, restPressure); });
     }
 
-    void World::add_polygon_collider(std::vector<size_t> &indices, float staticFriction, float kineticFriction, float compliance)
+    void World::add_polygon_collider(const std::vector<size_t> &indices, float staticFriction, float kineticFriction, float compliance)
     {
         polygonColliders.emplace_back(indices, staticFriction, kineticFriction, compliance);
     }
-    void World::add_points_collider(std::vector<size_t> &indices, float staticFriction, float kineticFriction, float compliance)
+    void World::enqueue_add_polygon_collider(std::vector<size_t> indices, float staticFriction, float kineticFriction, float compliance)
+    {
+        enqueue_function([this, indices = std::move(indices), staticFriction, kineticFriction, compliance]
+                         { add_polygon_collider(indices, staticFriction, kineticFriction, compliance); });
+    }
+
+    void World::add_points_collider(const std::vector<size_t> &indices, float staticFriction, float kineticFriction, float compliance)
     {
         pointsColliders.emplace_back(indices, staticFriction, kineticFriction, compliance);
     }
+    void World::enqueue_add_points_collider(std::vector<size_t> indices, float staticFriction, float kineticFriction, float compliance)
+    {
+        enqueue_function([this, indices = std::move(indices), staticFriction, kineticFriction, compliance] mutable
+                         { add_points_collider(indices, staticFriction, kineticFriction, compliance); });
+    }
 
-    void World::spawnFromJson(const std::string &name, const glm::vec2 &position)
+    void World::spawn_from_json(const std::string &name, const glm::vec2 &position)
     {
         json_body_loader::load(*this, name, position);
     }
+    void World::enqueue_spawn_from_json(std::string name, glm::vec2 position)
+    {
+        enqueue_function([this, name = std::move(name), position]
+                         { spawn_from_json(name, position); });
+    }
 
-    void World::spawnPolygon(glm::vec2 pos, float radius, size_t segments, float mass, float compliance)
+    void World::spawn_polygon(glm::vec2 pos, float radius, size_t segments, float mass, float compliance)
     {
         if (segments < 3)
             segments = 3;
@@ -807,13 +842,18 @@ namespace xpbd
         }
 
         for (int i = 0; i < segments; ++i)
-            this->add_distance_constraint_auto_restDist(start + i, start + (i + 1) % segments, compliance, particles);
+            add_distance_constraint(start + i, start + (i + 1) % segments, compliance);
 
         add_volume_constraint(ids, compliance);
 
         float staticFriction = 0.4f;
         float kineticFriction = 0.3f;
         add_polygon_collider(ids, staticFriction, kineticFriction, compliance);
+    }
+    void World::enqueue_spawn_polygon(glm::vec2 pos, float radius, size_t segments, float mass, float compliance)
+    {
+        enqueue_function([this, pos, radius, segments, mass, compliance]
+                         { spawn_polygon(pos, radius, segments, mass, compliance); });
     }
 
 }

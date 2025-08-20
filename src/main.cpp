@@ -9,17 +9,11 @@
 
 #include "Remotery.h"
 
-// #include "tracy/Tracy.hpp"
+#include "Tracy.hpp"
 // #define TRACY_ENABLE
 
-void draw_world(xpbd::World &world, glm::vec2 offset = {0.0f, 0.0f})
+void draw_worldDraw(xpbd::WorldDraw worldDraw, glm::vec2 offset = {0.0f, 0.0f})
 {
-    xpbd::WorldDraw worldDraw;
-    {
-        std::lock_guard<std::mutex> lk(world.drawMutex);
-        worldDraw = world.draw;
-    }
-
     // ZoneScoped;
     renderer::set_color(sf::Color::Red);
     for (auto p : worldDraw.particles.pos)
@@ -107,7 +101,7 @@ void spawn_many(
         for (size_t j = 0; j < amountY; ++j)
         {
             float y = pos.y + spacingY * j;
-            world.spawnFromJson(name, {x, y});
+            world.spawn_from_json(name, {x, y});
         }
     }
 }
@@ -123,6 +117,12 @@ int main()
 
     xpbd::World world;
     world.init();
+    // unsafe, unly do here to draw 'ground' on first frame
+    world.spawn_from_json("ground", {0, -1000});
+    world.submit_draw();
+    bool paused = world.updateState == xpbd::World::UpdateState::Paused;
+
+    xpbd::WorldDraw worldDraw;
     // world.spawnPolygon({0, 0}, 40, 6, 3, 0.005f);
 
     // while (true)
@@ -205,7 +205,7 @@ int main()
                             const size_t segments = 6;
                             const float mass = 10;
                             const float compliance = 0.005f;
-                            world.spawnPolygon({x, y}, radius, segments, mass, compliance);
+                            world.spawn_polygon({x, y}, radius, segments, mass, compliance);
                         }
                     }
                 }
@@ -225,30 +225,32 @@ int main()
                             const size_t segments = 6;
                             const float mass = 10;
                             const float compliance = 0.005f;
-                            world.spawnPolygon({x, y}, radius, segments, mass, compliance);
+                            world.enqueue_spawn_polygon({x, y}, radius, segments, mass, compliance);
                         }
                     }
                 }
 
                 if (event.key.code == sf::Keyboard::A)
-                    world.spawnFromJson("car", position);
+                    world.enqueue_spawn_from_json("car", position);
                 if (event.key.code == sf::Keyboard::S)
-                    world.spawnFromJson("balloon", position);
+                    world.enqueue_spawn_from_json("balloon", position);
                 if (event.key.code == sf::Keyboard::D)
                 {
-                    const float radius = 40;
-                    const size_t segments = 6;
-                    const float mass = 5;
-                    const float compliance = 0.005f;
-                    world.spawnPolygon(position, radius, segments, mass, compliance);
+                    float radius = 40;
+                    size_t segments = 6;
+                    float mass = 5;
+                    float compliance = 0.005f;
+                    world.enqueue_spawn_polygon(position, radius, segments, mass, compliance);
                 }
                 if (event.key.code == sf::Keyboard::F)
-                    world.spawnFromJson("person", position);
+                    world.enqueue_spawn_from_json("person", position);
                 if (event.key.code == sf::Keyboard::G)
-                    world.spawnFromJson("square", position);
+                    world.enqueue_spawn_from_json("square", position);
 
-                if (event.key.code == sf::Keyboard::R)
-                    world.init();
+                if (event.key.code == sf::Keyboard::R){
+                    world.enqueue_init();
+                    world.enqueue_spawn_from_json("ground", {0, -1000});
+                }
             }
         }
 
@@ -262,20 +264,24 @@ int main()
         if (ImGui::Button(draw_thick ? "turn off: draw_thick" : "turn on: draw_thick"))
             draw_thick = !draw_thick;
 
-        if (ImGui::Button(world.updateState == xpbd::World::UpdateState::Paused ? "Resume" : "Pause"))
-            if (world.updateState == xpbd::World::UpdateState::Paused)
+        if (ImGui::Button(paused ? "Resume" : "Pause"))
+        {
+            if (paused)
                 world.resume_update();
             else
                 world.pause_update();
+
+            paused = !paused;
+        }
         if (ImGui::Button("Step once"))
             world.step_once_update();
-        ImGui::SliderFloat("timeScale", &world.timeScale, 0.01f, 50, "%.3f");
-        size_t min_value = 1;
-        size_t max_value = 20;
-        ImGui::SliderScalar("substeps", ImGuiDataType_U64, &world.substeps, &min_value, &max_value, "%zu", ImGuiSliderFlags_None);
-        ImGui::SliderScalar("iterations", ImGuiDataType_U64, &world.iterations, &min_value, &max_value, "%zu", ImGuiSliderFlags_None);
-        ImGui::SliderFloat("gravity.x", &world.gravity.x, -20, 20);
-        ImGui::SliderFloat("gravity.y", &world.gravity.y, -20, 20);
+        // ImGui::SliderFloat("timeScale", &world.timeScale, 0.01f, 50, "%.3f");
+        // size_t min_value = 1;
+        // size_t max_value = 20;
+        // ImGui::SliderScalar("substeps", ImGuiDataType_U64, &world.substeps, &min_value, &max_value, "%zu", ImGuiSliderFlags_None);
+        // ImGui::SliderScalar("iterations", ImGuiDataType_U64, &world.iterations, &min_value, &max_value, "%zu", ImGuiSliderFlags_None);
+        // ImGui::SliderFloat("gravity.x", &world.gravity.x, -20, 20);
+        // ImGui::SliderFloat("gravity.y", &world.gravity.y, -20, 20);
         // int cellSize = world.spatialHashAABB.cellSize;
         // ImGui::SliderInt("spatialHashing_cellSize: ", &cellSize, 30, 1000);
         // world.spatialHashAABB.cellSize = cellSize;
@@ -286,16 +292,23 @@ int main()
         renderer::window.clear();
         if (draw)
         {
-            draw_world(world);
+            {
+                std::lock_guard<std::mutex> lk(world.drawMutex);
+                if (world.newFrame){
+                    std::swap(worldDraw, world.draw);
+                    world.newFrame = false;
+                }
+            }
+            draw_worldDraw(worldDraw);
             if (draw_thick)
             {
-                draw_world(world, {0.0f, 0.5f});
-                draw_world(world, {0.0f, 1.0f});
-                draw_world(world, {0.5f, 0.0f});
-                draw_world(world, {1.0f, 0.0f});
-                draw_world(world, {1.0f, 0.5f});
-                draw_world(world, {0.5f, 1.0f});
-                draw_world(world, {1.0f, 1.0f});
+                draw_worldDraw(worldDraw, {0.0f, 0.5f});
+                draw_worldDraw(worldDraw, {0.0f, 1.0f});
+                draw_worldDraw(worldDraw, {0.5f, 0.0f});
+                draw_worldDraw(worldDraw, {1.0f, 0.0f});
+                draw_worldDraw(worldDraw, {1.0f, 0.5f});
+                draw_worldDraw(worldDraw, {0.5f, 1.0f});
+                draw_worldDraw(worldDraw, {1.0f, 1.0f});
             }
         }
         // renderer::set_color(sf::Color::White);

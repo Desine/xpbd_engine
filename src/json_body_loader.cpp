@@ -2,6 +2,7 @@
 #include <fstream>
 #include <nlohmann/json.hpp>
 
+#include "defines.hpp"
 #include "xpbd.hpp"
 
 using json = nlohmann::json;
@@ -61,15 +62,8 @@ namespace json_body_loader
                 size_t i1 = dc["i1"].get<size_t>() + base_index;
                 size_t i2 = dc["i2"].get<size_t>() + base_index;
                 float compliance = dc["compliance"].get<float>();
-                if (dc.contains("restDistance"))
-                {
-                    float restDist = dc["restDistance"].get<float>();
-                    world.add_distance_constraint(i1, i2, compliance, restDist);
-                }
-                else
-                {
-                    world.add_distance_constraint_auto_restDist(i1, i2, compliance, world.particles);
-                }
+                float restDist = dc.contains("restDistance") ? dc["restDistance"].get<float>() : FLOAT_DEFAULT;
+                world.add_distance_constraint(i1, i2, compliance, restDist);
             }
         }
 
@@ -82,8 +76,8 @@ namespace json_body_loader
                 for (const auto &idx : vc["indices"])
                     indices.push_back(idx.get<size_t>() + base_index);
 
-                float restPressure = vc["restPressure"].get<float>();
                 float compliance = vc["compliance"].get<float>();
+                float restPressure = vc.contains("restPressure") ? vc["restPressure"].get<float>() : FLOAT_DEFAULT;
                 world.add_volume_constraint(indices, compliance, restPressure);
             }
         }

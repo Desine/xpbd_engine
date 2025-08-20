@@ -5,6 +5,8 @@
 #include <thread>
 #include <condition_variable>
 #include <chrono>
+#include <queue>
+#include <functional>
 
 #include "json_body_loader.hpp"
 #include "spatial_hashing.hpp"
@@ -113,6 +115,7 @@ namespace xpbd
 
         std::mutex drawMutex;
         WorldDraw draw;
+        bool newFrame = false;
 
         enum class UpdateState
         {
@@ -124,15 +127,17 @@ namespace xpbd
         std::thread updateThread;
         std::mutex updateMutex;
         std::condition_variable updateCv;
-        bool stopUpdate = false;
         UpdateState updateState = UpdateState::Paused;
         std::chrono::time_point<std::chrono::_V2::steady_clock, std::chrono::duration<double, std::chrono::_V2::system_clock::period>>
             nextUpdateTimePoint;
 
+        std::queue<std::function<void()>> queue;
+        std::mutex functionQueueMutex;
+
         World();
         ~World();
 
-        void init();
+        void submit_draw();
 
         void step();
         void update_loop();
@@ -140,24 +145,32 @@ namespace xpbd
         void resume_update();
         void step_once_update();
 
+        void enqueue_function(std::function<void()> f);
+        void execute_enqueued_functions();
+
+        void init();
+        void enqueue_init();
+
         void set_tickRate(size_t tickRate);
+        void enqueue_set_tickRate(size_t tickRate);
 
-        void submit_draw();
-
-        void add_particle(const glm::vec2 &pos, float mass);
-        void add_particle(const glm::vec2 &pos, float mass, const glm::vec2 &vel);
+        void add_particle(const glm::vec2 &pos, const float mass, const glm::vec2 &vel);
+        void enqueue_add_particle(const glm::vec2 &pos, const float mass, const glm::vec2 &vel);
 
         void add_distance_constraint(size_t i1, size_t i2, float compliance, float restDist);
-        void add_distance_constraint_auto_restDist(size_t i1, size_t i2, float compliance, Particles &p);
-
-        void add_volume_constraint(const std::vector<size_t> &indices, float compliance);
+        void enqueue_add_distance_constraint(size_t i1, size_t i2, float compliance, float restDist);
         void add_volume_constraint(const std::vector<size_t> &indices, float compliance, float restPressure);
+        void enqueue_add_volume_constraint(std::vector<size_t> indices, float compliance, float restPressure);
 
-        void add_polygon_collider(std::vector<size_t> &indices, float staticFriction, float kineticFriction, float compliance);
-        void add_points_collider(std::vector<size_t> &indices, float staticFriction, float kineticFriction, float compliance);
+        void add_polygon_collider(const std::vector<size_t> &indices, float staticFriction, float kineticFriction, float compliance);
+        void enqueue_add_polygon_collider(std::vector<size_t> indices, float staticFriction, float kineticFriction, float compliance);
+        void add_points_collider(const std::vector<size_t> &indices, float staticFriction, float kineticFriction, float compliance);
+        void enqueue_add_points_collider( std::vector<size_t> indices, float staticFriction, float kineticFriction, float compliance);
 
-        void spawnFromJson(const std::string &name, const glm::vec2 &position);
-        void spawnPolygon(glm::vec2 pos, float radius, size_t segments, float mass, float compliance);
+        void spawn_from_json(const std::string &name, const glm::vec2 &position);
+        void enqueue_spawn_from_json( std::string name,  glm::vec2 position);
+        void spawn_polygon(glm::vec2 pos, float radius, size_t segments, float mass, float compliance);
+        void enqueue_spawn_polygon(glm::vec2 pos, float radius, size_t segments, float mass, float compliance);
     };
 
     void iterate(Particles &p, float dt, const glm::vec2 &gravity);
