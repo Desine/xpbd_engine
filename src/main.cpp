@@ -7,14 +7,10 @@
 #include "renderer.hpp"
 #include "xpbd.hpp"
 
-#include "Remotery.h"
-
-#include "Tracy.hpp"
-// #define TRACY_ENABLE
+#include "profiler.hpp"
 
 void draw_worldDraw(xpbd::WorldDraw worldDraw, glm::vec2 offset = {0.0f, 0.0f})
 {
-    // ZoneScoped;
     renderer::set_color(sf::Color::Red);
     for (auto p : worldDraw.particles.pos)
         renderer::draw_circle(p, 2);
@@ -101,7 +97,7 @@ void spawn_many(
         for (size_t j = 0; j < amountY; ++j)
         {
             float y = pos.y + spacingY * j;
-            world.spawn_from_json(name, {x, y});
+            world.enqueue_spawn_from_json(name, {x, y});
         }
     }
 }
@@ -109,11 +105,6 @@ void spawn_many(
 int main()
 {
     std::println("<print> reminder {}", 123);
-
-    rmtSettings *settings = rmt_Settings();
-    settings->port = 17815; // default 17815
-    Remotery *rmt;
-    // rmt_CreateGlobalInstance(&rmt);
 
     xpbd::World world;
     world.init();
@@ -138,6 +129,7 @@ int main()
     sf::Clock clock;
     while (renderer::window.isOpen())
     {
+        FrameMark;
         sf::Time deltaTime = clock.restart();
 
         sf::Event event;
@@ -205,7 +197,7 @@ int main()
                             const size_t segments = 6;
                             const float mass = 10;
                             const float compliance = 0.005f;
-                            world.spawn_polygon({x, y}, radius, segments, mass, compliance);
+                            world.enqueue_spawn_polygon({x, y}, radius, segments, mass, compliance);
                         }
                     }
                 }
@@ -292,6 +284,7 @@ int main()
         renderer::window.clear();
         if (draw)
         {
+            ZoneScoped;
             {
                 std::lock_guard<std::mutex> lk(world.drawMutex);
                 if (world.newFrame){
@@ -320,5 +313,4 @@ int main()
 
     ImGui::SFML::Shutdown();
     renderer::window.close();
-    // rmt_DestroyGlobalInstance(rmt);
 }

@@ -7,7 +7,8 @@
 
 #include "defines.hpp"
 #include "renderer.hpp"
-#include "Remotery.h"
+
+#include "profiler.hpp"
 
 namespace xpbd
 {
@@ -465,9 +466,7 @@ namespace xpbd
 
     // Class World
     World::World()
-        : updateState(UpdateState::Paused),
-          nextUpdateTimePoint(std::chrono::steady_clock::now()),
-          deltaTick(std::chrono::duration<double>(1.0 / tickRate))
+        : deltaTick(std::chrono::duration<double>(1.0 / tickRate))
     {
         updateThread = std::thread(&World::update_loop, this);
     }
@@ -511,6 +510,7 @@ namespace xpbd
     void World::update_loop()
     {
         std::unique_lock<std::mutex> update_lk(updateMutex);
+        nextUpdateTimePoint = std::chrono::steady_clock::now();
 
         while (updateState != UpdateState::Stopped)
         {
@@ -541,6 +541,8 @@ namespace xpbd
 
     void World::step()
     {
+        ZoneScoped;
+
         size_t polygons_size = polygonColliders.size();
         size_t points_size = pointsColliders.size();
 
@@ -555,25 +557,19 @@ namespace xpbd
 
             for (size_t iter = 0; iter < iterations; ++iter)
             {
-                rmt_BeginCPUSample(solve_distance_constraints, 0);
                 solve_distance_constraints(particles, distanceConstraints, substep_time);
-                rmt_EndCPUSample();
-                rmt_BeginCPUSample(solve_volume_constraints, 0);
                 solve_volume_constraints(particles, volumeConstraints, substep_time);
-                rmt_EndCPUSample();
 
                 std::vector<AABB> polygonColliders_aabbs(polygons_size);
                 generate_collider_points_aabbs(polygonColliders_aabbs, particles, polygonColliders);
                 std::vector<AABB> pointsColliders_aabbs(points_size);
                 generate_collider_points_aabbs(pointsColliders_aabbs, particles, pointsColliders);
 
-                rmt_BeginCPUSample(fill_hash, 0);
                 spatialHashAABB.clear();
                 for (size_t i = 0; i < polygons_size; ++i)
                     spatialHashAABB.add_aabb(polygonColliders_aabbs[i], i);
-                rmt_EndCPUSample();
 
-                // rmt_BeginCPUSample(generate_pecc, 0);
+            
                 std::vector<PolygonCache> polygonsCache(polygons_size);
                 for (size_t polygonId = 0; polygonId < polygons_size; ++polygonId)
                 {
@@ -611,7 +607,6 @@ namespace xpbd
 #pragma omp parallel for
                 for (size_t pid = 0; pid < combinedColliderPoints.size(); ++pid)
                 {
-                    rmt_BeginCPUSample(hash_get_ids, 0);
                     std::vector<size_t> overlapping_aabb_ids;
                     spatialHashAABB.get_overlapping_aabb_ids_excludeId(overlapping_aabb_ids, combinedAABB[pid], pid);
 
@@ -623,9 +618,7 @@ namespace xpbd
                             if (i != pid && combinedAABB[pid].intersects(polygonColliders_aabbs[i]))
                                 overlapping_aabb_ids.emplace_back(i);
                     }
-                    rmt_EndCPUSample();
 
-                    rmt_ScopedCPUSample(thread, 0);
                     auto &local_pecc = pecc_thread[omp_get_thread_num()];
                     local_pecc.reserve(overlapping_aabb_ids.size() * 10);
 
@@ -657,11 +650,9 @@ namespace xpbd
                 pecc.reserve(total_size);
                 for (auto &v : pecc_thread)
                     pecc.insert(pecc.end(), v.begin(), v.end());
-                // rmt_EndCPUSample();
+            
 
-                rmt_BeginCPUSample(solve_pecc, 0);
                 solve_point_edge_collision_constraints(particles, pecc, substep_time);
-                rmt_EndCPUSample();
             }
 
             update_velocities(particles, substep_time);

@@ -11,8 +11,6 @@
 #include "json_body_loader.hpp"
 #include "spatial_hashing.hpp"
 
-#include "Remotery.h"
-
 namespace xpbd
 {
     struct Particles
