@@ -5,10 +5,12 @@
 #include <cstddef>
 #include <algorithm>
 #include <ankerl/unordered_dense.h>
+#include <print>
 
 struct AABB
 {
     float l, r, b, t;
+    int8_t layer, mask;
 
     bool intersects(const AABB &o) const
     {
@@ -103,13 +105,13 @@ public:
 
         for (int y = startY; y <= endY; ++y)
         {
-            for (int y = startX; y <= endX; ++y)
+            for (int x = startX; x <= endX; ++x)
             {
-                auto idT = idTable.find(CellCoord{y, y});
+                auto idT = idTable.find(CellCoord{x, y});
                 for (size_t id : idT->second)
                 {
                     auto aabbT = aabbTable.find(id);
-                    if (aabbT != aabbTable.end() && aabb.intersects(aabbT->second))
+                    if (aabbT != aabbTable.end() && layer_mask_collide(aabb, aabbT->second) && aabb.intersects(aabbT->second))
                     {
                         out.emplace_back(id);
                     }
@@ -138,7 +140,7 @@ public:
                         if (id == excludeId)
                             continue;
                         auto aabbT = aabbTable.find(id);
-                        if (aabbT != aabbTable.end() && aabb.intersects(aabbT->second))
+                        if (aabbT != aabbTable.end() && layer_mask_collide(aabb, aabbT->second) && aabb.intersects(aabbT->second))
                         {
                             out.emplace_back(id);
                         }
@@ -150,6 +152,11 @@ public:
     }
 
 private:
+    static bool layer_mask_collide(AABB points, AABB polygon)
+    {
+        return points.mask & polygon.layer || points.layer & polygon.mask;
+    }
+
     inline void get_cell_range(const AABB &aabb,
                                int &startX, int &endX,
                                int &startY, int &endY) const noexcept

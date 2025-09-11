@@ -43,6 +43,8 @@ namespace xpbd
         float staticFriction;
         float kineticFriction;
         float compliance;
+        int8_t layer;
+        int8_t mask;
     };
     struct PointEdgeCollision
     {
@@ -161,10 +163,10 @@ namespace xpbd
         void add_volume_constraint(const std::vector<size_t> &indices, float compliance, float restPressure);
         void enqueue_add_volume_constraint(std::vector<size_t> indices, float compliance, float restPressure);
 
-        void add_polygon_collider(const std::vector<size_t> &indices, float staticFriction, float kineticFriction, float compliance);
-        void enqueue_add_polygon_collider(std::vector<size_t> indices, float staticFriction, float kineticFriction, float compliance);
-        void add_points_collider(const std::vector<size_t> &indices, float staticFriction, float kineticFriction, float compliance);
-        void enqueue_add_points_collider( std::vector<size_t> indices, float staticFriction, float kineticFriction, float compliance);
+        void add_polygon_collider(const std::vector<size_t> &indices, float staticFriction, float kineticFriction, float compliance, int8_t layer, int8_t mask);
+        void enqueue_add_polygon_collider(std::vector<size_t> indices, float staticFriction, float kineticFriction, float compliance, int8_t layer, int8_t mask);
+        void add_points_collider(const std::vector<size_t> &indices, float staticFriction, float kineticFriction, float compliance, int8_t layer, int8_t mask);
+        void enqueue_add_points_collider( std::vector<size_t> indices, float staticFriction, float kineticFriction, float compliance, int8_t layer, int8_t mask);
 
         void spawn_from_json(const std::string &name, const glm::vec2 &position);
         void enqueue_spawn_from_json( std::string name,  glm::vec2 position);

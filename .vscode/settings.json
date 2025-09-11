@@ -81,6 +81,7 @@
         "syncstream": "cpp",
         "csignal": "cpp",
         "print": "cpp",
-        "cfenv": "cpp"
+        "cfenv": "cpp",
+        "*.inc": "cpp"
     }
 }

@@ -1,6 +1,7 @@
 #include "json_body_loader.hpp"
 #include <fstream>
 #include <nlohmann/json.hpp>
+#include <print>
 
 #include "defines.hpp"
 #include "xpbd.hpp"
@@ -94,8 +95,10 @@ namespace json_body_loader
                 float staticFriction = cc["staticFriction"].get<float>();
                 float kineticFriction = cc["kineticFriction"].get<float>();
                 float compliance = cc["compliance"].get<float>();
+                int8_t layer = cc.contains("layer") ? cc["layer"].get<int8_t>() : 1;
+                int8_t mask = cc.contains("mask") ? cc["mask"].get<int8_t>() : 1;
 
-                world.add_polygon_collider(indices, staticFriction, kineticFriction, compliance);
+                world.add_polygon_collider(indices, staticFriction, kineticFriction, compliance, layer, mask);
             }
         }
 
@@ -111,8 +114,10 @@ namespace json_body_loader
                 float staticFriction = cc["staticFriction"].get<float>();
                 float kineticFriction = cc["kineticFriction"].get<float>();
                 float compliance = cc["compliance"].get<float>();
+                int8_t layer = cc.contains("layer") ? cc["layer"].get<int8_t>() : 1;
+                int8_t mask = cc.contains("mask") ? cc["mask"].get<int8_t>() : 1;
 
-                world.add_points_collider(indices, staticFriction, kineticFriction, compliance);
+                world.add_points_collider(indices, staticFriction, kineticFriction, compliance, layer, mask);
             }
         }
     }

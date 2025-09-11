@@ -212,6 +212,8 @@ namespace xpbd
             current.r = -std::numeric_limits<float>::max();
             current.b = std::numeric_limits<float>::max();
             current.t = -std::numeric_limits<float>::max();
+            current.layer = c.layer;
+            current.mask = c.mask;
 
             for (auto i : c.indices)
             {
@@ -617,7 +619,7 @@ namespace xpbd
                     std::vector<size_t> overlapping_aabb_ids;
                     spatialHashAABB.get_overlapping_aabb_ids_excludeId(overlapping_aabb_ids, combinedAABB[pid], pid);
 
-                    bool intersection_brute_force = true;
+                    bool intersection_brute_force = false;
                     if (intersection_brute_force)
                     {
                         overlapping_aabb_ids.clear();
@@ -789,24 +791,24 @@ namespace xpbd
                          { add_volume_constraint(indices, compliance, restPressure); });
     }
 
-    void World::add_polygon_collider(const std::vector<size_t> &indices, float staticFriction, float kineticFriction, float compliance)
+    void World::add_polygon_collider(const std::vector<size_t> &indices, float staticFriction, float kineticFriction, float compliance, int8_t layer, int8_t mask)
     {
-        polygonColliders.emplace_back(indices, staticFriction, kineticFriction, compliance);
+        polygonColliders.emplace_back(indices, staticFriction, kineticFriction, compliance, layer, mask);
     }
-    void World::enqueue_add_polygon_collider(std::vector<size_t> indices, float staticFriction, float kineticFriction, float compliance)
+    void World::enqueue_add_polygon_collider(std::vector<size_t> indices, float staticFriction, float kineticFriction, float compliance, int8_t layer, int8_t mask)
     {
-        enqueue_function([this, indices = std::move(indices), staticFriction, kineticFriction, compliance]
-                         { add_polygon_collider(indices, staticFriction, kineticFriction, compliance); });
+        enqueue_function([this, indices = std::move(indices), staticFriction, kineticFriction, compliance, layer, mask]
+                         { add_polygon_collider(indices, staticFriction, kineticFriction, compliance, layer, mask); });
     }
 
-    void World::add_points_collider(const std::vector<size_t> &indices, float staticFriction, float kineticFriction, float compliance)
+    void World::add_points_collider(const std::vector<size_t> &indices, float staticFriction, float kineticFriction, float compliance, int8_t layer, int8_t mask)
     {
-        pointsColliders.emplace_back(indices, staticFriction, kineticFriction, compliance);
+        pointsColliders.emplace_back(indices, staticFriction, kineticFriction, compliance, layer, mask);
     }
-    void World::enqueue_add_points_collider(std::vector<size_t> indices, float staticFriction, float kineticFriction, float compliance)
+    void World::enqueue_add_points_collider(std::vector<size_t> indices, float staticFriction, float kineticFriction, float compliance, int8_t layer, int8_t mask)
     {
-        enqueue_function([this, indices = std::move(indices), staticFriction, kineticFriction, compliance] mutable
-                         { add_points_collider(indices, staticFriction, kineticFriction, compliance); });
+        enqueue_function([this, indices = std::move(indices), staticFriction, kineticFriction, compliance, layer, mask] mutable
+                         { add_points_collider(indices, staticFriction, kineticFriction, compliance, layer, mask); });
     }
 
     void World::spawn_from_json(const std::string &name, const glm::vec2 &position)
@@ -845,7 +847,11 @@ namespace xpbd
 
         float staticFriction = 0.4f;
         float kineticFriction = 0.3f;
-        add_polygon_collider(ids, staticFriction, kineticFriction, compliance);
+
+        int8_t layer = 1;
+        int8_t mask = 1;
+
+        add_polygon_collider(ids, staticFriction, kineticFriction, compliance, layer, mask);
     }
     void World::enqueue_spawn_polygon(glm::vec2 pos, float radius, size_t segments, float mass, float compliance)
     {
