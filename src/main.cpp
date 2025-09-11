@@ -160,9 +160,10 @@ int main()
             if (event.type == sf::Event::MouseWheelScrolled && event.mouseWheelScroll.wheel == sf::Mouse::VerticalWheel)
                 renderer::zoom(event.mouseWheelScroll.delta > 0 ? 0.95 : 1.05);
 
-            // spawn
+            // keyboard
             if (event.type == sf::Event::KeyReleased)
             {
+                // spawn
                 sf::Vector2f worldPos = renderer::window.mapPixelToCoords(mouseCurrent);
                 glm::vec2 position(worldPos.x, worldPos.y);
                 if (event.key.code == sf::Keyboard::Q)
@@ -239,9 +240,21 @@ int main()
                 if (event.key.code == sf::Keyboard::G)
                     world.enqueue_spawn_from_json("square", position);
 
-                if (event.key.code == sf::Keyboard::R){
+                // clear world
+                if (event.key.code == sf::Keyboard::R)
+                {
                     world.enqueue_init();
                     world.enqueue_spawn_from_json("ground", {0, -1000});
+                }
+                // pause / resume
+                if (event.key.code == sf::Keyboard::Space)
+                {
+                    if (paused)
+                        world.resume_update();
+                    else
+                        world.pause_update();
+
+                    paused = !paused;
                 }
             }
         }
@@ -287,7 +300,8 @@ int main()
             ZoneScoped;
             {
                 std::lock_guard<std::mutex> lk(world.drawMutex);
-                if (world.newFrame){
+                if (world.newFrame)
+                {
                     std::swap(worldDraw, world.draw);
                     world.newFrame = false;
                 }

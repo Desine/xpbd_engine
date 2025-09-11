@@ -1,11 +1,12 @@
 #include "xpbd.hpp"
-#include "utils.hpp"
 #include "cstdio"
 #include <algorithm>
 #include <omp.h>
 #include <thread>
+#include <print>
 
 #include "defines.hpp"
+#include "utils.hpp"
 #include "renderer.hpp"
 
 #include "profiler.hpp"
@@ -73,11 +74,17 @@ namespace xpbd
         p1 += w1 * correction;
         p2 -= w2 * correction;
     }
-    void solve_distance_constraints(Particles &p, std::vector<DistanceConstraint> &dc, float dt)
+    void solve_distance_constraints(Particles &p, std::vector<DistanceConstraint> &dc, float dt, bool reversePass)
     {
-        for (size_t i = 0; i < dc.size(); ++i)
+        if (reversePass)
         {
-            solve_distance_constraint(p, dc[i], dt);
+            for (auto it = dc.rbegin(); it != dc.rend(); ++it)
+                solve_distance_constraint(p, *it, dt);
+        }
+        else
+        {
+            for (auto &c : dc)
+                solve_distance_constraint(p, c, dt);
         }
     }
     void apply_distance_constraints_damping(Particles &p, std::vector<DistanceConstraint> &dc, float dt)
@@ -187,9 +194,7 @@ namespace xpbd
     void solve_volume_constraints(Particles &p, std::vector<VolumeConstraint> &vc, float dt)
     {
         for (size_t i = 0; i < vc.size(); ++i)
-        {
             solve_volume_constraint(p, vc[i], dt);
-        }
     }
 
     void generate_collider_points_aabbs(
@@ -557,7 +562,9 @@ namespace xpbd
 
             for (size_t iter = 0; iter < iterations; ++iter)
             {
-                solve_distance_constraints(particles, distanceConstraints, substep_time);
+                reversePass = !reversePass;
+
+                solve_distance_constraints(particles, distanceConstraints, substep_time, reversePass);
                 solve_volume_constraints(particles, volumeConstraints, substep_time);
 
                 std::vector<AABB> polygonColliders_aabbs(polygons_size);
@@ -569,7 +576,6 @@ namespace xpbd
                 for (size_t i = 0; i < polygons_size; ++i)
                     spatialHashAABB.add_aabb(polygonColliders_aabbs[i], i);
 
-            
                 std::vector<PolygonCache> polygonsCache(polygons_size);
                 for (size_t polygonId = 0; polygonId < polygons_size; ++polygonId)
                 {
@@ -604,7 +610,8 @@ namespace xpbd
                 combinedAABB.insert(combinedAABB.end(), pointsColliders_aabbs.begin(), pointsColliders_aabbs.end());
 
                 std::vector<std::vector<PointEdgeCollisionConstraints>> pecc_thread(omp_get_max_threads());
-#pragma omp parallel for
+                // std::println("omp_get_max_threads(): {}", omp_get_max_threads());
+#pragma omp parallel for num_threads(6) // TODO. REMOVE. HARD CODED num_threads(n)
                 for (size_t pid = 0; pid < combinedColliderPoints.size(); ++pid)
                 {
                     std::vector<size_t> overlapping_aabb_ids;
@@ -650,7 +657,6 @@ namespace xpbd
                 pecc.reserve(total_size);
                 for (auto &v : pecc_thread)
                     pecc.insert(pecc.end(), v.begin(), v.end());
-            
 
                 solve_point_edge_collision_constraints(particles, pecc, substep_time);
             }

@@ -96,6 +96,7 @@ namespace xpbd
         float timeScale = 10.f;
         float tickRate = 30.f;
         std::chrono::duration<double> deltaTick;
+        bool reversePass = false;
 
         Particles particles;
         std::vector<DistanceConstraint> distanceConstraints;
@@ -178,7 +179,7 @@ namespace xpbd
     void reset_volume_constraints_lambdas(std::vector<VolumeConstraint> &vc);
 
     void solve_distance_constraint(Particles &p, DistanceConstraint &dc, float dt);
-    void solve_distance_constraints(Particles &p, std::vector<DistanceConstraint> &dc, float dt);
+    void solve_distance_constraints(Particles &p, std::vector<DistanceConstraint> &dc, float dt, bool reversePass);
     void apply_distance_constraints_damping(Particles &p, std::vector<DistanceConstraint> &dc, float dt);
 
     float compute_polygon_area(const std::vector<glm::vec2> &positions);
