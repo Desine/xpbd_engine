@@ -1,8 +1,7 @@
-cmake_minimum_required(VERSION 3.13)
-project(imgui_sfml VERSION 2.6.1 LANGUAGES CXX)
+cmake_minimum_required(VERSION 3.22)
+project(imgui_sfml VERSION 3.0.0 LANGUAGES CXX)
 
 option(IMGUI_SFML_FIND_SFML "Use find_package to find SFML" ON)
-option(IMGUI_SFML_IMGUI_DEMO "Build imgui_demo.cpp" ON)
 option(IMGUI_SFML_ENABLE_WARNINGS "Enable compiler warnings" OFF)
 option(IMGUI_SFML_DISABLE_OBSOLETE_FUNCTIONS "Disable obsolete ImGui functions" OFF)
 
@@ -27,7 +26,7 @@ if(IMGUI_SFML_FIND_SFML)
   if(NOT BUILD_SHARED_LIBS)
     set(SFML_STATIC_LIBRARIES ON)
   endif()
-  find_package(SFML 2.5 REQUIRED COMPONENTS graphics)
+  find_package(SFML 3 REQUIRED COMPONENTS Graphics)
 endif()
 
 # ImGui does not provide native support for CMakeLists, workaround for now to have
@@ -39,7 +38,7 @@ if(NOT IMGUI_DIR)
 endif()
 
 # This uses FindImGui.cmake provided in ImGui-SFML repo for now
-find_package(ImGui 1.89 REQUIRED)
+find_package(ImGui 1.91.1 REQUIRED)
 
 # These headers will be installed alongside ImGui-SFML
 set(IMGUI_PUBLIC_HEADERS
@@ -52,18 +51,12 @@ set(IMGUI_PUBLIC_HEADERS
   ${IMGUI_INCLUDE_DIR}/misc/cpp/imgui_stdlib.h
 )
 
-if(IMGUI_SFML_IMGUI_DEMO)
-  list(APPEND IMGUI_SOURCES ${IMGUI_DEMO_SOURCES})
-endif()
-
 # CMake 3.11 and later prefer to choose GLVND, but we choose legacy OpenGL just because it's safer
 # (unless the OpenGL_GL_PREFERENCE was explicitly set)
 # See CMP0072 for more details (cmake --help-policy CMP0072)
-if((NOT ${CMAKE_VERSION} VERSION_LESS 3.11) AND (NOT OpenGL_GL_PREFERENCE))
+if(NOT OpenGL_GL_PREFERENCE)
   set(OpenGL_GL_PREFERENCE "LEGACY")
 endif()
-
-find_package(OpenGL REQUIRED)
 
 include(GNUInstallDirs)
 
@@ -71,18 +64,31 @@ include(GNUInstallDirs)
 add_library(ImGui-SFML imgui-SFML.cpp ${IMGUI_SOURCES})
 add_library(ImGui-SFML::ImGui-SFML ALIAS ImGui-SFML)
 target_include_directories(ImGui-SFML PUBLIC
-  $<BUILD_INTERFACE:${IMGUI_INCLUDE_DIR}>
   $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
-target_compile_features(ImGui-SFML PUBLIC cxx_std_11)
-target_link_libraries(ImGui-SFML PUBLIC sfml-graphics OpenGL::GL)
+target_include_directories(ImGui-SFML SYSTEM PUBLIC
+  $<BUILD_INTERFACE:${IMGUI_INCLUDE_DIR}>
+)
+
+if(IOS)
+    target_link_libraries(ImGui-SFML PRIVATE "-framework OpenGLES")
+elseif(ANDROID)
+    find_package(EGL REQUIRED)
+    find_package(GLES REQUIRED)
+    target_link_libraries(ImGui-SFML PRIVATE EGL::EGL GLES::GLES)
+else()
+    find_package(OpenGL REQUIRED COMPONENTS OpenGL)
+    target_link_libraries(ImGui-SFML PRIVATE OpenGL::GL)
+endif()
+
+target_link_libraries(ImGui-SFML PUBLIC SFML::Graphics)
 if(WIN32 AND MINGW)
   target_link_libraries(ImGui-SFML PUBLIC imm32)
 endif()
 if(BUILD_SHARED_LIBS)
-  target_compile_definitions(ImGui-SFML PRIVATE IMGUI_SFML_SHARED_LIB)
-  set_target_properties(ImGui-SFML PROPERTIES DEFINE_SYMBOL "IMGUI_SFML_EXPORTS")
+  target_compile_definitions(ImGui-SFML PUBLIC IMGUI_SFML_SHARED_LIB
+                                        PRIVATE IMGUI_SFML_EXPORTS)
   set_target_properties(ImGui-SFML PROPERTIES DEBUG_POSTFIX "_d")
 endif()
 if(IMGUI_SFML_DISABLE_OBSOLETE_FUNCTIONS)
@@ -139,7 +145,10 @@ install(TARGETS ImGui-SFML
 install(EXPORT ImGui-SFML
   DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/ImGui-SFML
   NAMESPACE ImGui-SFML::
-  FILE ImGui-SFMLConfig.cmake
+)
+
+install(FILES ${PROJECT_SOURCE_DIR}/cmake/ImGui-SFMLConfig.cmake
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/ImGui-SFML
 )
 
 # Stop configuration if being consumed by a higher level project

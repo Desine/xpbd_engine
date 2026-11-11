@@ -1,7 +1,7 @@
 #ifndef define_json_body_loader
 #define define_json_body_loader
-#include "glm/glm.hpp"
 #include <string>
+#include "glm/glm.hpp"
 
 namespace xpbd
 {

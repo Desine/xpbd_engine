@@ -83,5 +83,6 @@
         "print": "cpp",
         "cfenv": "cpp",
         "*.inc": "cpp"
-    }
+    },
+    "cmake.sourceDirectory": "/mnt/D/development/desine/xpbd_engine/tracy"
 }

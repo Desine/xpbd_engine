@@ -15,13 +15,14 @@ namespace renderer
     void setup_view()
     {
         view = window.getDefaultView();
-        view.setSize(width, -height);
+        view.setSize(sf::Vector2f(width, -height));
         sf::Vector2f cameraCenter(0, 0);
         view.setCenter(cameraCenter);
         window.setView(view);
     }
-    
-    void zoom(float factor){
+
+    void zoom(float factor)
+    {
         scale *= factor;
         view.zoom(factor);
         window.setView(view);
@@ -30,7 +31,7 @@ namespace renderer
     {
         width = w;
         height = h;
-        view.setSize(width, -height);
+        view.setSize(sf::Vector2f(width, -height));
         view.zoom(scale);
         window.setView(view);
     }
@@ -55,7 +56,7 @@ namespace renderer
             {
                 sf::Vertex(sf::Vector2f(from.x, from.y), color),
                 sf::Vertex(sf::Vector2f(to.x, to.y), color)};
-        window.draw(line, 2, sf::Lines);
+        window.draw(line, 2,sf::PrimitiveType::Lines);
     }
     void draw_segmented_line(const std::vector<glm::vec2> &points)
     {
@@ -72,8 +73,8 @@ namespace renderer
     {
         sf::CircleShape shape(radius);
         shape.setFillColor(color);
-        shape.setOrigin(radius, radius);
-        shape.setPosition(pos.x, pos.y);
+        shape.setOrigin(sf::Vector2f(radius, radius));
+        shape.setPosition(sf::Vector2f(pos.x, pos.y));
         window.draw(shape);
     }
 

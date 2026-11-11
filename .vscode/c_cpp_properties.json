@@ -3,12 +3,10 @@
         {
             "name": "Linux",
             "includePath": [
-                "/usr/include/glm",
                 "${workspaceFolder}",
                 "${workspaceFolder}/**",
                 "${workspaceFolder}/include/imgui",
                 "${workspaceFolder}/include/imgui-sfml",
-                "${workspaceFolder}/Remotery/lib",
                 "${workspaceFolder}/tracy/public/tracy"
             ],
             "defines": [],

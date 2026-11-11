@@ -1,3 +1,12 @@
 [submodule "tracy"]
 	path = tracy
 	url = https://github.com/wolfpld/tracy.git
+[submodule "include/imgui"]
+	path = include/imgui
+	url = https://github.com/ocornut/imgui
+[submodule "include/imgui-sfml"]
+	path = include/imgui-sfml
+	url = https://github.com/SFML/imgui-sfml
+[submodule "include/glm"]
+	path = include/glm
+	url = https://github.com/g-truc/glm

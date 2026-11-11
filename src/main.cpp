@@ -1,6 +1,8 @@
+#include <filesystem>
 #include "imgui.h"
 #include "imgui-SFML.h"
 #include <SFML/Graphics.hpp>
+#include "glm/glm.hpp"
 
 #include <print>
 
@@ -104,11 +106,11 @@ void spawn_many(
 
 int main()
 {
-    std::println("<print> reminder {}", 123);
+    //json_body_loader::folder = std::filesystem::current_path().u8string() + "./body/";
+
 
     xpbd::World world;
     world.init();
-    // unsafe, unly do here to draw 'ground' on first frame
     world.spawn_from_json("ground", {0, -1000});
     world.submit_draw();
     bool paused = world.updateState == xpbd::World::UpdateState::Paused;
@@ -132,18 +134,17 @@ int main()
         FrameMark;
         sf::Time deltaTime = clock.restart();
 
-        sf::Event event;
-        while (renderer::window.pollEvent(event))
+        while (const auto event = renderer::window.pollEvent())
         {
-            ImGui::SFML::ProcessEvent(renderer::window, event);
+            ImGui::SFML::ProcessEvent(renderer::window, *event);
 
-            if (event.type == sf::Event::Closed)
+            if (event->is<sf::Event::Closed>())
                 renderer::window.close();
 
-            if (event.type == sf::Event::Resized)
+            if (const auto resized = event->getIf<sf::Event::Resized>())
                 renderer::resize(
-                    static_cast<float>(event.size.width),
-                    static_cast<float>(event.size.height));
+                    resized->size.x,
+                    resized->size.y);
 
             // camera
             sf::Vector2i mouseCurrent = sf::Mouse::getPosition(renderer::window);
@@ -157,16 +158,16 @@ int main()
                 renderer::view.move(-delta);
                 renderer::window.setView(renderer::view);
             }
-            if (event.type == sf::Event::MouseWheelScrolled && event.mouseWheelScroll.wheel == sf::Mouse::VerticalWheel)
-                renderer::zoom(event.mouseWheelScroll.delta > 0 ? 0.95 : 1.05);
+            if (const auto scrolled = event->getIf<sf::Event::MouseWheelScrolled>())
+                renderer::zoom(scrolled->delta > 0 ? 0.95 : 1.05);
 
             // keyboard
-            if (event.type == sf::Event::KeyReleased)
+            if (const auto keyReleased = event->getIf<sf::Event::KeyReleased>())
             {
                 // spawn
                 sf::Vector2f worldPos = renderer::window.mapPixelToCoords(mouseCurrent);
                 glm::vec2 position(worldPos.x, worldPos.y);
-                if (event.key.code == sf::Keyboard::Q)
+                if (keyReleased->code == sf::Keyboard::Key::Q)
                 {
                     size_t amountX = 5;
                     size_t amountY = 5;
@@ -174,7 +175,7 @@ int main()
                     float spacingY = 200;
                     spawn_many(world, position, amountX, amountY, spacingX, spacingY, "car");
                 }
-                if (event.key.code == sf::Keyboard::W)
+                if (keyReleased->code == sf::Keyboard::Key::W)
                 {
                     size_t amountX = 5;
                     size_t amountY = 5;
@@ -182,7 +183,7 @@ int main()
                     float spacingY = 200;
                     spawn_many(world, position, amountX, amountY, spacingX, spacingY, "balloon");
                 }
-                if (event.key.code == sf::Keyboard::E)
+                if (keyReleased->code == sf::Keyboard::Key::E)
                 {
                     size_t amountX = 10;
                     size_t amountY = 10;
@@ -202,7 +203,7 @@ int main()
                         }
                     }
                 }
-                if (event.key.code == sf::Keyboard::C)
+                if (keyReleased->code == sf::Keyboard::Key::C)
                 {
                     size_t amountX = 30;
                     size_t amountY = 1;
@@ -223,11 +224,11 @@ int main()
                     }
                 }
 
-                if (event.key.code == sf::Keyboard::A)
+                if (keyReleased->code == sf::Keyboard::Key::A)
                     world.enqueue_spawn_from_json("car", position);
-                if (event.key.code == sf::Keyboard::S)
+                if (keyReleased->code == sf::Keyboard::Key::S)
                     world.enqueue_spawn_from_json("balloon", position);
-                if (event.key.code == sf::Keyboard::D)
+                if (keyReleased->code == sf::Keyboard::Key::D)
                 {
                     float radius = 40;
                     size_t segments = 6;
@@ -235,19 +236,19 @@ int main()
                     float compliance = 0.005f;
                     world.enqueue_spawn_polygon(position, radius, segments, mass, compliance);
                 }
-                if (event.key.code == sf::Keyboard::F)
+                if (keyReleased->code == sf::Keyboard::Key::F)
                     world.enqueue_spawn_from_json("person", position);
-                if (event.key.code == sf::Keyboard::G)
+                if (keyReleased->code == sf::Keyboard::Key::G)
                     world.enqueue_spawn_from_json("square", position);
 
                 // clear world
-                if (event.key.code == sf::Keyboard::R)
+                if (keyReleased->code == sf::Keyboard::Key::R)
                 {
                     world.enqueue_init();
                     world.enqueue_spawn_from_json("ground", {0, -1000});
                 }
                 // pause / resume
-                if (event.key.code == sf::Keyboard::Space)
+                if (keyReleased->code == sf::Keyboard::Key::Space)
                 {
                     if (paused)
                         world.resume_update();

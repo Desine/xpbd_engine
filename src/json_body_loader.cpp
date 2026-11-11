@@ -21,8 +21,10 @@ namespace json_body_loader
         glm::vec2 offset = {0.0f, 0.0f})
     {
         std::ifstream file(folder + filename + extension);
-        if (!file.is_open())
+        if (!file.is_open()){
+            
             throw std::runtime_error("Failed to open file: " + folder + filename + extension);
+        }
 
         json j;
         file >> j;
