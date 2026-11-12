@@ -1,5 +1,5 @@
-#ifndef define_json_body_loader
-#define define_json_body_loader
+#ifndef JSON_BODY_LOADER
+#define JSON_BODY_LOADER
 #include <string>
 #include "glm/glm.hpp"
 
@@ -10,9 +10,9 @@ namespace xpbd
 
 namespace json_body_loader
 {
-    const std::string folder = "./body/";
-    const std::string extension = ".body";
+    extern std::string folder;
+    extern const std::string extension;
 
     void load(xpbd::World &world, const std::string &filename, glm::vec2 offset);
 }
-#endif // define_json_body_loader
+#endif // JSON_BODY_LOADER

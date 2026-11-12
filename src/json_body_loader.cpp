@@ -1,126 +1,120 @@
 #include "json_body_loader.hpp"
+#include "nlohmann/json.hpp"
 #include <fstream>
-#include <nlohmann/json.hpp>
-#include <print>
 
-#include "defines.hpp"
 #include "xpbd.hpp"
 
-using json = nlohmann::json;
+std::string json_body_loader::folder = "";
+const std::string json_body_loader::extension = ".body";
 
-namespace xpbd
+void json_body_loader::load(
+    xpbd::World &world,
+    const std::string &filename,
+    glm::vec2 offset = {0.0f, 0.0f})
 {
-    class World;
-}
+    std::ifstream file(folder + filename + extension);
+    if (!file.is_open())
+        throw std::runtime_error("Failed to open file: |" + folder + "|" + filename + "|" + extension);
 
-namespace json_body_loader
-{
-    void load(
-        xpbd::World &world,
-        const std::string &filename,
-        glm::vec2 offset = {0.0f, 0.0f})
+    nlohmann::json j;
+    file >> j;
+
+    glm::vec2 position_offset = {0, 0};
+    if (j.contains("position") && j["position"].is_array() && j["position"].size() == 2)
     {
-        std::ifstream file(folder + filename + extension);
-        if (!file.is_open()){
-            
-            throw std::runtime_error("Failed to open file: " + folder + filename + extension);
-        }
+        position_offset = {j["position"][0].get<float>(), j["position"][1].get<float>()};
+    }
 
-        json j;
-        file >> j;
+    size_t base_index = world.particles.pos.size(); // offset for constraint indices
 
-        glm::vec2 position_offset = {0, 0};
-        if (j.contains("position") && j["position"].is_array() && j["position"].size() == 2)
+    // Load Particles
+    if (j.contains("Particles") && j["Particles"].is_array())
+    {
+        for (const auto &p : j["Particles"])
         {
-            position_offset = {j["position"][0].get<float>(), j["position"][1].get<float>()};
+            if (!p.contains("pos") || !p.contains("mass"))
+                continue;
+
+            glm::vec2 pos(p["pos"][0].get<float>(), p["pos"][1].get<float>());
+            pos += position_offset + offset;
+
+            glm::vec2 vel = {0, 0};
+            if (p.contains("vel"))
+                vel = {p["vel"][0].get<float>(), p["vel"][1].get<float>()};
+
+            float mass = p["mass"].get<float>();
+            //world.add_particle(pos, mass, vel);
+            world.enqueue_function(Queue::add_particle(pos, mass, vel));
         }
+    }
 
-        size_t base_index = world.particles.pos.size(); // offset for constraint indices
-
-        // Load Particles
-        if (j.contains("Particles") && j["Particles"].is_array())
+    // Load Distance Constraints
+    if (j.contains("DistanceConstraints") && j["DistanceConstraints"].is_array())
+    {
+        for (const auto &dc : j["DistanceConstraints"])
         {
-            for (const auto &p : j["Particles"])
-            {
-                if (!p.contains("pos") || !p.contains("mass"))
-                    continue;
-
-                glm::vec2 pos(p["pos"][0].get<float>(), p["pos"][1].get<float>());
-                pos += position_offset + offset;
-
-                glm::vec2 vel = {0, 0};
-                if (p.contains("vel"))
-                    vel = {p["vel"][0].get<float>(), p["vel"][1].get<float>()};
-
-                float mass = p["mass"].get<float>();
-                world.add_particle(pos, mass, vel);
-            }
+            size_t i1 = dc["i1"].get<size_t>() + base_index;
+            size_t i2 = dc["i2"].get<size_t>() + base_index;
+            float compliance = dc["compliance"].get<float>();
+            float restDist = dc.contains("restDistance") ? dc["restDistance"].get<float>() : __FLT_MAX__;
+            //world.add_distance_constraint(i1, i2, compliance, restDist);
+            world.enqueue_function(Queue::add_distance_constraint(i1, i2, compliance, restDist));
         }
+    }
 
-        // Load Distance Constraints
-        if (j.contains("DistanceConstraints") && j["DistanceConstraints"].is_array())
+    // Load Volume Constraints
+    if (j.contains("VolumeConstraints") && j["VolumeConstraints"].is_array())
+    {
+        for (const auto &vc : j["VolumeConstraints"])
         {
-            for (const auto &dc : j["DistanceConstraints"])
-            {
-                size_t i1 = dc["i1"].get<size_t>() + base_index;
-                size_t i2 = dc["i2"].get<size_t>() + base_index;
-                float compliance = dc["compliance"].get<float>();
-                float restDist = dc.contains("restDistance") ? dc["restDistance"].get<float>() : FLOAT_DEFAULT;
-                world.add_distance_constraint(i1, i2, compliance, restDist);
-            }
+            std::vector<size_t> indices;
+            for (const auto &idx : vc["indices"])
+                indices.push_back(idx.get<size_t>() + base_index);
+
+            float compliance = vc["compliance"].get<float>();
+            float restPressure = vc.contains("restPressure") ? vc["restPressure"].get<float>() : __FLT_MAX__;
+            //world.add_volume_constraint(indices, compliance, restPressure);
+            world.enqueue_function(Queue::add_volume_constraint(indices, compliance, restPressure));
         }
+    }
 
-        // Load Volume Constraints
-        if (j.contains("VolumeConstraints") && j["VolumeConstraints"].is_array())
+    // Load Polygon Colliders
+    if (j.contains("PolygonColliders") && j["PolygonColliders"].is_array())
+    {
+        for (const auto &cc : j["PolygonColliders"])
         {
-            for (const auto &vc : j["VolumeConstraints"])
-            {
-                std::vector<size_t> indices;
-                for (const auto &idx : vc["indices"])
-                    indices.push_back(idx.get<size_t>() + base_index);
+            std::vector<size_t> indices;
+            for (const auto &idx : cc["indices"])
+                indices.push_back(idx.get<size_t>() + base_index);
 
-                float compliance = vc["compliance"].get<float>();
-                float restPressure = vc.contains("restPressure") ? vc["restPressure"].get<float>() : FLOAT_DEFAULT;
-                world.add_volume_constraint(indices, compliance, restPressure);
-            }
+            float staticFriction = cc["staticFriction"].get<float>();
+            float kineticFriction = cc["kineticFriction"].get<float>();
+            float compliance = cc["compliance"].get<float>();
+            int8_t layer = cc.contains("layer") ? cc["layer"].get<int8_t>() : 1;
+            int8_t mask = cc.contains("mask") ? cc["mask"].get<int8_t>() : 1;
+
+            //world.add_polygon_collider(indices, staticFriction, kineticFriction, compliance, layer, mask);
+            world.enqueue_function(Queue::add_polygon_collider(indices, staticFriction, kineticFriction, compliance, layer, mask));
         }
+    }
 
-        // Load Polygon Colliders
-        if (j.contains("PolygonColliders") && j["PolygonColliders"].is_array())
+    // Load Point Colliders
+    if (j.contains("PointsColliders") && j["PointsColliders"].is_array())
+    {
+        for (const auto &cc : j["PointsColliders"])
         {
-            for (const auto &cc : j["PolygonColliders"])
-            {
-                std::vector<size_t> indices;
-                for (const auto &idx : cc["indices"])
-                    indices.push_back(idx.get<size_t>() + base_index);
+            std::vector<size_t> indices;
+            for (const auto &idx : cc["indices"])
+                indices.push_back(idx.get<size_t>() + base_index);
 
-                float staticFriction = cc["staticFriction"].get<float>();
-                float kineticFriction = cc["kineticFriction"].get<float>();
-                float compliance = cc["compliance"].get<float>();
-                int8_t layer = cc.contains("layer") ? cc["layer"].get<int8_t>() : 1;
-                int8_t mask = cc.contains("mask") ? cc["mask"].get<int8_t>() : 1;
+            float staticFriction = cc["staticFriction"].get<float>();
+            float kineticFriction = cc["kineticFriction"].get<float>();
+            float compliance = cc["compliance"].get<float>();
+            int8_t layer = cc.contains("layer") ? cc["layer"].get<int8_t>() : 1;
+            int8_t mask = cc.contains("mask") ? cc["mask"].get<int8_t>() : 1;
 
-                world.add_polygon_collider(indices, staticFriction, kineticFriction, compliance, layer, mask);
-            }
-        }
-
-        // Load Point Colliders
-        if (j.contains("PointsColliders") && j["PointsColliders"].is_array())
-        {
-            for (const auto &cc : j["PointsColliders"])
-            {
-                std::vector<size_t> indices;
-                for (const auto &idx : cc["indices"])
-                    indices.push_back(idx.get<size_t>() + base_index);
-
-                float staticFriction = cc["staticFriction"].get<float>();
-                float kineticFriction = cc["kineticFriction"].get<float>();
-                float compliance = cc["compliance"].get<float>();
-                int8_t layer = cc.contains("layer") ? cc["layer"].get<int8_t>() : 1;
-                int8_t mask = cc.contains("mask") ? cc["mask"].get<int8_t>() : 1;
-
-                world.add_points_collider(indices, staticFriction, kineticFriction, compliance, layer, mask);
-            }
+            //world.add_points_collider(indices, staticFriction, kineticFriction, compliance, layer, mask);
+            world.enqueue_function(Queue::add_points_collider(indices, staticFriction, kineticFriction, compliance, layer, mask));
         }
     }
 }

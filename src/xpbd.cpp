@@ -3,13 +3,14 @@
 #include <algorithm>
 #include <omp.h>
 #include <thread>
+#include <thread>
 #include <print>
 
-#include "defines.hpp"
 #include "utils.hpp"
 #include "renderer.hpp"
 
 #include "profiler.hpp"
+#include "json_body_loader.hpp"
 
 namespace xpbd
 {
@@ -669,25 +670,6 @@ namespace xpbd
         }
     }
 
-    void World::enqueue_function(std::function<void()> f)
-    {
-        std::lock_guard<std::mutex> lk(functionQueueMutex);
-        queue.push(std::move(f));
-    }
-    void World::execute_enqueued_functions()
-    {
-        std::queue<std::function<void()>> local;
-        {
-            std::lock_guard<std::mutex> lk(functionQueueMutex);
-            std::swap(local, queue);
-        }
-        while (!local.empty())
-        {
-            local.front()();
-            local.pop();
-        }
-    }
-
     void World::init()
     {
         particles.pos.clear();
@@ -721,11 +703,6 @@ namespace xpbd
 
         // pecc.reserve(5000);
     }
-    void World::enqueue_init()
-    {
-        enqueue_function([this]
-                         { init(); });
-    }
 
     void World::submit_draw()
     {
@@ -742,11 +719,6 @@ namespace xpbd
     {
         deltaTick = std::chrono::duration<double>(1.0 / tickRate);
     }
-    void World::enqueue_set_tickRate(size_t tickRate)
-    {
-        enqueue_function([this, tickRate]
-                         { set_tickRate(tickRate); });
-    }
 
     void World::add_particle(const glm::vec2 &pos, float mass, const glm::vec2 &vel = {0.0f, 0.0f})
     {
@@ -756,71 +728,35 @@ namespace xpbd
         float w = mass == 0 ? 0 : 1 / mass;
         particles.w.emplace_back(w);
     }
-    void World::enqueue_add_particle(const glm::vec2 &pos, float mass, const glm::vec2 &vel = {0.0f, 0.0f})
+    void World::add_distance_constraint(size_t i1, size_t i2, float compliance, float restDist = __FLT_MAX__)
     {
-        enqueue_function([this, pos, mass, vel]
-                         { add_particle(pos, mass, vel); });
-    }
-
-    void World::add_distance_constraint(size_t i1, size_t i2, float compliance, float restDist = FLOAT_DEFAULT)
-    {
-        if (restDist == FLOAT_DEFAULT)
+        if (restDist == __FLT_MAX__)
             restDist = glm::distance(particles.pos[i1], particles.pos[i2]);
         float compressionDamping = 0.5f;
         float extensionDamping = 0.5f;
         float lambda = 0;
         distanceConstraints.emplace_back(i1, i2, restDist, compressionDamping, extensionDamping, compliance, lambda);
     }
-    void World::enqueue_add_distance_constraint(size_t i1, size_t i2, float compliance, float restDist = FLOAT_DEFAULT)
-    {
-        enqueue_function([this, i1, i2, compliance, restDist]
-                         { add_distance_constraint(i1, i2, compliance, restDist); });
-    }
-
-    void World::add_volume_constraint(const std::vector<size_t> &indices, float compliance, float restPressure = FLOAT_DEFAULT)
+    void World::add_volume_constraint(const std::vector<size_t> &indices, float compliance, float restPressure = __FLT_MAX__)
     {
         float restVolume = compute_polygon_area(particles, indices);
-        if (restPressure != FLOAT_DEFAULT)
+        if (restPressure != __FLT_MAX__)
             restVolume *= restPressure;
         float lambda = 0;
         volumeConstraints.emplace_back(indices, restVolume, compliance, lambda);
     }
-    void World::enqueue_add_volume_constraint(std::vector<size_t> indices, float compliance, float restPressure = FLOAT_DEFAULT)
-    {
-        enqueue_function([this, indices = std::move(indices), compliance, restPressure]
-                         { add_volume_constraint(indices, compliance, restPressure); });
-    }
-
     void World::add_polygon_collider(const std::vector<size_t> &indices, float staticFriction, float kineticFriction, float compliance, int8_t layer, int8_t mask)
     {
         polygonColliders.emplace_back(indices, staticFriction, kineticFriction, compliance, layer, mask);
     }
-    void World::enqueue_add_polygon_collider(std::vector<size_t> indices, float staticFriction, float kineticFriction, float compliance, int8_t layer, int8_t mask)
-    {
-        enqueue_function([this, indices = std::move(indices), staticFriction, kineticFriction, compliance, layer, mask]
-                         { add_polygon_collider(indices, staticFriction, kineticFriction, compliance, layer, mask); });
-    }
-
     void World::add_points_collider(const std::vector<size_t> &indices, float staticFriction, float kineticFriction, float compliance, int8_t layer, int8_t mask)
     {
         pointsColliders.emplace_back(indices, staticFriction, kineticFriction, compliance, layer, mask);
     }
-    void World::enqueue_add_points_collider(std::vector<size_t> indices, float staticFriction, float kineticFriction, float compliance, int8_t layer, int8_t mask)
-    {
-        enqueue_function([this, indices = std::move(indices), staticFriction, kineticFriction, compliance, layer, mask] mutable
-                         { add_points_collider(indices, staticFriction, kineticFriction, compliance, layer, mask); });
-    }
-
     void World::spawn_from_json(const std::string &name, const glm::vec2 &position)
     {
         json_body_loader::load(*this, name, position);
     }
-    void World::enqueue_spawn_from_json(std::string name, glm::vec2 position)
-    {
-        enqueue_function([this, name = std::move(name), position]
-                         { spawn_from_json(name, position); });
-    }
-
     void World::spawn_polygon(glm::vec2 pos, float radius, size_t segments, float mass, float compliance)
     {
         if (segments < 3)
@@ -853,10 +789,50 @@ namespace xpbd
 
         add_polygon_collider(ids, staticFriction, kineticFriction, compliance, layer, mask);
     }
-    void World::enqueue_spawn_polygon(glm::vec2 pos, float radius, size_t segments, float mass, float compliance)
+
+    void World::enqueue_function(Queue::Command variant)
     {
-        enqueue_function([this, pos, radius, segments, mass, compliance]
-                         { spawn_polygon(pos, radius, segments, mass, compliance); });
+        std::lock_guard<std::mutex> lk(functionQueueMutex);
+        queue.push(variant);
+    }
+    void World::execute_enqueued_functions()
+    {
+        std::queue<Queue::Command> local;
+        {
+            std::lock_guard<std::mutex> lk(functionQueueMutex);
+            std::swap(local, queue);
+        }
+
+        while (!local.empty())
+        {
+            Queue::Command cmd = std::move(local.front());
+            local.pop();
+
+            std::visit([this](auto &&arg)
+                       {
+                    using T = std::decay_t<decltype(arg)>;
+
+                    if constexpr (std::is_same_v<T, Queue::init>)
+                        init();
+                    else if constexpr (std::is_same_v<T, Queue::set_tickRate>)
+                        set_tickRate(arg.tickRate);
+                    else if constexpr (std::is_same_v<T, Queue::add_particle>)
+                        add_particle(arg.pos, arg.mass, arg.vel);
+                    else if constexpr (std::is_same_v<T, Queue::add_distance_constraint>)
+                        add_distance_constraint(arg.i1, arg.i2, arg.compliance, arg.restDist);
+                    else if constexpr (std::is_same_v<T, Queue::add_volume_constraint>)
+                        add_volume_constraint(arg.indices, arg.compliance, arg.restPressure);
+                    else if constexpr (std::is_same_v<T, Queue::add_polygon_collider>)
+                        add_polygon_collider(arg.indices, arg.staticFriction, arg.kineticFriction,
+                                            arg.compliance, arg.layer, arg.mask);
+                    else if constexpr (std::is_same_v<T, Queue::add_points_collider>)
+                        add_points_collider(arg.indices, arg.staticFriction, arg.kineticFriction,
+                                            arg.compliance, arg.layer, arg.mask);
+                    else if constexpr (std::is_same_v<T, Queue::spawn_from_json>)
+                        spawn_from_json(arg.name, arg.position);
+                    else if constexpr (std::is_same_v<T, Queue::spawn_polygon>)
+                        spawn_polygon(arg.pos, arg.radius, arg.segments, arg.mass, arg.compliance); }, cmd);
+        }
     }
 
 }

@@ -1,15 +1,93 @@
-#ifndef define_xpbd
-#define define_xpbd
+#ifndef XPBD
+#define XPBD
 #include "glm/glm.hpp"
 #include <vector>
-#include <thread>
 #include <condition_variable>
 #include <chrono>
 #include <queue>
 #include <functional>
 
-#include "json_body_loader.hpp"
 #include "spatial_hashing.hpp"
+
+namespace Queue
+{
+    struct init
+    {
+    };
+
+    struct set_tickRate
+    {
+        float tickRate;
+    };
+
+    struct add_particle
+    {
+        glm::vec2 pos;
+        float mass;
+        glm::vec2 vel;
+    };
+
+    struct add_distance_constraint
+    {
+        size_t i1;
+        size_t i2;
+        float compliance;
+        float restDist;
+    };
+
+    struct add_volume_constraint
+    {
+        std::vector<size_t> indices;
+        float compliance;
+        float restPressure;
+    };
+
+    struct add_polygon_collider
+    {
+        std::vector<size_t> indices;
+        float staticFriction;
+        float kineticFriction;
+        float compliance;
+        int8_t layer;
+        int8_t mask;
+    };
+
+    struct add_points_collider
+    {
+        std::vector<size_t> indices;
+        float staticFriction;
+        float kineticFriction;
+        float compliance;
+        int8_t layer;
+        int8_t mask;
+    };
+
+    struct spawn_from_json
+    {
+        std::string name;
+        glm::vec2 position;
+    };
+
+    struct spawn_polygon
+    {
+        glm::vec2 pos;
+        float radius;
+        size_t segments;
+        float mass;
+        float compliance;
+    };
+
+    using Command = std::variant<
+        init,
+        set_tickRate,
+        add_particle,
+        add_distance_constraint,
+        add_volume_constraint,
+        add_polygon_collider,
+        add_points_collider,
+        spawn_from_json,
+        spawn_polygon>;
+}
 
 namespace xpbd
 {
@@ -100,6 +178,7 @@ namespace xpbd
         std::chrono::duration<double> deltaTick;
         bool reversePass = false;
 
+
         Particles particles;
         std::vector<DistanceConstraint> distanceConstraints;
         std::vector<VolumeConstraint> volumeConstraints;
@@ -128,12 +207,14 @@ namespace xpbd
         std::thread updateThread;
         std::mutex updateMutex;
         std::condition_variable updateCv;
-        UpdateState updateState = UpdateState::Paused;
+        UpdateState updateState = UpdateState::Running;
         std::chrono::time_point<std::chrono::_V2::steady_clock, std::chrono::duration<double, std::chrono::_V2::system_clock::period>>
             nextUpdateTimePoint;
 
-        std::queue<std::function<void()>> queue;
         std::mutex functionQueueMutex;
+        std::queue<Queue::Command> queue;
+        void enqueue_function(Queue::Command variant);
+        void execute_enqueued_functions();
 
         World();
         ~World();
@@ -146,32 +227,20 @@ namespace xpbd
         void resume_update();
         void step_once_update();
 
-        void enqueue_function(std::function<void()> f);
-        void execute_enqueued_functions();
 
         void init();
-        void enqueue_init();
-
         void set_tickRate(size_t tickRate);
-        void enqueue_set_tickRate(size_t tickRate);
-
+        
         void add_particle(const glm::vec2 &pos, const float mass, const glm::vec2 &vel);
-        void enqueue_add_particle(const glm::vec2 &pos, const float mass, const glm::vec2 &vel);
 
         void add_distance_constraint(size_t i1, size_t i2, float compliance, float restDist);
-        void enqueue_add_distance_constraint(size_t i1, size_t i2, float compliance, float restDist);
         void add_volume_constraint(const std::vector<size_t> &indices, float compliance, float restPressure);
-        void enqueue_add_volume_constraint(std::vector<size_t> indices, float compliance, float restPressure);
-
+        
         void add_polygon_collider(const std::vector<size_t> &indices, float staticFriction, float kineticFriction, float compliance, int8_t layer, int8_t mask);
-        void enqueue_add_polygon_collider(std::vector<size_t> indices, float staticFriction, float kineticFriction, float compliance, int8_t layer, int8_t mask);
         void add_points_collider(const std::vector<size_t> &indices, float staticFriction, float kineticFriction, float compliance, int8_t layer, int8_t mask);
-        void enqueue_add_points_collider( std::vector<size_t> indices, float staticFriction, float kineticFriction, float compliance, int8_t layer, int8_t mask);
-
+        
         void spawn_from_json(const std::string &name, const glm::vec2 &position);
-        void enqueue_spawn_from_json( std::string name,  glm::vec2 position);
         void spawn_polygon(glm::vec2 pos, float radius, size_t segments, float mass, float compliance);
-        void enqueue_spawn_polygon(glm::vec2 pos, float radius, size_t segments, float mass, float compliance);
     };
 
     void iterate(Particles &p, float dt, const glm::vec2 &gravity);
@@ -195,4 +264,4 @@ namespace xpbd
     void solve_point_edge_collision_constraints(Particles &p, std::vector<PointEdgeCollisionConstraints> &pecc, float dt);
     void apply_point_edge_collision_constraints_kinetic_friction(Particles &p, const std::vector<PointEdgeCollisionConstraints> &pecc, float dt);
 }
-#endif // define_xpbd
+#endif // XPBD
