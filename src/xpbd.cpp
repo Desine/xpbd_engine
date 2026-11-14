@@ -580,7 +580,9 @@ namespace xpbd
                 break;
 
             update_lk.unlock();
+            auto start = std::chrono::steady_clock::now();
             step();
+            lastStepTime = std::chrono::steady_clock::now() - start;
             {
                 // submit draw
                 std::lock_guard<std::mutex> draw_lk(clusterDrawMutex);
@@ -998,7 +1000,7 @@ namespace xpbd
         int8_t layer = 1;
         int8_t mask = 1;
 
-        add_polygon_collider(cluster, ids, staticFriction, kineticFriction, compliance, layer, mask);
+        add_polygon_collider(cluster, ids, staticFriction, kineticFriction, 0.0001f, layer, mask);
     }
 
 }

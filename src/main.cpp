@@ -14,9 +14,10 @@
 
 void draw_worldDraw(xpbd::Cluster clusterDraw, glm::vec2 offset = {0.0f, 0.0f})
 {
+    float circleSize = 0.03f;
     renderer::set_color(sf::Color::Red);
     for (auto p : clusterDraw.particles.pos)
-        renderer::draw_circle(p, 2);
+        renderer::draw_circle(p, circleSize);
 
     for (size_t i = 0; i < clusterDraw.distanceConstraints.size(); ++i)
         renderer::draw_line(clusterDraw.particles.pos[clusterDraw.distanceConstraints[i].i1] + offset, clusterDraw.particles.pos[clusterDraw.distanceConstraints[i].i2] + offset);
@@ -36,7 +37,7 @@ void draw_worldDraw(xpbd::Cluster clusterDraw, glm::vec2 offset = {0.0f, 0.0f})
     renderer::set_color(sf::Color::Green);
     for (auto &pc : clusterDraw.pointsColliders)
         for (auto id : pc.indices)
-            renderer::draw_circle(clusterDraw.particles.pos[id], 2);
+            renderer::draw_circle(clusterDraw.particles.pos[id], circleSize);
 }
 
 void draw_collisions(std::vector<xpbd::PointsPolygonCollision> collisions)
@@ -47,39 +48,26 @@ void draw_collisions(std::vector<xpbd::PointsPolygonCollision> collisions)
 
 void ShowFpsGraph(float newFps)
 {
-    const size_t historyFrames = 120;
-    static float fpsHistory[historyFrames] = {0};
-    static int offset = 0;
-    offset = (offset + 1) % IM_ARRAYSIZE(fpsHistory);
-
-    fpsHistory[offset] = newFps;
-
-    float fpsHistoryToDraw[historyFrames];
-    std::copy(std::begin(fpsHistory), std::end(fpsHistory), std::begin(fpsHistoryToDraw));
-
-    float min = 0.0f;
-    float max = 144.0f;
-
+    const size_t n = 120;
+    static float hist[n] = {0};
+    static int writePos = 0;
     static bool scroll = true;
-    float scrollFloat = offset;
-    if (!scroll)
-    {
-        scrollFloat = 0.0f;
-        fpsHistoryToDraw[offset] = max;
-        fpsHistoryToDraw[(offset + 1) % IM_ARRAYSIZE(fpsHistory)] = min;
-    }
 
-    ImVec2 size(0, 150);
+    writePos = (writePos + 1) % n;
+    hist[writePos] = newFps;
 
-    ImGui::PlotLines(
-        "FPS",
-        fpsHistoryToDraw,
-        IM_ARRAYSIZE(fpsHistory),
-        scrollFloat,
-        nullptr,
-        min,
-        max,
-        size);
+    float toDraw[n];
+    for (size_t i = 0; i < n; ++i)
+        toDraw[i] = hist[(writePos + 1 + i) % n];
+
+    int valuesOffset = scroll ? 0 : 0; // см. ниже — оба 0, разница в другом
+
+    float minV = 0.0f;
+    float maxV = 60.0f;
+
+    ImGui::PlotLines("FPS", toDraw, (int)n, valuesOffset,
+                     nullptr, minV, maxV, ImVec2(0, 150));
+
     if (ImGui::Button("toggle fps scroll"))
         scroll = !scroll;
 }
@@ -112,15 +100,17 @@ int main()
 
     xpbd::World world;
     world.enqueue_command(Commands::init());
-    world.enqueue_command(Commands::spawn_from_json("ground", {0, -1000}));
+    world.enqueue_command(Commands::spawn_from_json("ground", {0, -10}));
     bool paused = world.updateState == xpbd::World::UpdateState::Paused;
     bool reversePass = world.reversePass;
+    int drawThickness = 1;
 
     xpbd::Cluster clusterDraw;
 
     renderer::setup_window();
     renderer::setup_view();
     renderer::setup_imgui();
+    renderer::zoom(0.01f);
 
     sf::Vector2i mouseDrag;
     sf::Clock clock;
@@ -166,34 +156,34 @@ int main()
                 {
                     size_t amountX = 5;
                     size_t amountY = 5;
-                    float spacingX = 300;
-                    float spacingY = 200;
+                    float spacingX = 3;
+                    float spacingY = 2;
                     spawn_many(world, position, amountX, amountY, spacingX, spacingY, "car");
                 }
                 if (keyReleased->code == sf::Keyboard::Key::W)
                 {
                     size_t amountX = 5;
                     size_t amountY = 5;
-                    float spacingX = 300;
-                    float spacingY = 200;
+                    float spacingX = 3;
+                    float spacingY = 2;
                     spawn_many(world, position, amountX, amountY, spacingX, spacingY, "balloon");
                 }
                 if (keyReleased->code == sf::Keyboard::Key::E)
                 {
                     size_t amountX = 10;
                     size_t amountY = 10;
-                    float spacingX = 100;
-                    float spacingY = 100;
+                    float spacingX = 1;
+                    float spacingY = 1;
                     for (size_t i = 0; i < amountX; ++i)
                     {
                         float x = position.x - amountX * spacingX * 0.5 + spacingX * i;
                         for (size_t j = 0; j < amountY; ++j)
                         {
                             float y = position.y + spacingY * j;
-                            const float radius = 40;
+                            const float radius = 0.5f;
                             const size_t segments = 6;
                             const float mass = 10;
-                            const float compliance = 0.005f;
+                            const float compliance = 0.001f;
                             world.enqueue_command(Commands::spawn_polygon({x, y}, radius, segments, mass, compliance));
                         }
                     }
@@ -202,18 +192,18 @@ int main()
                 {
                     size_t amountX = 30;
                     size_t amountY = 1;
-                    float spacingX = 100;
-                    float spacingY = 100;
+                    float spacingX = 1;
+                    float spacingY = 1;
                     for (size_t i = 0; i < amountX; ++i)
                     {
                         float x = position.x - amountX * spacingX * 0.5 + spacingX * i;
                         for (size_t j = 0; j < amountY; ++j)
                         {
                             float y = position.y + spacingY * j;
-                            const float radius = 40;
+                            const float radius = 0.5f;
                             const size_t segments = 6;
                             const float mass = 10;
-                            const float compliance = 0.005f;
+                            const float compliance = 0.001f;
                             world.enqueue_command(Commands::spawn_polygon({x, y}, radius, segments, mass, compliance));
                         }
                     }
@@ -225,10 +215,10 @@ int main()
                     world.enqueue_command(Commands::spawn_from_json("balloon", position));
                 if (keyReleased->code == sf::Keyboard::Key::D)
                 {
-                    float radius = 40;
+                    float radius = 0.5f;
                     size_t segments = 6;
                     float mass = 5;
-                    float compliance = 0.005f;
+                    float compliance = 0.001f;
                     world.enqueue_command(Commands::spawn_polygon(position, radius, segments, mass, compliance));
                 }
                 if (keyReleased->code == sf::Keyboard::Key::F)
@@ -240,7 +230,7 @@ int main()
                 if (keyReleased->code == sf::Keyboard::Key::R)
                 {
                     world.enqueue_command(Commands::init());
-                    world.enqueue_command(Commands::spawn_from_json("ground", {0, -1000}));
+                    world.enqueue_command(Commands::spawn_from_json("ground", {0, -10}));
                 }
                 // pause / resume
                 if (keyReleased->code == sf::Keyboard::Key::Space)
@@ -253,7 +243,11 @@ int main()
 
         ImGui::NewFrame();
         ImGui::Begin("Main");
-        ShowFpsGraph(1.0f / deltaTime.asSeconds());
+
+        float dt = world.lastStepTime.count();
+        float fps = (dt > 0.0f) ? (1.0f / dt) : 0.0f;
+        ShowFpsGraph(fps);
+
         static bool draw = true;
         if (ImGui::Button(draw ? "turn off: draw" : "turn on: draw"))
             draw = !draw;
@@ -283,6 +277,7 @@ int main()
         // int cellSize = world.spatialHashAABB.cellSize;
         // ImGui::SliderInt("spatialHashing_cellSize: ", &cellSize, 30, 1000);
         // world.spatialHashAABB.cellSize = cellSize;
+        ImGui::SliderInt("Draw thickness", &drawThickness, 1, 10);
 
         ImGui::End();
         ImGui::EndFrame();
@@ -297,16 +292,13 @@ int main()
                 std::lock_guard<std::mutex> lk(world.clusterDrawMutex);
                 std::swap(clusterDraw, world.clusterDraw);
             }
-            draw_worldDraw(clusterDraw);
-            if (draw_thick)
+            float angleStep = 2.0f * float(M_PI) / drawThickness;
+            for (int i = 0; i < drawThickness; ++i)
             {
-                draw_worldDraw(clusterDraw, {0.0f, 0.5f});
-                draw_worldDraw(clusterDraw, {0.0f, 1.0f});
-                draw_worldDraw(clusterDraw, {0.5f, 0.0f});
-                draw_worldDraw(clusterDraw, {1.0f, 0.0f});
-                draw_worldDraw(clusterDraw, {1.0f, 0.5f});
-                draw_worldDraw(clusterDraw, {0.5f, 1.0f});
-                draw_worldDraw(clusterDraw, {1.0f, 1.0f});
+                float angle = i * angleStep;
+                glm::vec2 dir = glm::vec2(cosf(angle), sinf(angle));
+
+                draw_worldDraw(clusterDraw, dir * 0.01f);
             }
         }
         // renderer::set_color(sf::Color::White);

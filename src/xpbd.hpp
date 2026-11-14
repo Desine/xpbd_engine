@@ -183,10 +183,10 @@ namespace xpbd
         size_t substeps = 10;
         size_t iterations = 1;
         glm::vec2 gravity = {0, -9.8f};
-        float timeScale = 10.f;
+        float timeScale = 1.f;
         float tickRate = 30.f;
         std::chrono::duration<double> deltaTick;
-        bool reversePass = true;
+        bool reversePass = false;
 
         Cluster cluster;
         std::mutex clusterMutex;
@@ -204,6 +204,7 @@ namespace xpbd
         Cluster clusterDraw;
         std::mutex clusterDrawMutex;
         bool newFrame = false;
+        std::chrono::duration<float> lastStepTime;
 
         enum class UpdateState
         {
