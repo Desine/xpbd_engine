@@ -62,6 +62,23 @@ void json_body_loader::load(
         }
     }
 
+    // Load Angle Constraints
+    if (j.contains("AngleConstraints") && j["AngleConstraints"].is_array())
+    {
+        for (const auto &ac : j["AngleConstraints"])
+        {
+            size_t i1 = ac["i1"].get<size_t>() + base_index;
+            size_t i2 = ac["i2"].get<size_t>() + base_index;
+            size_t i3 = ac["i3"].get<size_t>() + base_index;
+            size_t i4 = ac["i4"].get<size_t>() + base_index;
+            float compliance = ac["compliance"].get<float>();
+            if (ac.contains("restAngle"))
+                xpbd::add_angle_constraint(cluster, i1, i2, i3, i4, compliance, ac["restAngle"].get<float>());
+            else
+                xpbd::add_angle_constraint(cluster, i1, i2, i3, i4, compliance);
+        }
+    }
+
     // Load Volume Constraints
     if (j.contains("VolumeConstraints") && j["VolumeConstraints"].is_array())
     {
