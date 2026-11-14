@@ -158,7 +158,7 @@ namespace xpbd
         float lambda;
     };
 
-    struct WorldDraw
+    struct Cluster
     {
         Particles particles;
         std::vector<DistanceConstraint> distanceConstraints;
@@ -178,12 +178,10 @@ namespace xpbd
         std::chrono::duration<double> deltaTick;
         bool reversePass = false;
 
-
-        Particles particles;
-        std::vector<DistanceConstraint> distanceConstraints;
-        std::vector<VolumeConstraint> volumeConstraints;
-        std::vector<ColliderPoints> polygonColliders;
-        std::vector<ColliderPoints> pointsColliders;
+        Cluster cluster;
+        std::mutex clusterMutex;
+        Cluster clusterAdd;
+        std::mutex clusterAddMutex;
 
         // std::vector<AABB> polygonColliders_aabbs;
         // std::vector<AABB> pointsColliders_aabbs;
@@ -193,8 +191,8 @@ namespace xpbd
         // std::vector<AABB> combinedAABB;
         // std::vector<PointEdgeCollisionConstraints> pecc;
 
-        std::mutex drawMutex;
-        WorldDraw draw;
+        Cluster clusterDraw;
+        std::mutex clusterDrawMutex;
         bool newFrame = false;
 
         enum class UpdateState
@@ -219,29 +217,32 @@ namespace xpbd
         World();
         ~World();
 
-        void submit_draw();
-
         void step();
         void update_loop();
         void pause_update();
         void resume_update();
         void step_once_update();
 
-
+    private:
         void init();
         void set_tickRate(size_t tickRate);
-        
-        void add_particle(const glm::vec2 &pos, const float mass, const glm::vec2 &vel);
 
-        void add_distance_constraint(size_t i1, size_t i2, float compliance, float restDist);
-        void add_volume_constraint(const std::vector<size_t> &indices, float compliance, float restPressure);
-        
-        void add_polygon_collider(const std::vector<size_t> &indices, float staticFriction, float kineticFriction, float compliance, int8_t layer, int8_t mask);
-        void add_points_collider(const std::vector<size_t> &indices, float staticFriction, float kineticFriction, float compliance, int8_t layer, int8_t mask);
-        
         void spawn_from_json(const std::string &name, const glm::vec2 &position);
         void spawn_polygon(glm::vec2 pos, float radius, size_t segments, float mass, float compliance);
     };
+
+    void merge_clusters(Cluster &into, Cluster &from);
+
+    void add_particle(Cluster &cluster, const glm::vec2 &pos, const float mass, const glm::vec2 &vel);
+
+    void add_distance_constraint(Cluster &cluster, size_t i1, size_t i2, float compliance, float restDist);
+    void add_volume_constraint(Cluster &cluster, const std::vector<size_t> &indices, float compliance, float restPressure);
+
+    void add_polygon_collider(Cluster &cluster, const std::vector<size_t> &indices, float staticFriction, float kineticFriction, float compliance, int8_t layer, int8_t mask);
+    void add_points_collider(Cluster &cluster, const std::vector<size_t> &indices, float staticFriction, float kineticFriction, float compliance, int8_t layer, int8_t mask);
+
+    void spawn_from_json(Cluster &cluster, const std::string &name, const glm::vec2 &position);
+    void spawn_polygon(Cluster &cluster, glm::vec2 pos, float radius, size_t segments, float mass, float compliance);
 
     void iterate(Particles &p, float dt, const glm::vec2 &gravity);
     void update_velocities(Particles &p, float dt);

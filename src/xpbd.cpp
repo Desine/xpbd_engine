@@ -530,7 +530,12 @@ namespace xpbd
 
             update_lk.unlock();
             step();
-            submit_draw();
+            {
+                // submit draw
+                std::lock_guard<std::mutex> draw_lk(clusterDrawMutex);
+                clusterDraw = cluster;
+                newFrame = true;
+            }
             execute_enqueued_functions();
             update_lk.lock();
 
@@ -551,29 +556,29 @@ namespace xpbd
     {
         ZoneScoped;
 
-        size_t polygons_size = polygonColliders.size();
-        size_t points_size = pointsColliders.size();
+        size_t polygons_size = cluster.polygonColliders.size();
+        size_t points_size = cluster.pointsColliders.size();
 
         float substep_time = 1.0f / tickRate * timeScale / substeps;
 
         for (size_t sub = 0; sub < substeps; ++sub)
         {
-            iterate(particles, substep_time, gravity);
+            iterate(cluster.particles, substep_time, gravity);
 
-            reset_distance_constraints_lambdas(distanceConstraints);
-            reset_volume_constraints_lambdas(volumeConstraints);
+            reset_distance_constraints_lambdas(cluster.distanceConstraints);
+            reset_volume_constraints_lambdas(cluster.volumeConstraints);
 
             for (size_t iter = 0; iter < iterations; ++iter)
             {
                 reversePass = !reversePass;
 
-                solve_distance_constraints(particles, distanceConstraints, substep_time, reversePass);
-                solve_volume_constraints(particles, volumeConstraints, substep_time);
+                solve_distance_constraints(cluster.particles, cluster.distanceConstraints, substep_time, reversePass);
+                solve_volume_constraints(cluster.particles, cluster.volumeConstraints, substep_time);
 
                 std::vector<AABB> polygonColliders_aabbs(polygons_size);
-                generate_collider_points_aabbs(polygonColliders_aabbs, particles, polygonColliders);
+                generate_collider_points_aabbs(polygonColliders_aabbs, cluster.particles, cluster.polygonColliders);
                 std::vector<AABB> pointsColliders_aabbs(points_size);
-                generate_collider_points_aabbs(pointsColliders_aabbs, particles, pointsColliders);
+                generate_collider_points_aabbs(pointsColliders_aabbs, cluster.particles, cluster.pointsColliders);
 
                 spatialHashAABB.clear();
                 for (size_t i = 0; i < polygons_size; ++i)
@@ -583,13 +588,13 @@ namespace xpbd
                 for (size_t polygonId = 0; polygonId < polygons_size; ++polygonId)
                 {
                     PolygonCache &hash = polygonsCache[polygonId];
-                    std::vector<size_t> &polygonIndices = polygonColliders[polygonId].indices;
+                    std::vector<size_t> &polygonIndices = cluster.polygonColliders[polygonId].indices;
                     size_t n = polygonIndices.size();
                     hash.positions_size = n;
 
                     hash.positions.resize(polygonIndices.size());
                     for (size_t i = 0; i < n; ++i)
-                        hash.positions[i] = particles.pos[polygonIndices[i]];
+                        hash.positions[i] = cluster.particles.pos[polygonIndices[i]];
 
                     hash.edges.resize(n);
                     hash.edgesLen2.resize(n);
@@ -604,8 +609,8 @@ namespace xpbd
                 // until polygons_size: polygon/polygon // after: point/polygon
                 std::vector<ColliderPoints> combinedColliderPoints;
                 combinedColliderPoints.reserve(polygons_size + points_size);
-                combinedColliderPoints.insert(combinedColliderPoints.end(), polygonColliders.begin(), polygonColliders.end());
-                combinedColliderPoints.insert(combinedColliderPoints.end(), pointsColliders.begin(), pointsColliders.end());
+                combinedColliderPoints.insert(combinedColliderPoints.end(), cluster.polygonColliders.begin(), cluster.polygonColliders.end());
+                combinedColliderPoints.insert(combinedColliderPoints.end(), cluster.pointsColliders.begin(), cluster.pointsColliders.end());
 
                 std::vector<AABB> combinedAABB;
                 combinedAABB.reserve(polygons_size + points_size);
@@ -613,8 +618,8 @@ namespace xpbd
                 combinedAABB.insert(combinedAABB.end(), pointsColliders_aabbs.begin(), pointsColliders_aabbs.end());
 
                 std::vector<std::vector<PointEdgeCollisionConstraints>> pecc_thread(omp_get_max_threads());
-                // std::println("omp_get_max_threads(): {}", omp_get_max_threads());
-#pragma omp parallel for num_threads(6) // TODO. REMOVE. HARD CODED num_threads(n)
+
+                // #pragma omp parallel for num_threads(6)
                 for (size_t pid = 0; pid < combinedColliderPoints.size(); ++pid)
                 {
                     std::vector<size_t> overlapping_aabb_ids;
@@ -634,20 +639,20 @@ namespace xpbd
 
                     for (size_t i : overlapping_aabb_ids)
                     {
-                        float avgStaticFriction = (combinedColliderPoints[pid].staticFriction + polygonColliders[i].staticFriction) * 0.5f;
-                        float avgKineticFriction = (combinedColliderPoints[pid].kineticFriction + polygonColliders[i].kineticFriction) * 0.5f;
-                        float avgCompliance = (combinedColliderPoints[pid].compliance + polygonColliders[i].compliance) * 0.5f;
+                        float avgStaticFriction = (combinedColliderPoints[pid].staticFriction + cluster.polygonColliders[i].staticFriction) * 0.5f;
+                        float avgKineticFriction = (combinedColliderPoints[pid].kineticFriction + cluster.polygonColliders[i].kineticFriction) * 0.5f;
+                        float avgCompliance = (combinedColliderPoints[pid].compliance + cluster.polygonColliders[i].compliance) * 0.5f;
 
                         PointsPolygonCollision pointsPolygonCollision{
                             combinedColliderPoints[pid].indices,
-                            polygonColliders[i].indices,
+                            cluster.polygonColliders[i].indices,
                             avgStaticFriction,
                             avgKineticFriction,
                             avgCompliance,
                             combinedAABB[pid].get_intersection(polygonColliders_aabbs[i]),
                             polygonsCache[i],
                         };
-                        add_PointEdgeCollisionConstraints_from_PointsPolygonCollision(local_pecc, particles, pointsPolygonCollision);
+                        add_PointEdgeCollisionConstraints_from_PointsPolygonCollision(local_pecc, cluster.particles, pointsPolygonCollision);
                     }
                 }
 
@@ -661,10 +666,10 @@ namespace xpbd
                 for (auto &v : pecc_thread)
                     pecc.insert(pecc.end(), v.begin(), v.end());
 
-                solve_point_edge_collision_constraints(particles, pecc, substep_time);
+                solve_point_edge_collision_constraints(cluster.particles, pecc, substep_time);
             }
 
-            update_velocities(particles, substep_time);
+            update_velocities(cluster.particles, substep_time);
             // apply_point_edge_collision_constraints_kinetic_friction(particles, pecc, substep_time);
             // apply_distance_constraints_damping(particles, distanceConstraints, substep_time);
         }
@@ -672,26 +677,26 @@ namespace xpbd
 
     void World::init()
     {
-        particles.pos.clear();
-        particles.pos.reserve(5000);
-        particles.prev.clear();
-        particles.prev.reserve(5000);
-        particles.vel.clear();
-        particles.vel.reserve(5000);
-        particles.w.clear();
-        particles.w.reserve(5000);
+        cluster.particles.pos.clear();
+        cluster.particles.pos.reserve(5000);
+        cluster.particles.prev.clear();
+        cluster.particles.prev.reserve(5000);
+        cluster.particles.vel.clear();
+        cluster.particles.vel.reserve(5000);
+        cluster.particles.w.clear();
+        cluster.particles.w.reserve(5000);
 
-        distanceConstraints.clear();
-        distanceConstraints.reserve(5000);
+        cluster.distanceConstraints.clear();
+        cluster.distanceConstraints.reserve(5000);
 
-        volumeConstraints.clear();
-        volumeConstraints.reserve(1000);
+        cluster.volumeConstraints.clear();
+        cluster.volumeConstraints.reserve(1000);
 
-        polygonColliders.clear();
-        polygonColliders.reserve(1000);
+        cluster.polygonColliders.clear();
+        cluster.polygonColliders.reserve(1000);
 
-        pointsColliders.clear();
-        pointsColliders.reserve(1000);
+        cluster.pointsColliders.clear();
+        cluster.pointsColliders.reserve(1000);
 
         // polygonColliders_aabbs.reserve(1000);
         // pointsColliders_aabbs.reserve(1000);
@@ -704,90 +709,25 @@ namespace xpbd
         // pecc.reserve(5000);
     }
 
-    void World::submit_draw()
-    {
-        std::lock_guard<std::mutex> draw_lk(drawMutex);
-        draw.particles = particles;
-        draw.distanceConstraints = distanceConstraints;
-        draw.volumeConstraints = volumeConstraints;
-        draw.polygonColliders = polygonColliders;
-        draw.pointsColliders = pointsColliders;
-        newFrame = true;
-    }
-
     void World::set_tickRate(size_t tickRate)
     {
         deltaTick = std::chrono::duration<double>(1.0 / tickRate);
     }
-
-    void World::add_particle(const glm::vec2 &pos, float mass, const glm::vec2 &vel = {0.0f, 0.0f})
-    {
-        particles.pos.emplace_back(pos);
-        particles.prev.emplace_back(pos);
-        particles.vel.emplace_back(vel);
-        float w = mass == 0 ? 0 : 1 / mass;
-        particles.w.emplace_back(w);
-    }
-    void World::add_distance_constraint(size_t i1, size_t i2, float compliance, float restDist = __FLT_MAX__)
-    {
-        if (restDist == __FLT_MAX__)
-            restDist = glm::distance(particles.pos[i1], particles.pos[i2]);
-        float compressionDamping = 0.5f;
-        float extensionDamping = 0.5f;
-        float lambda = 0;
-        distanceConstraints.emplace_back(i1, i2, restDist, compressionDamping, extensionDamping, compliance, lambda);
-    }
-    void World::add_volume_constraint(const std::vector<size_t> &indices, float compliance, float restPressure = __FLT_MAX__)
-    {
-        float restVolume = compute_polygon_area(particles, indices);
-        if (restPressure != __FLT_MAX__)
-            restVolume *= restPressure;
-        float lambda = 0;
-        volumeConstraints.emplace_back(indices, restVolume, compliance, lambda);
-    }
-    void World::add_polygon_collider(const std::vector<size_t> &indices, float staticFriction, float kineticFriction, float compliance, int8_t layer, int8_t mask)
-    {
-        polygonColliders.emplace_back(indices, staticFriction, kineticFriction, compliance, layer, mask);
-    }
-    void World::add_points_collider(const std::vector<size_t> &indices, float staticFriction, float kineticFriction, float compliance, int8_t layer, int8_t mask)
-    {
-        pointsColliders.emplace_back(indices, staticFriction, kineticFriction, compliance, layer, mask);
-    }
     void World::spawn_from_json(const std::string &name, const glm::vec2 &position)
     {
-        json_body_loader::load(*this, name, position);
+        std::lock_guard<std::mutex> clusterAdd_lk(clusterAddMutex);
+        json_body_loader::load(clusterAdd, name, position);
+
+        std::lock_guard<std::mutex> cluster_lk(clusterMutex);
+        merge_clusters(cluster, clusterAdd);
     }
     void World::spawn_polygon(glm::vec2 pos, float radius, size_t segments, float mass, float compliance)
     {
-        if (segments < 3)
-            segments = 3;
+        std::lock_guard<std::mutex> clusterAdd_lk(clusterAddMutex);
+        xpbd::spawn_polygon(clusterAdd, pos, radius, segments, mass, compliance);
 
-        size_t start = particles.pos.size();
-        size_t end = start + segments;
-        std::vector<size_t> ids;
-
-        float angleStep = 2.0f * float(M_PI) / segments;
-        for (int i = 0; i < segments; ++i)
-        {
-            float angle = i * angleStep;
-            glm::vec2 dir = glm::vec2(cosf(angle), sinf(angle));
-            add_particle(dir * radius + pos, mass / segments);
-
-            ids.emplace_back(start + i);
-        }
-
-        for (int i = 0; i < segments; ++i)
-            add_distance_constraint(start + i, start + (i + 1) % segments, compliance);
-
-        add_volume_constraint(ids, compliance);
-
-        float staticFriction = 0.4f;
-        float kineticFriction = 0.3f;
-
-        int8_t layer = 1;
-        int8_t mask = 1;
-
-        add_polygon_collider(ids, staticFriction, kineticFriction, compliance, layer, mask);
+        std::lock_guard<std::mutex> cluster_lk(clusterMutex);
+        merge_clusters(cluster, clusterAdd);
     }
 
     void World::enqueue_function(Queue::Command variant)
@@ -817,22 +757,147 @@ namespace xpbd
                     else if constexpr (std::is_same_v<T, Queue::set_tickRate>)
                         set_tickRate(arg.tickRate);
                     else if constexpr (std::is_same_v<T, Queue::add_particle>)
-                        add_particle(arg.pos, arg.mass, arg.vel);
+                        add_particle(cluster, arg.pos, arg.mass, arg.vel);
                     else if constexpr (std::is_same_v<T, Queue::add_distance_constraint>)
-                        add_distance_constraint(arg.i1, arg.i2, arg.compliance, arg.restDist);
+                        add_distance_constraint(cluster, arg.i1, arg.i2, arg.compliance, arg.restDist);
                     else if constexpr (std::is_same_v<T, Queue::add_volume_constraint>)
-                        add_volume_constraint(arg.indices, arg.compliance, arg.restPressure);
+                        add_volume_constraint(cluster, arg.indices, arg.compliance, arg.restPressure);
                     else if constexpr (std::is_same_v<T, Queue::add_polygon_collider>)
-                        add_polygon_collider(arg.indices, arg.staticFriction, arg.kineticFriction,
+                        add_polygon_collider(cluster, arg.indices, arg.staticFriction, arg.kineticFriction,
                                             arg.compliance, arg.layer, arg.mask);
                     else if constexpr (std::is_same_v<T, Queue::add_points_collider>)
-                        add_points_collider(arg.indices, arg.staticFriction, arg.kineticFriction,
+                        add_points_collider(cluster, arg.indices, arg.staticFriction, arg.kineticFriction,
                                             arg.compliance, arg.layer, arg.mask);
                     else if constexpr (std::is_same_v<T, Queue::spawn_from_json>)
                         spawn_from_json(arg.name, arg.position);
                     else if constexpr (std::is_same_v<T, Queue::spawn_polygon>)
                         spawn_polygon(arg.pos, arg.radius, arg.segments, arg.mass, arg.compliance); }, cmd);
         }
+    }
+    void merge_clusters(Cluster &into, Cluster &from)
+    {
+        if (&into == &from)
+            return;
+
+        const size_t offset = into.particles.pos.size();
+
+        // --- Particles ---
+        into.particles.pos.insert(into.particles.pos.end(),
+                                  from.particles.pos.begin(), from.particles.pos.end());
+        into.particles.prev.insert(into.particles.prev.end(),
+                                   from.particles.prev.begin(), from.particles.prev.end());
+        into.particles.vel.insert(into.particles.vel.end(),
+                                  from.particles.vel.begin(), from.particles.vel.end());
+        into.particles.w.insert(into.particles.w.end(),
+                                from.particles.w.begin(), from.particles.w.end());
+
+        // --- Distance constraints (сдвиг индексов) ---
+        into.distanceConstraints.reserve(into.distanceConstraints.size() + from.distanceConstraints.size());
+        for (auto dc : from.distanceConstraints)
+        {
+            dc.i1 += offset;
+            dc.i2 += offset;
+            into.distanceConstraints.push_back(dc);
+        }
+
+        // --- Volume constraints (сдвиг индексов в списке) ---
+        into.volumeConstraints.reserve(into.volumeConstraints.size() + from.volumeConstraints.size());
+        for (auto vc : from.volumeConstraints)
+        {
+            for (auto &idx : vc.indices)
+                idx += offset;
+            into.volumeConstraints.push_back(std::move(vc));
+        }
+
+        // --- Polygon colliders (сдвиг индексов вершин) ---
+        into.polygonColliders.reserve(into.polygonColliders.size() + from.polygonColliders.size());
+        for (auto pc : from.polygonColliders)
+        {
+            for (auto &idx : pc.indices)
+                idx += offset;
+            into.polygonColliders.push_back(std::move(pc));
+        }
+
+        // --- Points colliders (сдвиг индексов) ---
+        into.pointsColliders.reserve(into.pointsColliders.size() + from.pointsColliders.size());
+        for (auto pc : from.pointsColliders)
+        {
+            for (auto &idx : pc.indices)
+                idx += offset;
+            into.pointsColliders.push_back(std::move(pc));
+        }
+
+        from = Cluster();
+    }
+
+    void add_particle(Cluster &cluster, const glm::vec2 &pos, float mass, const glm::vec2 &vel = {0.0f, 0.0f})
+    {
+        cluster.particles.pos.emplace_back(pos);
+        cluster.particles.prev.emplace_back(pos);
+        cluster.particles.vel.emplace_back(vel);
+        float w = mass == 0 ? 0 : 1 / mass;
+        cluster.particles.w.emplace_back(w);
+    }
+    void add_distance_constraint(Cluster &cluster, size_t i1, size_t i2, float compliance, float restDist = __FLT_MAX__)
+    {
+        if (restDist == __FLT_MAX__)
+            restDist = glm::distance(cluster.particles.pos[i1], cluster.particles.pos[i2]);
+        float compressionDamping = 0.5f;
+        float extensionDamping = 0.5f;
+        float lambda = 0;
+        cluster.distanceConstraints.emplace_back(i1, i2, restDist, compressionDamping, extensionDamping, compliance, lambda);
+    }
+    void add_volume_constraint(Cluster &cluster, const std::vector<size_t> &indices, float compliance, float restPressure = __FLT_MAX__)
+    {
+        float restVolume = compute_polygon_area(cluster.particles, indices);
+        if (restPressure != __FLT_MAX__)
+            restVolume *= restPressure;
+        float lambda = 0;
+        cluster.volumeConstraints.emplace_back(indices, restVolume, compliance, lambda);
+    }
+    void add_polygon_collider(Cluster &cluster, const std::vector<size_t> &indices, float staticFriction, float kineticFriction, float compliance, int8_t layer, int8_t mask)
+    {
+        cluster.polygonColliders.emplace_back(indices, staticFriction, kineticFriction, compliance, layer, mask);
+    }
+    void add_points_collider(Cluster &cluster, const std::vector<size_t> &indices, float staticFriction, float kineticFriction, float compliance, int8_t layer, int8_t mask)
+    {
+        cluster.pointsColliders.emplace_back(indices, staticFriction, kineticFriction, compliance, layer, mask);
+    }
+    void spawn_from_json(Cluster &cluster, const std::string &name, const glm::vec2 &position)
+    {
+        json_body_loader::load(cluster, name, position);
+    }
+    void spawn_polygon(Cluster &cluster, glm::vec2 pos, float radius, size_t segments, float mass, float compliance)
+    {
+        if (segments < 3)
+            segments = 3;
+
+        size_t start = cluster.particles.pos.size();
+        size_t end = start + segments;
+        std::vector<size_t> ids;
+
+        float angleStep = 2.0f * float(M_PI) / segments;
+        for (int i = 0; i < segments; ++i)
+        {
+            float angle = i * angleStep;
+            glm::vec2 dir = glm::vec2(cosf(angle), sinf(angle));
+            add_particle(cluster, dir * radius + pos, mass / segments);
+
+            ids.emplace_back(start + i);
+        }
+
+        for (int i = 0; i < segments; ++i)
+            add_distance_constraint(cluster, start + i, start + (i + 1) % segments, compliance);
+
+        add_volume_constraint(cluster, ids, compliance);
+
+        float staticFriction = 0.4f;
+        float kineticFriction = 0.3f;
+
+        int8_t layer = 1;
+        int8_t mask = 1;
+
+        add_polygon_collider(cluster, ids, staticFriction, kineticFriction, compliance, layer, mask);
     }
 
 }

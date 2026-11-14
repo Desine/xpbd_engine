@@ -11,31 +11,31 @@
 
 #include "profiler.hpp"
 
-void draw_worldDraw(xpbd::WorldDraw worldDraw, glm::vec2 offset = {0.0f, 0.0f})
+void draw_worldDraw(xpbd::Cluster clusterDraw, glm::vec2 offset = {0.0f, 0.0f})
 {
     renderer::set_color(sf::Color::Red);
-    for (auto p : worldDraw.particles.pos)
+    for (auto p : clusterDraw.particles.pos)
         renderer::draw_circle(p, 2);
 
-    for (size_t i = 0; i < worldDraw.distanceConstraints.size(); ++i)
-        renderer::draw_line(worldDraw.particles.pos[worldDraw.distanceConstraints[i].i1] + offset, worldDraw.particles.pos[worldDraw.distanceConstraints[i].i2] + offset);
+    for (size_t i = 0; i < clusterDraw.distanceConstraints.size(); ++i)
+        renderer::draw_line(clusterDraw.particles.pos[clusterDraw.distanceConstraints[i].i1] + offset, clusterDraw.particles.pos[clusterDraw.distanceConstraints[i].i2] + offset);
 
     renderer::set_color(sf::Color::Green);
-    for (auto &pc : worldDraw.polygonColliders)
+    for (auto &pc : clusterDraw.polygonColliders)
     {
         std::vector<glm::vec2> points;
         points.reserve(pc.indices.size());
 
         for (auto id : pc.indices)
-            points.emplace_back(worldDraw.particles.pos[id] + offset);
+            points.emplace_back(clusterDraw.particles.pos[id] + offset);
 
         renderer::draw_segmented_loop(points);
     }
 
     renderer::set_color(sf::Color::Green);
-    for (auto &pc : worldDraw.pointsColliders)
+    for (auto &pc : clusterDraw.pointsColliders)
         for (auto id : pc.indices)
-            renderer::draw_circle(worldDraw.particles.pos[id], 2);
+            renderer::draw_circle(clusterDraw.particles.pos[id], 2);
 }
 
 void draw_collisions(std::vector<xpbd::PointsPolygonCollision> collisions)
@@ -99,7 +99,7 @@ void spawn_many(
         for (size_t j = 0; j < amountY; ++j)
         {
             float y = pos.y + spacingY * j;
-            world.spawn_from_json(name, {x, y});
+            world.enqueue_function(Queue::spawn_from_json(name, {x, y}));
         }
     }
 }
@@ -111,16 +111,10 @@ int main()
 
     xpbd::World world;
     world.enqueue_function(Queue::init());
-    world.spawn_from_json("ground", {0, -1000});
+    world.enqueue_function(Queue::spawn_from_json("ground", {0, -1000}));
     bool paused = world.updateState == xpbd::World::UpdateState::Paused;
 
-    xpbd::WorldDraw worldDraw;
-    // world.spawnPolygon({0, 0}, 40, 6, 3, 0.005f);
-
-    // while (true)
-    // {
-    //     world.step(0.01f);
-    // }
+    xpbd::Cluster clusterDraw;
 
     renderer::setup_window();
     renderer::setup_view();
@@ -198,7 +192,7 @@ int main()
                             const size_t segments = 6;
                             const float mass = 10;
                             const float compliance = 0.005f;
-                            world.spawn_polygon({x, y}, radius, segments, mass, compliance);
+                            world.enqueue_function(Queue::spawn_polygon({x, y}, radius, segments, mass, compliance));
                         }
                     }
                 }
@@ -218,33 +212,33 @@ int main()
                             const size_t segments = 6;
                             const float mass = 10;
                             const float compliance = 0.005f;
-                            world.spawn_polygon({x, y}, radius, segments, mass, compliance);
+                            world.enqueue_function(Queue::spawn_polygon({x, y}, radius, segments, mass, compliance));
                         }
                     }
                 }
 
                 if (keyReleased->code == sf::Keyboard::Key::A)
-                    world.spawn_from_json("car", position);
+                    world.enqueue_function(Queue::spawn_from_json("car", position));
                 if (keyReleased->code == sf::Keyboard::Key::S)
-                    world.spawn_from_json("balloon", position);
+                    world.enqueue_function(Queue::spawn_from_json("balloon", position));
                 if (keyReleased->code == sf::Keyboard::Key::D)
                 {
                     float radius = 40;
                     size_t segments = 6;
                     float mass = 5;
                     float compliance = 0.005f;
-                    world.spawn_polygon(position, radius, segments, mass, compliance);
+                    world.enqueue_function(Queue::spawn_polygon(position, radius, segments, mass, compliance));
                 }
                 if (keyReleased->code == sf::Keyboard::Key::F)
-                    world.spawn_from_json("person", position);
+                    world.enqueue_function(Queue::spawn_from_json("person", position));
                 if (keyReleased->code == sf::Keyboard::Key::G)
-                    world.spawn_from_json("square", position);
+                    world.enqueue_function(Queue::spawn_from_json("square", position));
 
                 // clear world
                 if (keyReleased->code == sf::Keyboard::Key::R)
                 {
                     world.enqueue_function(Queue::init());
-                    //world.spawn_from_json("ground", {0, -1000});
+                    world.enqueue_function(Queue::spawn_from_json("ground", {0, -1000}));
                 }
                 // pause / resume
                 if (keyReleased->code == sf::Keyboard::Key::Space)
@@ -267,11 +261,7 @@ int main()
 
         if (ImGui::Button(paused ? "Resume" : "Pause"))
         {
-            if (paused)
-                world.resume_update();
-            else
-                world.pause_update();
-
+            paused ? world.resume_update() : world.pause_update();
             paused = !paused;
         }
         if (ImGui::Button("Step once"))
@@ -294,24 +284,22 @@ int main()
         if (draw)
         {
             ZoneScoped;
+            if (world.newFrame)
             {
-                std::lock_guard<std::mutex> lk(world.drawMutex);
-                if (world.newFrame)
-                {
-                    std::swap(worldDraw, world.draw);
-                    world.newFrame = false;
-                }
+                world.newFrame = false;
+                std::lock_guard<std::mutex> lk(world.clusterDrawMutex);
+                std::swap(clusterDraw, world.clusterDraw);
             }
-            draw_worldDraw(worldDraw);
+            draw_worldDraw(clusterDraw);
             if (draw_thick)
             {
-                draw_worldDraw(worldDraw, {0.0f, 0.5f});
-                draw_worldDraw(worldDraw, {0.0f, 1.0f});
-                draw_worldDraw(worldDraw, {0.5f, 0.0f});
-                draw_worldDraw(worldDraw, {1.0f, 0.0f});
-                draw_worldDraw(worldDraw, {1.0f, 0.5f});
-                draw_worldDraw(worldDraw, {0.5f, 1.0f});
-                draw_worldDraw(worldDraw, {1.0f, 1.0f});
+                draw_worldDraw(clusterDraw, {0.0f, 0.5f});
+                draw_worldDraw(clusterDraw, {0.0f, 1.0f});
+                draw_worldDraw(clusterDraw, {0.5f, 0.0f});
+                draw_worldDraw(clusterDraw, {1.0f, 0.0f});
+                draw_worldDraw(clusterDraw, {1.0f, 0.5f});
+                draw_worldDraw(clusterDraw, {0.5f, 1.0f});
+                draw_worldDraw(clusterDraw, {1.0f, 1.0f});
             }
         }
         // renderer::set_color(sf::Color::White);

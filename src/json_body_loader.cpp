@@ -8,7 +8,7 @@ std::string json_body_loader::folder = "";
 const std::string json_body_loader::extension = ".body";
 
 void json_body_loader::load(
-    xpbd::World &world,
+    xpbd::Cluster &cluster,
     const std::string &filename,
     glm::vec2 offset = {0.0f, 0.0f})
 {
@@ -25,7 +25,7 @@ void json_body_loader::load(
         position_offset = {j["position"][0].get<float>(), j["position"][1].get<float>()};
     }
 
-    size_t base_index = world.particles.pos.size(); // offset for constraint indices
+    size_t base_index = cluster.particles.pos.size(); // offset for constraint indices
 
     // Load Particles
     if (j.contains("Particles") && j["Particles"].is_array())
@@ -43,8 +43,7 @@ void json_body_loader::load(
                 vel = {p["vel"][0].get<float>(), p["vel"][1].get<float>()};
 
             float mass = p["mass"].get<float>();
-            //world.add_particle(pos, mass, vel);
-            world.enqueue_function(Queue::add_particle(pos, mass, vel));
+            xpbd::add_particle(cluster, pos, mass, vel);
         }
     }
 
@@ -57,8 +56,7 @@ void json_body_loader::load(
             size_t i2 = dc["i2"].get<size_t>() + base_index;
             float compliance = dc["compliance"].get<float>();
             float restDist = dc.contains("restDistance") ? dc["restDistance"].get<float>() : __FLT_MAX__;
-            //world.add_distance_constraint(i1, i2, compliance, restDist);
-            world.enqueue_function(Queue::add_distance_constraint(i1, i2, compliance, restDist));
+            xpbd::add_distance_constraint(cluster, i1, i2, compliance, restDist);
         }
     }
 
@@ -73,8 +71,7 @@ void json_body_loader::load(
 
             float compliance = vc["compliance"].get<float>();
             float restPressure = vc.contains("restPressure") ? vc["restPressure"].get<float>() : __FLT_MAX__;
-            //world.add_volume_constraint(indices, compliance, restPressure);
-            world.enqueue_function(Queue::add_volume_constraint(indices, compliance, restPressure));
+            xpbd::add_volume_constraint(cluster, indices, compliance, restPressure);
         }
     }
 
@@ -93,8 +90,7 @@ void json_body_loader::load(
             int8_t layer = cc.contains("layer") ? cc["layer"].get<int8_t>() : 1;
             int8_t mask = cc.contains("mask") ? cc["mask"].get<int8_t>() : 1;
 
-            //world.add_polygon_collider(indices, staticFriction, kineticFriction, compliance, layer, mask);
-            world.enqueue_function(Queue::add_polygon_collider(indices, staticFriction, kineticFriction, compliance, layer, mask));
+            xpbd::add_polygon_collider(cluster, indices, staticFriction, kineticFriction, compliance, layer, mask);
         }
     }
 
@@ -113,8 +109,7 @@ void json_body_loader::load(
             int8_t layer = cc.contains("layer") ? cc["layer"].get<int8_t>() : 1;
             int8_t mask = cc.contains("mask") ? cc["mask"].get<int8_t>() : 1;
 
-            //world.add_points_collider(indices, staticFriction, kineticFriction, compliance, layer, mask);
-            world.enqueue_function(Queue::add_points_collider(indices, staticFriction, kineticFriction, compliance, layer, mask));
+            xpbd::add_points_collider(cluster, indices, staticFriction, kineticFriction, compliance, layer, mask);
         }
     }
 }

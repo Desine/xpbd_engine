@@ -64,7 +64,7 @@ public:
     ankerl::unordered_dense::map<CellCoord, std::vector<size_t>, CellCoordHash> idTable;
     ankerl::unordered_dense::map<size_t, AABB> aabbTable;
 
-    explicit SpatialHashAABB(size_t cellSize = 300, size_t tableReserve = 1024, size_t bucketReserve = 20, size_t outIdsReserve = 10)
+    explicit SpatialHashAABB(size_t cellSize = 300, size_t tableReserve = 1024, size_t bucketReserve = 32, size_t outIdsReserve = 10)
         : cellSize(cellSize), tableReserve(tableReserve), bucketReserve(bucketReserve), outIdsReserve(outIdsReserve)
     {
         clear();
