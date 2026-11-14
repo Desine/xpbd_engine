@@ -9,6 +9,7 @@
 #include "xpbd.hpp"
 #include "json_body_loader.hpp"
 
+#include "utils.hpp"
 #include "profiler.hpp"
 
 void draw_worldDraw(xpbd::Cluster clusterDraw, glm::vec2 offset = {0.0f, 0.0f})
@@ -99,7 +100,7 @@ void spawn_many(
         for (size_t j = 0; j < amountY; ++j)
         {
             float y = pos.y + spacingY * j;
-            world.enqueue_function(Queue::spawn_from_json(name, {x, y}));
+            world.enqueue_command(Commands::spawn_from_json(name, {x, y}));
         }
     }
 }
@@ -110,9 +111,10 @@ int main()
     std::println("folder {}", json_body_loader::folder);
 
     xpbd::World world;
-    world.enqueue_function(Queue::init());
-    world.enqueue_function(Queue::spawn_from_json("ground", {0, -1000}));
+    world.enqueue_command(Commands::init());
+    world.enqueue_command(Commands::spawn_from_json("ground", {0, -1000}));
     bool paused = world.updateState == xpbd::World::UpdateState::Paused;
+    bool reversePass = world.reversePass;
 
     xpbd::Cluster clusterDraw;
 
@@ -192,7 +194,7 @@ int main()
                             const size_t segments = 6;
                             const float mass = 10;
                             const float compliance = 0.005f;
-                            world.enqueue_function(Queue::spawn_polygon({x, y}, radius, segments, mass, compliance));
+                            world.enqueue_command(Commands::spawn_polygon({x, y}, radius, segments, mass, compliance));
                         }
                     }
                 }
@@ -212,33 +214,33 @@ int main()
                             const size_t segments = 6;
                             const float mass = 10;
                             const float compliance = 0.005f;
-                            world.enqueue_function(Queue::spawn_polygon({x, y}, radius, segments, mass, compliance));
+                            world.enqueue_command(Commands::spawn_polygon({x, y}, radius, segments, mass, compliance));
                         }
                     }
                 }
 
                 if (keyReleased->code == sf::Keyboard::Key::A)
-                    world.enqueue_function(Queue::spawn_from_json("car", position));
+                    world.enqueue_command(Commands::spawn_from_json("car", position));
                 if (keyReleased->code == sf::Keyboard::Key::S)
-                    world.enqueue_function(Queue::spawn_from_json("balloon", position));
+                    world.enqueue_command(Commands::spawn_from_json("balloon", position));
                 if (keyReleased->code == sf::Keyboard::Key::D)
                 {
                     float radius = 40;
                     size_t segments = 6;
                     float mass = 5;
                     float compliance = 0.005f;
-                    world.enqueue_function(Queue::spawn_polygon(position, radius, segments, mass, compliance));
+                    world.enqueue_command(Commands::spawn_polygon(position, radius, segments, mass, compliance));
                 }
                 if (keyReleased->code == sf::Keyboard::Key::F)
-                    world.enqueue_function(Queue::spawn_from_json("person", position));
+                    world.enqueue_command(Commands::spawn_from_json("person", position));
                 if (keyReleased->code == sf::Keyboard::Key::G)
-                    world.enqueue_function(Queue::spawn_from_json("square", position));
+                    world.enqueue_command(Commands::spawn_from_json("square", position));
 
                 // clear world
                 if (keyReleased->code == sf::Keyboard::Key::R)
                 {
-                    world.enqueue_function(Queue::init());
-                    world.enqueue_function(Queue::spawn_from_json("ground", {0, -1000}));
+                    world.enqueue_command(Commands::init());
+                    world.enqueue_command(Commands::spawn_from_json("ground", {0, -1000}));
                 }
                 // pause / resume
                 if (keyReleased->code == sf::Keyboard::Key::Space)
@@ -263,6 +265,11 @@ int main()
         {
             paused ? world.resume_update() : world.pause_update();
             paused = !paused;
+        }
+        if (ImGui::Button(reversePass ? "Reverse pass is on" : "Reverse pass is off"))
+        {
+            reversePass ? world.reversePass = false : world.reversePass = true;
+            reversePass = !reversePass;
         }
         if (ImGui::Button("Step once"))
             world.step_once_update();

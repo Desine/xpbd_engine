@@ -1,4 +1,6 @@
 #include "renderer.hpp"
+#include "imgui.h"
+#include <imgui-SFML.h>
 
 namespace renderer
 {

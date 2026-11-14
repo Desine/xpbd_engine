@@ -55,8 +55,10 @@ void json_body_loader::load(
             size_t i1 = dc["i1"].get<size_t>() + base_index;
             size_t i2 = dc["i2"].get<size_t>() + base_index;
             float compliance = dc["compliance"].get<float>();
-            float restDist = dc.contains("restDistance") ? dc["restDistance"].get<float>() : __FLT_MAX__;
-            xpbd::add_distance_constraint(cluster, i1, i2, compliance, restDist);
+            if (dc.contains("restDistance"))
+                xpbd::add_distance_constraint(cluster, i1, i2, compliance, dc["restDistance"].get<float>());
+            else
+                xpbd::add_distance_constraint(cluster, i1, i2, compliance);
         }
     }
 
@@ -70,8 +72,10 @@ void json_body_loader::load(
                 indices.push_back(idx.get<size_t>() + base_index);
 
             float compliance = vc["compliance"].get<float>();
-            float restPressure = vc.contains("restPressure") ? vc["restPressure"].get<float>() : __FLT_MAX__;
-            xpbd::add_volume_constraint(cluster, indices, compliance, restPressure);
+            if (vc.contains("restPressure"))
+                xpbd::add_volume_constraint(cluster, indices, compliance, vc["restPressure"].get<float>());
+            else
+                xpbd::add_volume_constraint(cluster, indices, compliance);
         }
     }
 

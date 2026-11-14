@@ -38,12 +38,30 @@ namespace xpbd
         for (auto &c : dc)
             c.lambda = 0;
     }
+    void reset_angle_constraints_lambdas(std::vector<AngleConstraint> &ac)
+    {
+        for (auto &c : ac)
+            c.lambda = 0;
+    }
     void reset_volume_constraints_lambdas(std::vector<VolumeConstraint> &vc)
     {
         for (auto &c : vc)
             c.lambda = 0;
     }
 
+    void solve_distance_constraints(Particles &p, std::vector<DistanceConstraint> &dc, float dt, bool reversePass)
+    {
+        if (reversePass)
+        {
+            for (auto it = dc.rbegin(); it != dc.rend(); it++)
+                solve_distance_constraint(p, *it, dt);
+        }
+        else
+        {
+            for (auto &c : dc)
+                solve_distance_constraint(p, c, dt);
+        }
+    }
     void solve_distance_constraint(Particles &p, DistanceConstraint &dc, float dt)
     {
         size_t i1 = dc.i1;
@@ -74,19 +92,6 @@ namespace xpbd
         glm::vec2 correction = deltaLambda * grad;
         p1 += w1 * correction;
         p2 -= w2 * correction;
-    }
-    void solve_distance_constraints(Particles &p, std::vector<DistanceConstraint> &dc, float dt, bool reversePass)
-    {
-        if (reversePass)
-        {
-            for (auto it = dc.rbegin(); it != dc.rend(); ++it)
-                solve_distance_constraint(p, *it, dt);
-        }
-        else
-        {
-            for (auto &c : dc)
-                solve_distance_constraint(p, c, dt);
-        }
     }
     void apply_distance_constraints_damping(Particles &p, std::vector<DistanceConstraint> &dc, float dt)
     {
@@ -126,6 +131,54 @@ namespace xpbd
         }
     }
 
+    void solve_angle_constraints(Particles &p, std::vector<AngleConstraint> &ac, float dt)
+    {
+        for (auto &c : ac)
+            solve_angle_constraint(p, c, dt);
+    }
+    void solve_angle_constraint(Particles &p, AngleConstraint &ac, float dt)
+    {
+        size_t i1 = ac.i1, i2 = ac.i2, i3 = ac.i3, i4 = ac.i4;
+
+        glm::vec2 v1 = p.pos[i2] - p.pos[i1];
+        glm::vec2 v2 = p.pos[i4] - p.pos[i3];
+
+        float len1 = glm::length(v1);
+        float len2 = glm::length(v2);
+        if (len1 < 1e-6f || len2 < 1e-6f)
+            return;
+
+        float w1eff = p.w[i2] + p.w[i1];
+        float w2eff = p.w[i4] + p.w[i3];
+        float inercia1 = len1 * w1eff;
+        float inercia2 = len2 * w2eff;
+
+        float alphaTilde = ac.compliance / (dt * dt);
+        float denom = inercia1 + inercia2 + alphaTilde;
+        if (denom < 1e-6f)
+            return;
+
+        float currentRelativeAngle = Utils::relative_angle_rad(v1, v2);
+        float C = currentRelativeAngle - ac.restAngle;
+
+        float deltaLambda = (-C - alphaTilde * ac.lambda) / denom;
+        ac.lambda += deltaLambda;
+
+        float correction1 = inercia2 / (inercia1 + inercia2);
+        float correction2 = inercia1 / (inercia1 + inercia2);
+
+        float rot1 = deltaLambda * correction1;
+        float rot2 = deltaLambda * correction2;
+
+        glm::vec2 d1 = Utils::perpCCW2d(v1) * rot1;
+        glm::vec2 d2 = Utils::perpCCW2d(v2) * rot2;
+
+        p.pos[i2] -= d1 * (p.w[i2] / w1eff);
+        p.pos[i1] += d1 * (p.w[i1] / w1eff);
+        p.pos[i4] += d2 * (p.w[i4] / w2eff);
+        p.pos[i3] -= d2 * (p.w[i3] / w2eff);
+    }
+
     float compute_polygon_area(const std::vector<glm::vec2> &positions)
     {
         float area = 0.0f;
@@ -134,7 +187,7 @@ namespace xpbd
         {
             const glm::vec2 &p0 = positions[j];
             const glm::vec2 &p1 = positions[i];
-            area += utils::cross_2d(p0, p1);
+            area += Utils::cross(p0, p1);
         }
         return 0.5f * area;
     }
@@ -146,11 +199,16 @@ namespace xpbd
         {
             const glm::vec2 &p0 = p.pos[indices[j]];
             const glm::vec2 &p1 = p.pos[indices[i]];
-            area += utils::cross_2d(p0, p1);
+            area += Utils::cross(p0, p1);
         }
         return 0.5f * area;
     }
 
+    void solve_volume_constraints(Particles &p, std::vector<VolumeConstraint> &vc, float dt)
+    {
+        for (auto &c : vc)
+            solve_volume_constraint(p, c, dt);
+    }
     void solve_volume_constraint(Particles &p, VolumeConstraint &vc, float dt)
     {
         std::vector<size_t> &indices = vc.indices;
@@ -167,7 +225,7 @@ namespace xpbd
             const glm::vec2 &pi_prev = p.pos[indices[(i + N - 1) % N]];
             const glm::vec2 &pi_next = p.pos[indices[(i + 1) % N]];
 
-            glm::vec2 grad = 0.5f * utils::perp_2d(pi_next, pi_prev);
+            glm::vec2 grad = 0.5f * Utils::perpCW2d(pi_next - pi_prev);
             grads[i] = grad;
 
             float wi = p.w[indices[i]];
@@ -176,7 +234,6 @@ namespace xpbd
 
         float alphaTilde = vc.compliance / (dt * dt);
         denom += alphaTilde;
-
         if (denom < 1e-6f)
             return;
 
@@ -190,12 +247,6 @@ namespace xpbd
 
             p.pos[idx] += wi * deltaLambda * grads[i];
         }
-    }
-
-    void solve_volume_constraints(Particles &p, std::vector<VolumeConstraint> &vc, float dt)
-    {
-        for (size_t i = 0; i < vc.size(); ++i)
-            solve_volume_constraint(p, vc[i], dt);
     }
 
     void generate_collider_points_aabbs(
@@ -242,7 +293,7 @@ namespace xpbd
         {
             const glm::vec2 &v1 = positions[i];
             const glm::vec2 &v2 = positions[j];
-            float cross = utils::cross_2d(v2 - v1, point - v1);
+            float cross = Utils::cross(v2 - v1, point - v1);
 
             if (v1.y <= point.y)
             {
@@ -536,7 +587,7 @@ namespace xpbd
                 clusterDraw = cluster;
                 newFrame = true;
             }
-            execute_enqueued_functions();
+            execute_enqueued_commands();
             update_lk.lock();
 
             if (updateState == UpdateState::StepOnce)
@@ -561,18 +612,23 @@ namespace xpbd
 
         float substep_time = 1.0f / tickRate * timeScale / substeps;
 
+        bool reversePass_switch = 0;
+
         for (size_t sub = 0; sub < substeps; ++sub)
         {
             iterate(cluster.particles, substep_time, gravity);
 
             reset_distance_constraints_lambdas(cluster.distanceConstraints);
+            reset_angle_constraints_lambdas(cluster.angleConstraints);
             reset_volume_constraints_lambdas(cluster.volumeConstraints);
 
             for (size_t iter = 0; iter < iterations; ++iter)
             {
-                reversePass = !reversePass;
+                if (reversePass)
+                    reversePass_switch = !reversePass_switch;
 
-                solve_distance_constraints(cluster.particles, cluster.distanceConstraints, substep_time, reversePass);
+                solve_distance_constraints(cluster.particles, cluster.distanceConstraints, substep_time, reversePass_switch);
+                solve_angle_constraints(cluster.particles, cluster.angleConstraints, substep_time);
                 solve_volume_constraints(cluster.particles, cluster.volumeConstraints, substep_time);
 
                 std::vector<AABB> polygonColliders_aabbs(polygons_size);
@@ -689,6 +745,9 @@ namespace xpbd
         cluster.distanceConstraints.clear();
         cluster.distanceConstraints.reserve(5000);
 
+        cluster.angleConstraints.clear();
+        cluster.angleConstraints.reserve(5000);
+
         cluster.volumeConstraints.clear();
         cluster.volumeConstraints.reserve(1000);
 
@@ -730,47 +789,47 @@ namespace xpbd
         merge_clusters(cluster, clusterAdd);
     }
 
-    void World::enqueue_function(Queue::Command variant)
+    void World::enqueue_command(Commands::Command variant)
     {
-        std::lock_guard<std::mutex> lk(functionQueueMutex);
-        queue.push(variant);
+        std::lock_guard<std::mutex> lk(commandQueueMutex);
+        commandQueue.push(variant);
     }
-    void World::execute_enqueued_functions()
+    void World::execute_enqueued_commands()
     {
-        std::queue<Queue::Command> local;
+        std::queue<Commands::Command> local;
         {
-            std::lock_guard<std::mutex> lk(functionQueueMutex);
-            std::swap(local, queue);
+            std::lock_guard<std::mutex> lk(commandQueueMutex);
+            std::swap(local, commandQueue);
         }
 
         while (!local.empty())
         {
-            Queue::Command cmd = std::move(local.front());
+            Commands::Command cmd = std::move(local.front());
             local.pop();
 
             std::visit([this](auto &&arg)
                        {
                     using T = std::decay_t<decltype(arg)>;
 
-                    if constexpr (std::is_same_v<T, Queue::init>)
+                    if constexpr (std::is_same_v<T, Commands::init>)
                         init();
-                    else if constexpr (std::is_same_v<T, Queue::set_tickRate>)
+                    else if constexpr (std::is_same_v<T, Commands::set_tickRate>)
                         set_tickRate(arg.tickRate);
-                    else if constexpr (std::is_same_v<T, Queue::add_particle>)
+                    else if constexpr (std::is_same_v<T, Commands::add_particle>)
                         add_particle(cluster, arg.pos, arg.mass, arg.vel);
-                    else if constexpr (std::is_same_v<T, Queue::add_distance_constraint>)
+                    else if constexpr (std::is_same_v<T, Commands::add_distance_constraint>)
                         add_distance_constraint(cluster, arg.i1, arg.i2, arg.compliance, arg.restDist);
-                    else if constexpr (std::is_same_v<T, Queue::add_volume_constraint>)
+                    else if constexpr (std::is_same_v<T, Commands::add_volume_constraint>)
                         add_volume_constraint(cluster, arg.indices, arg.compliance, arg.restPressure);
-                    else if constexpr (std::is_same_v<T, Queue::add_polygon_collider>)
+                    else if constexpr (std::is_same_v<T, Commands::add_polygon_collider>)
                         add_polygon_collider(cluster, arg.indices, arg.staticFriction, arg.kineticFriction,
                                             arg.compliance, arg.layer, arg.mask);
-                    else if constexpr (std::is_same_v<T, Queue::add_points_collider>)
+                    else if constexpr (std::is_same_v<T, Commands::add_points_collider>)
                         add_points_collider(cluster, arg.indices, arg.staticFriction, arg.kineticFriction,
                                             arg.compliance, arg.layer, arg.mask);
-                    else if constexpr (std::is_same_v<T, Queue::spawn_from_json>)
+                    else if constexpr (std::is_same_v<T, Commands::spawn_from_json>)
                         spawn_from_json(arg.name, arg.position);
-                    else if constexpr (std::is_same_v<T, Queue::spawn_polygon>)
+                    else if constexpr (std::is_same_v<T, Commands::spawn_polygon>)
                         spawn_polygon(arg.pos, arg.radius, arg.segments, arg.mass, arg.compliance); }, cmd);
         }
     }
@@ -781,7 +840,7 @@ namespace xpbd
 
         const size_t offset = into.particles.pos.size();
 
-        // --- Particles ---
+        // Particles
         into.particles.pos.insert(into.particles.pos.end(),
                                   from.particles.pos.begin(), from.particles.pos.end());
         into.particles.prev.insert(into.particles.prev.end(),
@@ -791,7 +850,7 @@ namespace xpbd
         into.particles.w.insert(into.particles.w.end(),
                                 from.particles.w.begin(), from.particles.w.end());
 
-        // --- Distance constraints (сдвиг индексов) ---
+        // Distance constraints
         into.distanceConstraints.reserve(into.distanceConstraints.size() + from.distanceConstraints.size());
         for (auto dc : from.distanceConstraints)
         {
@@ -800,7 +859,18 @@ namespace xpbd
             into.distanceConstraints.push_back(dc);
         }
 
-        // --- Volume constraints (сдвиг индексов в списке) ---
+        // Angle constraints
+        into.angleConstraints.reserve(into.angleConstraints.size() + from.angleConstraints.size());
+        for (auto ac : from.angleConstraints)
+        {
+            ac.i1 += offset;
+            ac.i2 += offset;
+            ac.i3 += offset;
+            ac.i4 += offset;
+            into.angleConstraints.push_back(ac);
+        }
+
+        // Volume constraints
         into.volumeConstraints.reserve(into.volumeConstraints.size() + from.volumeConstraints.size());
         for (auto vc : from.volumeConstraints)
         {
@@ -809,7 +879,7 @@ namespace xpbd
             into.volumeConstraints.push_back(std::move(vc));
         }
 
-        // --- Polygon colliders (сдвиг индексов вершин) ---
+        // Polygon colliders
         into.polygonColliders.reserve(into.polygonColliders.size() + from.polygonColliders.size());
         for (auto pc : from.polygonColliders)
         {
@@ -818,7 +888,7 @@ namespace xpbd
             into.polygonColliders.push_back(std::move(pc));
         }
 
-        // --- Points colliders (сдвиг индексов) ---
+        // Points colliders
         into.pointsColliders.reserve(into.pointsColliders.size() + from.pointsColliders.size());
         for (auto pc : from.pointsColliders)
         {
@@ -830,7 +900,11 @@ namespace xpbd
         from = Cluster();
     }
 
-    void add_particle(Cluster &cluster, const glm::vec2 &pos, float mass, const glm::vec2 &vel = {0.0f, 0.0f})
+    void add_particle(Cluster &cluster, const glm::vec2 &pos, float mass)
+    {
+        add_particle(cluster, pos, mass, {0, 0});
+    }
+    void add_particle(Cluster &cluster, const glm::vec2 &pos, float mass, const glm::vec2 &vel)
     {
         cluster.particles.pos.emplace_back(pos);
         cluster.particles.prev.emplace_back(pos);
@@ -838,20 +912,44 @@ namespace xpbd
         float w = mass == 0 ? 0 : 1 / mass;
         cluster.particles.w.emplace_back(w);
     }
-    void add_distance_constraint(Cluster &cluster, size_t i1, size_t i2, float compliance, float restDist = __FLT_MAX__)
+
+    void add_distance_constraint(Cluster &cluster, size_t i1, size_t i2, float compliance)
     {
-        if (restDist == __FLT_MAX__)
-            restDist = glm::distance(cluster.particles.pos[i1], cluster.particles.pos[i2]);
+        add_distance_constraint(cluster, i1, i2, compliance, glm::distance(cluster.particles.pos[i1], cluster.particles.pos[i2]));
+    }
+    void add_distance_constraint(Cluster &cluster, size_t i1, size_t i2, float compliance, float restDist)
+    {
         float compressionDamping = 0.5f;
         float extensionDamping = 0.5f;
         float lambda = 0;
         cluster.distanceConstraints.emplace_back(i1, i2, restDist, compressionDamping, extensionDamping, compliance, lambda);
     }
-    void add_volume_constraint(Cluster &cluster, const std::vector<size_t> &indices, float compliance, float restPressure = __FLT_MAX__)
+
+    void add_angle_constraint(Cluster &cluster, size_t i1, size_t i2, size_t i3, size_t i4, float compliance)
+    {
+        glm::vec2 v1 = cluster.particles.pos[i1];
+        glm::vec2 v2 = cluster.particles.pos[i2];
+        glm::vec2 v3 = cluster.particles.pos[i3];
+        glm::vec2 v4 = cluster.particles.pos[i4];
+
+        float restAngle = Utils::relative_angle_rad(v2 - v1, v4 - v3);
+        add_angle_constraint(cluster, i1, i2, i3, i4, compliance, restAngle);
+    }
+    void add_angle_constraint(Cluster &cluster, size_t i1, size_t i2, size_t i3, size_t i4, float compliance, float restAngle)
+    {
+        float lambda = 0;
+        cluster.angleConstraints.emplace_back(i1, i2, i3, i4, compliance, restAngle, lambda);
+    }
+
+    void add_volume_constraint(Cluster &cluster, const std::vector<size_t> &indices, float compliance)
     {
         float restVolume = compute_polygon_area(cluster.particles, indices);
-        if (restPressure != __FLT_MAX__)
-            restVolume *= restPressure;
+        float lambda = 0;
+        cluster.volumeConstraints.emplace_back(indices, restVolume, compliance, lambda);
+    }
+    void add_volume_constraint(Cluster &cluster, const std::vector<size_t> &indices, float compliance, float restPressure)
+    {
+        float restVolume = compute_polygon_area(cluster.particles, indices) * restPressure;
         float lambda = 0;
         cluster.volumeConstraints.emplace_back(indices, restVolume, compliance, lambda);
     }
@@ -887,7 +985,10 @@ namespace xpbd
         }
 
         for (int i = 0; i < segments; ++i)
+        {
             add_distance_constraint(cluster, start + i, start + (i + 1) % segments, compliance);
+            add_angle_constraint(cluster, start + i, start + (i + 1) % segments, start + (i + 1) % segments, start + (i + 2) % segments, compliance);
+        }
 
         add_volume_constraint(cluster, ids, compliance);
 

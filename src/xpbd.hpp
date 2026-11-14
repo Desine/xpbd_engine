@@ -9,7 +9,7 @@
 
 #include "spatial_hashing.hpp"
 
-namespace Queue
+namespace Commands
 {
     struct init
     {
@@ -108,6 +108,15 @@ namespace xpbd
         float compliance;
         float lambda;
     };
+    struct AngleConstraint{
+        size_t i1;
+        size_t i2;
+        size_t i3;
+        size_t i4;
+        float compliance;
+        float restAngle;
+        float lambda;
+    };
     struct VolumeConstraint
     {
         std::vector<size_t> indices;
@@ -162,6 +171,7 @@ namespace xpbd
     {
         Particles particles;
         std::vector<DistanceConstraint> distanceConstraints;
+        std::vector<AngleConstraint> angleConstraints;
         std::vector<VolumeConstraint> volumeConstraints;
         std::vector<ColliderPoints> polygonColliders;
         std::vector<ColliderPoints> pointsColliders;
@@ -176,7 +186,7 @@ namespace xpbd
         float timeScale = 10.f;
         float tickRate = 30.f;
         std::chrono::duration<double> deltaTick;
-        bool reversePass = false;
+        bool reversePass = true;
 
         Cluster cluster;
         std::mutex clusterMutex;
@@ -209,10 +219,10 @@ namespace xpbd
         std::chrono::time_point<std::chrono::_V2::steady_clock, std::chrono::duration<double, std::chrono::_V2::system_clock::period>>
             nextUpdateTimePoint;
 
-        std::mutex functionQueueMutex;
-        std::queue<Queue::Command> queue;
-        void enqueue_function(Queue::Command variant);
-        void execute_enqueued_functions();
+        std::queue<Commands::Command> commandQueue;
+        std::mutex commandQueueMutex;
+        void enqueue_command(Commands::Command variant);
+        void execute_enqueued_commands();
 
         World();
         ~World();
@@ -223,8 +233,9 @@ namespace xpbd
         void resume_update();
         void step_once_update();
 
-    private:
         void init();
+
+    private:
         void set_tickRate(size_t tickRate);
 
         void spawn_from_json(const std::string &name, const glm::vec2 &position);
@@ -235,7 +246,11 @@ namespace xpbd
 
     void add_particle(Cluster &cluster, const glm::vec2 &pos, const float mass, const glm::vec2 &vel);
 
+    void add_distance_constraint(Cluster &cluster, size_t i1, size_t i2, float compliance);
     void add_distance_constraint(Cluster &cluster, size_t i1, size_t i2, float compliance, float restDist);
+    void add_angle_constraint(Cluster &cluster, size_t i1, size_t i2,size_t i3, size_t i4, float compliance);
+    void add_angle_constraint(Cluster &cluster, size_t i1, size_t i2,size_t i3, size_t i4, float compliance, float restAngle);
+    void add_volume_constraint(Cluster &cluster, const std::vector<size_t> &indices, float compliance);
     void add_volume_constraint(Cluster &cluster, const std::vector<size_t> &indices, float compliance, float restPressure);
 
     void add_polygon_collider(Cluster &cluster, const std::vector<size_t> &indices, float staticFriction, float kineticFriction, float compliance, int8_t layer, int8_t mask);
@@ -253,6 +268,9 @@ namespace xpbd
     void solve_distance_constraint(Particles &p, DistanceConstraint &dc, float dt);
     void solve_distance_constraints(Particles &p, std::vector<DistanceConstraint> &dc, float dt, bool reversePass);
     void apply_distance_constraints_damping(Particles &p, std::vector<DistanceConstraint> &dc, float dt);
+
+    void solve_angle_constraint(Particles &p, AngleConstraint &ac, float dt);
+    void solve_angle_constraints(Particles &p, std::vector<AngleConstraint> &ac, float dt);
 
     float compute_polygon_area(const std::vector<glm::vec2> &positions);
     float compute_polygon_area(const Particles &p, const std::vector<size_t> &indices);

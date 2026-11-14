@@ -2,9 +2,6 @@
 #include "glm/glm.hpp"
 #include <vector>
 
-#include "imgui.h"
-#include <imgui-SFML.h>
-
 namespace renderer
 {
     static int width = 2000;
