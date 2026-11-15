@@ -96,7 +96,7 @@ void spawn_many(
 int main()
 {
     json_body_loader::folder = std::filesystem::current_path().generic_string() + "/body/";
-    std::println("folder {}", json_body_loader::folder);
+    //std::println("folder {}", json_body_loader::folder);
 
     xpbd::World world;
     world.enqueue_command(Commands::init());

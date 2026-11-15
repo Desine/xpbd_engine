@@ -15,14 +15,16 @@ void json_body_loader::load(
     std::ifstream file(folder + filename + extension);
     if (!file.is_open())
         throw std::runtime_error("Failed to open file: |" + folder + "|" + filename + "|" + extension);
+    else
+        std::println("opened file {}", folder + filename + extension);
 
     nlohmann::json j;
     file >> j;
 
-    glm::vec2 position_offset = {0, 0};
+    glm::vec2 read_offset = {0, 0};
     if (j.contains("position") && j["position"].is_array() && j["position"].size() == 2)
     {
-        position_offset = {j["position"][0].get<float>(), j["position"][1].get<float>()};
+        read_offset = {j["position"][0].get<float>(), j["position"][1].get<float>()};
     }
 
     size_t base_index = cluster.particles.pos.size(); // offset for constraint indices
@@ -36,7 +38,7 @@ void json_body_loader::load(
                 continue;
 
             glm::vec2 pos(p["pos"][0].get<float>(), p["pos"][1].get<float>());
-            pos += position_offset + offset;
+            pos += read_offset + offset;
 
             glm::vec2 vel = {0, 0};
             if (p.contains("vel"))
@@ -131,6 +133,20 @@ void json_body_loader::load(
             int8_t mask = cc.contains("mask") ? cc["mask"].get<int8_t>() : 1;
 
             xpbd::add_points_collider(cluster, indices, staticFriction, kineticFriction, compliance, layer, mask);
+        }
+    }
+
+    // Load Required bodies
+    if (j.contains("Require") && j["Require"].is_array())
+    {
+        for (const auto &r : j["Require"])
+        {
+            glm::vec2 r_offset = offset;
+            if (r.contains("offset"))
+                r_offset += glm::vec2(r["offset"][0].get<float>(), r["offset"][1].get<float>());
+
+            if (r.contains("name"))
+                load(cluster, r["name"].get<std::string>(), r_offset);
         }
     }
 }

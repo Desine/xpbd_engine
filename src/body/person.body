@@ -1,5 +1,5 @@
 {
-  "position" : [0, 0],
+  "offset" : [0, 0],
   "velocity" : [0, 0],
   "Particles": [
     {"pos": [0, 0], "mass": 20},
