@@ -136,47 +136,42 @@ namespace xpbd
         for (auto &c : ac)
             solve_angle_constraint(p, c, dt);
     }
+
     void solve_angle_constraint(Particles &p, AngleConstraint &ac, float dt)
     {
         size_t i1 = ac.i1, i2 = ac.i2, i3 = ac.i3, i4 = ac.i4;
 
-        glm::vec2 v1 = p.pos[i2] - p.pos[i1];
-        glm::vec2 v2 = p.pos[i4] - p.pos[i3];
+        glm::vec2 dir1 = p.pos[i2] - p.pos[i1];
+        glm::vec2 dir2 = p.pos[i4] - p.pos[i3];
 
-        float len1 = glm::length(v1);
-        float len2 = glm::length(v2);
-        if (len1 < 1e-6f || len2 < 1e-6f)
+        float len1Sq = glm::dot(dir1, dir1);
+        float len2Sq = glm::dot(dir2, dir2);
+        if (len1Sq < 1e-6f || len2Sq < 1e-6f)
             return;
 
-        float w1eff = p.w[i2] + p.w[i1];
-        float w2eff = p.w[i4] + p.w[i3];
-        float inercia1 = len1 * w1eff;
-        float inercia2 = len2 * w2eff;
+        float C = Utils::relative_angle_rad(dir1, dir2) - ac.restAngle;
+        C = std::atan2(std::sin(C), std::cos(C));
+
+        glm::vec2 grad1 = Utils::perpCCW2d(dir1) / len1Sq;
+        glm::vec2 grad2 = Utils::perpCCW2d(dir2) / len2Sq;
+
+        float w1 = p.w[i1], w2 = p.w[i2], w3 = p.w[i3], w4 = p.w[i4];
 
         float alphaTilde = ac.compliance / (dt * dt);
-        float denom = inercia1 + inercia2 + alphaTilde;
+        float denom =
+            (w1 + w2) * glm::dot(grad1, grad1) +
+            (w3 + w4) * glm::dot(grad2, grad2) +
+            alphaTilde;
         if (denom < 1e-6f)
             return;
-
-        float currentRelativeAngle = Utils::relative_angle_rad(v1, v2);
-        float C = currentRelativeAngle - ac.restAngle;
 
         float deltaLambda = (-C - alphaTilde * ac.lambda) / denom;
         ac.lambda += deltaLambda;
 
-        float correction1 = inercia2 / (inercia1 + inercia2);
-        float correction2 = inercia1 / (inercia1 + inercia2);
-
-        float rot1 = deltaLambda * correction1;
-        float rot2 = deltaLambda * correction2;
-
-        glm::vec2 d1 = Utils::perpCCW2d(v1) * rot1;
-        glm::vec2 d2 = Utils::perpCCW2d(v2) * rot2;
-
-        p.pos[i2] -= d1 * (p.w[i2] / w1eff);
-        p.pos[i1] += d1 * (p.w[i1] / w1eff);
-        p.pos[i4] += d2 * (p.w[i4] / w2eff);
-        p.pos[i3] -= d2 * (p.w[i3] / w2eff);
+        p.pos[i1] += w1 * grad1 * deltaLambda;
+        p.pos[i2] -= w2 * grad1 * deltaLambda;
+        p.pos[i3] -= w3 * grad2 * deltaLambda;
+        p.pos[i4] += w4 * grad2 * deltaLambda;
     }
 
     float compute_polygon_area(const std::vector<glm::vec2> &positions)

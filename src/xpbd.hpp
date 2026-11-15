@@ -180,7 +180,7 @@ namespace xpbd
     class World
     {
     public:
-        size_t substeps = 10;
+        size_t substeps = 20;
         size_t iterations = 1;
         glm::vec2 gravity = {0, -9.8f};
         float timeScale = 1.f;

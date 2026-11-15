@@ -73,7 +73,7 @@ void json_body_loader::load(
             size_t i4 = ac["i4"].get<size_t>() + base_index;
             float compliance = ac["compliance"].get<float>();
             if (ac.contains("restAngle"))
-                xpbd::add_angle_constraint(cluster, i1, i2, i3, i4, compliance, ac["restAngle"].get<float>());
+                xpbd::add_angle_constraint(cluster, i1, i2, i3, i4, compliance, glm::radians(ac["restAngle"].get<float>()));
             else
                 xpbd::add_angle_constraint(cluster, i1, i2, i3, i4, compliance);
         }
