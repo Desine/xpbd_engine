@@ -108,7 +108,8 @@ namespace xpbd
         float compliance;
         float lambda;
     };
-    struct AngleConstraint{
+    struct AngleConstraint
+    {
         size_t i1;
         size_t i2;
         size_t i3;
@@ -164,12 +165,13 @@ namespace xpbd
         float staticFriction;
         float kineticFriction;
         float compliance;
-        float lambda;
+        float lambdaN;
+        float lambdaT;
     };
 
     struct Cluster
     {
-        std::vector<std::pair<std::string, size_t>>  particleIds;
+        std::vector<std::pair<std::string, size_t>> particleIds;
         Particles particles;
         std::vector<DistanceConstraint> distanceConstraints;
         std::vector<AngleConstraint> angleConstraints;
@@ -250,8 +252,8 @@ namespace xpbd
 
     void add_distance_constraint(Cluster &cluster, size_t i1, size_t i2, float compliance);
     void add_distance_constraint(Cluster &cluster, size_t i1, size_t i2, float compliance, float restDist);
-    void add_angle_constraint(Cluster &cluster, size_t i1, size_t i2,size_t i3, size_t i4, float compliance);
-    void add_angle_constraint(Cluster &cluster, size_t i1, size_t i2,size_t i3, size_t i4, float compliance, float restAngle);
+    void add_angle_constraint(Cluster &cluster, size_t i1, size_t i2, size_t i3, size_t i4, float compliance);
+    void add_angle_constraint(Cluster &cluster, size_t i1, size_t i2, size_t i3, size_t i4, float compliance, float restAngle);
     void add_volume_constraint(Cluster &cluster, const std::vector<size_t> &indices, float compliance);
     void add_volume_constraint(Cluster &cluster, const std::vector<size_t> &indices, float compliance, float restPressure);
 
@@ -264,25 +266,27 @@ namespace xpbd
     void iterate(Particles &p, float dt, const glm::vec2 &gravity);
     void update_velocities(Particles &p, float dt);
 
-    void reset_distance_constraints_lambdas(std::vector<DistanceConstraint> &dc);
-    void reset_volume_constraints_lambdas(std::vector<VolumeConstraint> &vc);
+    void reset_distanceConstraints_lambdas(std::vector<DistanceConstraint> &dc);
+    void reset_volumeConstraints_lambdas(std::vector<VolumeConstraint> &vc);
 
     void solve_distance_constraint(Particles &p, DistanceConstraint &dc, float dt);
-    void solve_distance_constraints(Particles &p, std::vector<DistanceConstraint> &dc, float dt, bool reversePass);
+    void solve_distanceConstraints(Particles &p, std::vector<DistanceConstraint> &dc, float dt, bool reversePass);
     void apply_distance_constraints_damping(Particles &p, std::vector<DistanceConstraint> &dc, float dt);
 
     void solve_angle_constraint(Particles &p, AngleConstraint &ac, float dt);
-    void solve_angle_constraints(Particles &p, std::vector<AngleConstraint> &ac, float dt);
+    void solve_angleConstraints(Particles &p, std::vector<AngleConstraint> &ac, float dt);
 
     float compute_polygon_area(const std::vector<glm::vec2> &positions);
     float compute_polygon_area(const Particles &p, const std::vector<size_t> &indices);
     void solve_volume_constraint(Particles &p, VolumeConstraint &vc, float dt);
-    void solve_volume_constraints(Particles &p, std::vector<VolumeConstraint> &vc, float dt);
+    void solve_volumeConstraints(Particles &p, std::vector<VolumeConstraint> &vc, float dt);
 
-    void generate_collider_points_aabbs(std::vector<AABB> &out, const Particles &p, const std::vector<ColliderPoints> &colliderPoints);
+    void apply_angular_velocity_correction(Particles &p, size_t i1, size_t i2, size_t i3, size_t i4, float correction);
+
+    void generate_colliderPoints_aabbs(std::vector<AABB> &out, const Particles &p, const std::vector<ColliderPoints> &colliderPoints);
 
     void add_PointEdgeCollisionConstraints_from_PointsPolygonCollision(std::vector<PointEdgeCollisionConstraints> &pecc, const Particles &p, const PointsPolygonCollision &collision);
-    void solve_point_edge_collision_constraints(Particles &p, std::vector<PointEdgeCollisionConstraints> &pecc, float dt);
-    void apply_point_edge_collision_constraints_kinetic_friction(Particles &p, const std::vector<PointEdgeCollisionConstraints> &pecc, float dt);
+    void solve_pointEdgeCollisionConstraints(Particles &p, std::vector<PointEdgeCollisionConstraints> &pecc, float dt);
+    void apply_pointEdgeCollisionConstraints_kinetic_friction(Particles &p, const std::vector<PointEdgeCollisionConstraints> &pecc, float dt);
 }
 #endif // XPBD

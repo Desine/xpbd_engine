@@ -84,9 +84,6 @@ bool json_body_loader::load(xpbd::Cluster &cluster, const std::string &filename,
         }
     }
 
-    for (auto &part : cluster.particleIds)
-        std::println("name: {}  index: {}", part.first, part.second);
-
     // Load Distance Constraints
     if (j.contains("DistanceConstraints") && j["DistanceConstraints"].is_array())
     {

@@ -29,19 +29,19 @@
     { "i1": "bottom", "i2": "wheel2", "compliance": 0.0 }
   ],
   "AngleConstraints": [
-    { "i1": 9,  "i2": 0, "i3": 0, "i4": 1, "compliance": 0.0001},
-    { "i1": 0,  "i2": 1, "i3": 1, "i4": 2, "compliance": 0.000001},
-    { "i1": 1,  "i2": 2, "i3": 2, "i4": 3, "compliance": 0.0001},
-    { "i1": 2,  "i2": 3, "i3": 3, "i4": 4, "compliance": 0.0001},
-    { "i1": 3,  "i2": 4, "i3": 4, "i4": 5, "compliance": 0.0001},
-    { "i1": 4,  "i2": 5, "i3": 5, "i4": 6, "compliance": 0.0001},
-    { "i1": 5,  "i2": 6, "i3": 6, "i4": 7, "compliance": 0.0001},
-    { "i1": 6,  "i2": 7, "i3": 7, "i4": 8, "compliance": 0.0001},
-    { "i1": 7,  "i2": 8, "i3": 8, "i4": 9, "compliance": 0.0001},
-    { "i1": 8,  "i2": 9, "i3": 9, "i4": 0, "compliance": 0.0001 },
+    { "i1": 9,  "i2": 0, "i3": 0, "i4": 1, "compliance": 0.00001},
+    { "i1": 0,  "i2": 1, "i3": 1, "i4": 2, "compliance": 0.00001},
+    { "i1": 1,  "i2": 2, "i3": 2, "i4": 3, "compliance": 0.00001},
+    { "i1": 2,  "i2": 3, "i3": 3, "i4": 4, "compliance": 0.00001},
+    { "i1": 3,  "i2": 4, "i3": 4, "i4": 5, "compliance": 0.00001},
+    { "i1": 4,  "i2": 5, "i3": 5, "i4": 6, "compliance": 0.00001},
+    { "i1": 5,  "i2": 6, "i3": 6, "i4": 7, "compliance": 0.00001},
+    { "i1": 6,  "i2": 7, "i3": 7, "i4": 8, "compliance": 0.00001},
+    { "i1": 7,  "i2": 8, "i3": 8, "i4": 9, "compliance": 0.00001},
+    { "i1": 8,  "i2": 9, "i3": 9, "i4": 0, "compliance": 0.00001 },
 
-    { "i1": "bottomr",  "i2": "bottom", "i3": "bottom", "i4": "wheel", "compliance": 0.00001, "restAngle": 10 },
-    { "i1": "bottoml",  "i2": "bottom", "i3": "bottom", "i4": "wheel2", "compliance": 0.00001, "restAngle": -10 }
+    { "i1": "bottomr",  "i2": "bottom", "i3": "bottom", "i4": "wheel", "compliance": 0.00001, "restAngle": 15 },
+    { "i1": "bottoml",  "i2": "bottom", "i3": "bottom", "i4": "wheel2", "compliance": 0.00001, "restAngle": -15 }
   ],
   "VolumeConstraints": [
     {
@@ -53,9 +53,9 @@
   "PolygonColliders": [
     {
       "indices": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-      "staticFriction": 0.9,
-      "kineticFriction": 0.8,
-      "compliance": 0.000005,
+      "staticFriction": 0.2,
+      "kineticFriction": 0.3,
+      "compliance": 0.000001,
       "layer": 2,
       "mask": 1
     }

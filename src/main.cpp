@@ -298,7 +298,7 @@ int main()
                 float angle = i * angleStep;
                 glm::vec2 dir = glm::vec2(cosf(angle), sinf(angle));
 
-                draw_worldDraw(clusterDraw, dir * 0.001f);
+                draw_worldDraw(clusterDraw, dir * 0.005f);
             }
         }
         // renderer::set_color(sf::Color::White);
