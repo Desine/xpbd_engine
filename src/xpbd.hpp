@@ -169,6 +169,7 @@ namespace xpbd
 
     struct Cluster
     {
+        std::vector<std::pair<std::string, size_t>>  particleIds;
         Particles particles;
         std::vector<DistanceConstraint> distanceConstraints;
         std::vector<AngleConstraint> angleConstraints;

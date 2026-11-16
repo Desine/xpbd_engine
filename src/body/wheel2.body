@@ -1,0 +1,75 @@
+{
+  "offset": [0, 0],
+  "Particles": [
+    { "pos": [0.0, 0.0], "mass": 5, "id":"wheel2" },
+
+    { "pos": [0.400000, 0.000000], "mass": 1 },
+    { "pos": [0.323607, 0.247214], "mass": 1 },
+    { "pos": [0.123607, 0.380423], "mass": 1 },
+    { "pos": [-0.123607, 0.380423], "mass": 1 },
+    { "pos": [-0.323607, 0.247214], "mass": 1 },
+    { "pos": [-0.400000, 0.000000], "mass": 1 },
+    { "pos": [-0.323607, -0.247214], "mass": 1 },
+    { "pos": [-0.123607, -0.380423], "mass": 1 },
+    { "pos": [0.123607, -0.380423], "mass": 1 },
+    { "pos": [0.323607, -0.247214], "mass": 1 }
+  ],
+  "DistanceConstraints": [
+    { "i1": 0, "i2": 1, "compliance": 0.00005 },
+    { "i1": 0, "i2": 2, "compliance": 0.00005 },
+    { "i1": 0, "i2": 3, "compliance": 0.00005 },
+    { "i1": 0, "i2": 4, "compliance": 0.00005 },
+    { "i1": 0, "i2": 5, "compliance": 0.00005 },
+    { "i1": 0, "i2": 6, "compliance": 0.00005 },
+    { "i1": 0, "i2": 7, "compliance": 0.00005 },
+    { "i1": 0, "i2": 8, "compliance": 0.00005 },
+    { "i1": 0, "i2": 9, "compliance": 0.00005 },
+    { "i1": 0, "i2": 10, "compliance": 0.00005 },
+
+    { "i1": 1, "i2": 2, "compliance": 0.0 },
+    { "i1": 2, "i2": 3, "compliance": 0.0 },
+    { "i1": 3, "i2": 4, "compliance": 0.0 },
+    { "i1": 4, "i2": 5, "compliance": 0.0 },
+    { "i1": 5, "i2": 6, "compliance": 0.0 },
+    { "i1": 6, "i2": 7, "compliance": 0.0 },
+    { "i1": 7, "i2": 8, "compliance": 0.0 },
+    { "i1": 8, "i2": 9, "compliance": 0.0 },
+    { "i1": 9, "i2": 10, "compliance": 0.0 },
+    { "i1": 10, "i2": 1, "compliance": 0.0 }
+  ],
+  "AngleConstraints": [
+    { "i1": 0, "i2": 1, "i3": 0, "i4": 6, "compliance": 0.0 },
+    { "i1": 0, "i2": 2, "i3": 0, "i4": 7, "compliance": 0.0 },
+    { "i1": 0, "i2": 3, "i3": 0, "i4": 8, "compliance": 0.0 },
+    { "i1": 0, "i2": 4, "i3": 0, "i4": 9, "compliance": 0.0 },
+    { "i1": 0, "i2": 5, "i3": 0, "i4": 10, "compliance": 0.0 },
+
+    { "i1": 0, "i2": 1, "i3": 0, "i4": 3, "compliance": 0.0 },
+    { "i1": 0, "i2": 2, "i3": 0, "i4": 4, "compliance": 0.0 },
+    { "i1": 0, "i2": 3, "i3": 0, "i4": 5, "compliance": 0.0 },
+    { "i1": 0, "i2": 4, "i3": 0, "i4": 6, "compliance": 0.0 },
+    { "i1": 0, "i2": 5, "i3": 0, "i4": 7, "compliance": 0.0 },
+    { "i1": 0, "i2": 6, "i3": 0, "i4": 8, "compliance": 0.0 },
+    { "i1": 0, "i2": 7, "i3": 0, "i4": 9, "compliance": 0.0 },
+    { "i1": 0, "i2": 8, "i3": 0, "i4": 10, "compliance": 0.0 },
+    { "i1": 0, "i2": 9, "i3": 0, "i4": 1, "compliance": 0.0 },
+    { "i1": 0, "i2": 10, "i3": 0, "i4": 2, "compliance": 0.0 }
+  ],
+  "VolumeConstraints": [
+    {
+      "indices": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+      "restPressure": 1,
+      "compliance": 0.00001
+    }
+  ],
+  "PolygonColliders": [
+    {
+      "indices": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+      "staticFriction": 0.9,
+      "kineticFriction": 0.8,
+      "compliance": 0.000005,
+      "layer": 2,
+      "mask": 1
+    }
+  ]
+}
