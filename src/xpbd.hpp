@@ -11,82 +11,7 @@
 
 namespace Commands
 {
-    struct init
-    {
-    };
 
-    struct set_tickRate
-    {
-        float tickRate;
-    };
-
-    struct add_particle
-    {
-        glm::vec2 pos;
-        float mass;
-        glm::vec2 vel;
-    };
-
-    struct add_distance_constraint
-    {
-        size_t i1;
-        size_t i2;
-        float compliance;
-        float restDist;
-    };
-
-    struct add_volume_constraint
-    {
-        std::vector<size_t> indices;
-        float compliance;
-        float restPressure;
-    };
-
-    struct add_polygon_collider
-    {
-        std::vector<size_t> indices;
-        float staticFriction;
-        float kineticFriction;
-        float compliance;
-        int8_t layer;
-        int8_t mask;
-    };
-
-    struct add_points_collider
-    {
-        std::vector<size_t> indices;
-        float staticFriction;
-        float kineticFriction;
-        float compliance;
-        int8_t layer;
-        int8_t mask;
-    };
-
-    struct spawn_from_json
-    {
-        std::string name;
-        glm::vec2 position;
-    };
-
-    struct spawn_polygon
-    {
-        glm::vec2 pos;
-        float radius;
-        size_t segments;
-        float mass;
-        float compliance;
-    };
-
-    using Command = std::variant<
-        init,
-        set_tickRate,
-        add_particle,
-        add_distance_constraint,
-        add_volume_constraint,
-        add_polygon_collider,
-        add_points_collider,
-        spawn_from_json,
-        spawn_polygon>;
 }
 
 namespace xpbd
@@ -110,10 +35,8 @@ namespace xpbd
     };
     struct AngleConstraint
     {
-        size_t i1;
-        size_t i2;
-        size_t i3;
-        size_t i4;
+        size_t i1, i2;
+        size_t i3, i4;
         float compliance;
         float restAngle;
         float lambda;
@@ -125,7 +48,7 @@ namespace xpbd
         float compliance;
         float lambda;
     };
-    struct ColliderPoints
+    struct PointsCollider
     {
         std::vector<size_t> indices;
         float staticFriction;
@@ -169,6 +92,33 @@ namespace xpbd
         float lambdaT;
     };
 
+    struct AngularData
+    {
+        glm::vec2 grad1;
+        glm::vec2 grad2;
+        float invI1;
+        float invI2;
+        float invI;
+        float angle;
+        float omega;
+    };
+    struct AngularMotor
+    {
+        size_t i1, i2;
+        size_t i3, i4;
+        float targetVelocity;
+        float maxTorque;
+    };
+    struct AngularServo
+    {
+        size_t i1, i2;
+        size_t i3, i4;
+        float targetAngle;
+        float kp;
+        float kd;
+        float maxTorque;
+    };
+
     struct Cluster
     {
         std::vector<std::pair<std::string, size_t>> particleIds;
@@ -176,9 +126,95 @@ namespace xpbd
         std::vector<DistanceConstraint> distanceConstraints;
         std::vector<AngleConstraint> angleConstraints;
         std::vector<VolumeConstraint> volumeConstraints;
-        std::vector<ColliderPoints> polygonColliders;
-        std::vector<ColliderPoints> pointsColliders;
+        std::vector<PointsCollider> polygonColliders;
+        std::vector<PointsCollider> pointsColliders;
+        std::vector<AngularMotor> angularMotors;
+        std::vector<AngularServo> angularServos;
     };
+
+    struct init_command
+    {
+    };
+
+    struct set_tickRate_command
+    {
+        float tickRate;
+    };
+
+    struct add_particle_command
+    {
+        glm::vec2 pos;
+        float mass;
+        glm::vec2 vel;
+    };
+
+    struct add_distanceConstraint_command
+    {
+        DistanceConstraint constraint;
+    };
+
+    struct add_volumeConstraint_command
+    {
+        VolumeConstraint constraint;
+    };
+
+    struct add_polygonCollider_command
+    {
+        PointsCollider collider;
+    };
+
+    struct add_pointsCollider_command
+    {
+        PointsCollider collider;
+    };
+
+    struct spawn_from_json_command
+    {
+        std::string name;
+        glm::vec2 position;
+    };
+
+    struct spawn_polygon_command
+    {
+        glm::vec2 pos;
+        float radius;
+        size_t segments;
+        float mass;
+        float compliance;
+    };
+    struct add_angularMotor_command
+    {
+        AngularMotor motor;
+    };
+    struct update_angularMotor_command
+    {
+        size_t index;
+        AngularMotor motor;
+    };
+    struct add_angularServo_command
+    {
+        AngularServo servo;
+    };
+    struct update_angularServo_command
+    {
+        size_t index;
+        AngularServo servo;
+    };
+
+    using Command = std::variant<
+        init_command,
+        set_tickRate_command,
+        add_particle_command,
+        add_distanceConstraint_command,
+        add_volumeConstraint_command,
+        add_polygonCollider_command,
+        add_pointsCollider_command,
+        spawn_from_json_command,
+        spawn_polygon_command,
+        add_angularMotor_command,
+        update_angularMotor_command,
+        add_angularServo_command,
+        update_angularServo_command>;
 
     class World
     {
@@ -223,9 +259,9 @@ namespace xpbd
         std::chrono::time_point<std::chrono::_V2::steady_clock, std::chrono::duration<double, std::chrono::_V2::system_clock::period>>
             nextUpdateTimePoint;
 
-        std::queue<Commands::Command> commandQueue;
+        std::queue<Command> commandQueue;
         std::mutex commandQueueMutex;
-        void enqueue_command(Commands::Command variant);
+        void enqueue_command(Command variant);
         void execute_enqueued_commands();
 
         World();
@@ -250,15 +286,18 @@ namespace xpbd
 
     void add_particle(Cluster &cluster, const glm::vec2 &pos, const float mass, const glm::vec2 &vel);
 
-    void add_distance_constraint(Cluster &cluster, size_t i1, size_t i2, float compliance);
-    void add_distance_constraint(Cluster &cluster, size_t i1, size_t i2, float compliance, float restDist);
-    void add_angle_constraint(Cluster &cluster, size_t i1, size_t i2, size_t i3, size_t i4, float compliance);
-    void add_angle_constraint(Cluster &cluster, size_t i1, size_t i2, size_t i3, size_t i4, float compliance, float restAngle);
-    void add_volume_constraint(Cluster &cluster, const std::vector<size_t> &indices, float compliance);
-    void add_volume_constraint(Cluster &cluster, const std::vector<size_t> &indices, float compliance, float restPressure);
+    void add_distanceConstraint(Cluster &cluster, size_t i1, size_t i2, float compliance);
+    void add_distanceConstraint(Cluster &cluster, size_t i1, size_t i2, float compliance, float restDist);
+    void add_angleConstraint(Cluster &cluster, size_t i1, size_t i2, size_t i3, size_t i4, float compliance);
+    void add_angleConstraint(Cluster &cluster, size_t i1, size_t i2, size_t i3, size_t i4, float compliance, float restAngle);
+    void add_volumeConstraint(Cluster &cluster, const std::vector<size_t> &indices, float compliance);
+    void add_volumeConstraint(Cluster &cluster, const std::vector<size_t> &indices, float compliance, float restPressure);
 
-    void add_polygon_collider(Cluster &cluster, const std::vector<size_t> &indices, float staticFriction, float kineticFriction, float compliance, int8_t layer, int8_t mask);
-    void add_points_collider(Cluster &cluster, const std::vector<size_t> &indices, float staticFriction, float kineticFriction, float compliance, int8_t layer, int8_t mask);
+    void add_polygonCollider(Cluster &cluster, const std::vector<size_t> &indices, float staticFriction, float kineticFriction, float compliance, int8_t layer, int8_t mask);
+    void add_pointsCollider(Cluster &cluster, const std::vector<size_t> &indices, float staticFriction, float kineticFriction, float compliance, int8_t layer, int8_t mask);
+
+    void add_angularMotor(Cluster &cluster, size_t i1, size_t i2, size_t i3, size_t i4, float targetVelocity, float maxTorque);
+    void add_angularServo(Cluster &cluster, size_t i1, size_t i2, size_t i3, size_t i4, float targetAngle, float kp, float kd, float maxTorque);
 
     void spawn_from_json(Cluster &cluster, const std::string &name, const glm::vec2 &position);
     void spawn_polygon(Cluster &cluster, glm::vec2 pos, float radius, size_t segments, float mass, float compliance);
@@ -269,21 +308,25 @@ namespace xpbd
     void reset_distanceConstraints_lambdas(std::vector<DistanceConstraint> &dc);
     void reset_volumeConstraints_lambdas(std::vector<VolumeConstraint> &vc);
 
-    void solve_distance_constraint(Particles &p, DistanceConstraint &dc, float dt);
+    void solve_distanceConstraint(Particles &p, DistanceConstraint &dc, float dt);
     void solve_distanceConstraints(Particles &p, std::vector<DistanceConstraint> &dc, float dt, bool reversePass);
-    void apply_distance_constraints_damping(Particles &p, std::vector<DistanceConstraint> &dc, float dt);
+    void apply_distanceConstraints_damping(Particles &p, std::vector<DistanceConstraint> &dc, float dt);
 
-    void solve_angle_constraint(Particles &p, AngleConstraint &ac, float dt);
+    void solve_angleConstraint(Particles &p, AngleConstraint &ac, float dt);
     void solve_angleConstraints(Particles &p, std::vector<AngleConstraint> &ac, float dt);
 
     float compute_polygon_area(const std::vector<glm::vec2> &positions);
     float compute_polygon_area(const Particles &p, const std::vector<size_t> &indices);
-    void solve_volume_constraint(Particles &p, VolumeConstraint &vc, float dt);
+    void solve_volumeConstraint(Particles &p, VolumeConstraint &vc, float dt);
     void solve_volumeConstraints(Particles &p, std::vector<VolumeConstraint> &vc, float dt);
 
-    void apply_angular_velocity_correction(Particles &p, size_t i1, size_t i2, size_t i3, size_t i4, float correction);
+    bool get_angularData(const Particles &p, size_t i1, size_t i2, size_t i3, size_t i4, AngularData &data);
+    void apply_angular_velocity_correction(Particles &p, size_t i1, size_t i2, size_t i3, size_t i4, float deltaL);
+    void apply_torque(Particles &p, size_t i1, size_t i2, size_t i3, size_t i4, float torque, float dt);
+    void solve_angularMotor(Particles &p, const AngularMotor &motor, float dt);
+    void solve_angularServo(Particles &p, const AngularServo &servo, float dt);
 
-    void generate_colliderPoints_aabbs(std::vector<AABB> &out, const Particles &p, const std::vector<ColliderPoints> &colliderPoints);
+    void generate_colliderPoints_aabbs(std::vector<AABB> &out, const Particles &p, const std::vector<PointsCollider> &colliderPoints);
 
     void add_PointEdgeCollisionConstraints_from_PointsPolygonCollision(std::vector<PointEdgeCollisionConstraints> &pecc, const Particles &p, const PointsPolygonCollision &collision);
     void solve_pointEdgeCollisionConstraints(Particles &p, std::vector<PointEdgeCollisionConstraints> &pecc, float dt);

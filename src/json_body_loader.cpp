@@ -7,13 +7,19 @@
 std::string json_body_loader::folder = "";
 const std::string json_body_loader::extension = ".body";
 
+inline glm::vec2 get_vec2(const nlohmann::json &p, const char *key, glm::vec2 def = {0, 0})
+{
+    auto j = p.value(key, nlohmann::json::array({def.x, def.y}));
+    return {j[0].get<float>(), j[1].get<float>()};
+}
+
 std::optional<size_t> get_index_by_id(xpbd::Cluster &cluster, std::string id)
 {
     auto result = std::find_if(cluster.particleIds.begin(), cluster.particleIds.end(), [&id](const auto &p)
                                { return p.first == id; });
     if (result != cluster.particleIds.end())
         return result->second;
-    return NULL;
+    return std::nullopt;
 }
 
 size_t get_index(xpbd::Cluster &cluster, const nlohmann::json_abi_v3_11_3::json &element, size_t base_index)
@@ -22,7 +28,7 @@ size_t get_index(xpbd::Cluster &cluster, const nlohmann::json_abi_v3_11_3::json 
     {
         if (auto idFound = get_index_by_id(cluster, element.get<std::string>()))
             return idFound.value();
-        }
+    }
     else
         return element.get<size_t>() + base_index;
 }
@@ -45,9 +51,7 @@ bool json_body_loader::load(xpbd::Cluster &cluster, const std::string &filename,
     {
         for (const auto &r : j["Require"])
         {
-            glm::vec2 r_offset = offset;
-            if (r.contains("offset"))
-                r_offset += glm::vec2(r["offset"][0].get<float>(), r["offset"][1].get<float>());
+            glm::vec2 r_offset = get_vec2(r, "offset") + offset;
 
             if (r.contains("name"))
                 if (load(cluster, r["name"].get<std::string>(), r_offset) == false)
@@ -60,23 +64,13 @@ bool json_body_loader::load(xpbd::Cluster &cluster, const std::string &filename,
     // Load Particles
     if (j.contains("Particles") && j["Particles"].is_array())
     {
-        glm::vec2 j_offset = {0, 0};
-        if (j.contains("offset") && j["offset"].is_array() && j["offset"].size() == 2)
-            j_offset = {j["offset"][0].get<float>(), j["offset"][1].get<float>()};
+        glm::vec2 j_offset = get_vec2(j, "offset");
 
         for (const auto &&[index, p] : std::views::enumerate(j["Particles"]))
         {
-            if (!p.contains("pos") || !p.contains("mass"))
-                continue;
-
-            glm::vec2 pos(p["pos"][0].get<float>(), p["pos"][1].get<float>());
-            pos += j_offset + offset;
-
-            glm::vec2 vel = {0, 0};
-            if (p.contains("vel"))
-                vel = {p["vel"][0].get<float>(), p["vel"][1].get<float>()};
-
-            float mass = p["mass"].get<float>();
+            glm::vec2 pos = get_vec2(p, "pos") + offset + j_offset;
+            glm::vec2 vel = get_vec2(p, "vel");
+            float mass = p.value("mass", 0.0f);
             xpbd::add_particle(cluster, pos, mass, vel);
 
             if (p.contains("id"))
@@ -91,11 +85,11 @@ bool json_body_loader::load(xpbd::Cluster &cluster, const std::string &filename,
         {
             size_t i1 = get_index(cluster, dc["i1"], base_index);
             size_t i2 = get_index(cluster, dc["i2"], base_index);
-            float compliance = dc["compliance"].get<float>();
+            float compliance = dc.value("compliance", 0.0f);
             if (dc.contains("restDistance"))
-                xpbd::add_distance_constraint(cluster, i1, i2, compliance, dc["restDistance"].get<float>());
+                xpbd::add_distanceConstraint(cluster, i1, i2, compliance, dc["restDistance"].get<float>());
             else
-                xpbd::add_distance_constraint(cluster, i1, i2, compliance);
+                xpbd::add_distanceConstraint(cluster, i1, i2, compliance);
         }
     }
 
@@ -108,11 +102,11 @@ bool json_body_loader::load(xpbd::Cluster &cluster, const std::string &filename,
             size_t i2 = get_index(cluster, ac["i2"], base_index);
             size_t i3 = get_index(cluster, ac["i3"], base_index);
             size_t i4 = get_index(cluster, ac["i4"], base_index);
-            float compliance = ac["compliance"].get<float>();
+            float compliance = ac.value("compliance", 0.0f);
             if (ac.contains("restAngle"))
-                xpbd::add_angle_constraint(cluster, i1, i2, i3, i4, compliance, glm::radians(ac["restAngle"].get<float>()));
+                xpbd::add_angleConstraint(cluster, i1, i2, i3, i4, compliance, glm::radians(ac["restAngle"].get<float>()));
             else
-                xpbd::add_angle_constraint(cluster, i1, i2, i3, i4, compliance);
+                xpbd::add_angleConstraint(cluster, i1, i2, i3, i4, compliance);
         }
     }
 
@@ -125,11 +119,14 @@ bool json_body_loader::load(xpbd::Cluster &cluster, const std::string &filename,
             for (const auto &idx : vc["indices"])
                 indices.push_back(get_index(cluster, idx, base_index));
 
-            float compliance = vc["compliance"].get<float>();
+            float compliance = vc.value("compliance", 0.0f);
             if (vc.contains("restPressure"))
-                xpbd::add_volume_constraint(cluster, indices, compliance, vc["restPressure"].get<float>());
+            {
+                float restVolume = compute_polygon_area(cluster.particles, indices) * vc.value("restPressure", 1.0f);
+                xpbd::add_volumeConstraint(cluster, indices, compliance, restVolume);
+            }
             else
-                xpbd::add_volume_constraint(cluster, indices, compliance);
+                xpbd::add_volumeConstraint(cluster, indices, compliance);
         }
     }
 
@@ -142,13 +139,13 @@ bool json_body_loader::load(xpbd::Cluster &cluster, const std::string &filename,
             for (const auto &idx : cc["indices"])
                 indices.push_back(get_index(cluster, idx, base_index));
 
-            float staticFriction = cc["staticFriction"].get<float>();
-            float kineticFriction = cc["kineticFriction"].get<float>();
-            float compliance = cc["compliance"].get<float>();
-            int8_t layer = cc.contains("layer") ? cc["layer"].get<int8_t>() : 1;
-            int8_t mask = cc.contains("mask") ? cc["mask"].get<int8_t>() : 1;
+            float staticFriction = cc.value("staticFriction", 0.0f);
+            float kineticFriction = cc.value("kineticFriction", 0.0f);
+            float compliance = cc.value("compliance", 0.0f);
+            int8_t layer = cc.value("layer", 1);
+            int8_t mask = cc.value("mask", 1);
 
-            xpbd::add_polygon_collider(cluster, indices, staticFriction, kineticFriction, compliance, layer, mask);
+            xpbd::add_polygonCollider(cluster, indices, staticFriction, kineticFriction, compliance, layer, mask);
         }
     }
 
@@ -161,13 +158,69 @@ bool json_body_loader::load(xpbd::Cluster &cluster, const std::string &filename,
             for (const auto &idx : cc["indices"])
                 indices.push_back(get_index(cluster, idx, base_index));
 
-            float staticFriction = cc["staticFriction"].get<float>();
-            float kineticFriction = cc["kineticFriction"].get<float>();
-            float compliance = cc["compliance"].get<float>();
-            int8_t layer = cc.contains("layer") ? cc["layer"].get<int8_t>() : 1;
-            int8_t mask = cc.contains("mask") ? cc["mask"].get<int8_t>() : 1;
+            float staticFriction = cc.value("staticFriction", 0.0f);
+            float kineticFriction = cc.value("kineticFriction", 0.0f);
+            float compliance = cc.value("compliance", 0.0f);
+            int8_t layer = cc.value("layer", 1);
+            int8_t mask = cc.value("mask", 1);
 
-            xpbd::add_points_collider(cluster, indices, staticFriction, kineticFriction, compliance, layer, mask);
+            xpbd::add_pointsCollider(cluster, indices, staticFriction, kineticFriction, compliance, layer, mask);
+        }
+    }
+
+    // Load Angular Motors
+    if (j.contains("AngularMotors") && j["AngularMotors"].is_array())
+    {
+        for (const auto &m : j["AngularMotors"])
+        {
+            size_t i1 = get_index(cluster, m["i1"], base_index);
+            size_t i2 = get_index(cluster, m["i2"], base_index);
+            size_t i3 = get_index(cluster, m["i3"], base_index);
+            size_t i4 = get_index(cluster, m["i4"], base_index);
+
+            float targetVelocity =
+                m.value("targetVelocity", 0.0f);
+
+            float maxTorque =
+                m.value("maxTorque", 100.0f);
+
+            xpbd::add_angularMotor(
+                cluster,
+                i1, i2, i3, i4,
+                targetVelocity,
+                maxTorque);
+        }
+    }
+
+    // Load Angular Servos
+    if (j.contains("AngularServos") && j["AngularServos"].is_array())
+    {
+        for (const auto &s : j["AngularServos"])
+        {
+            size_t i1 = get_index(cluster, s["i1"], base_index);
+            size_t i2 = get_index(cluster, s["i2"], base_index);
+            size_t i3 = get_index(cluster, s["i3"], base_index);
+            size_t i4 = get_index(cluster, s["i4"], base_index);
+
+            float targetAngle =
+                s.value("targetAngle", 0.0f);
+
+            float kp =
+                s.value("kp", 0.0f);
+
+            float kd =
+                s.value("kd", 0.0f);
+
+            float maxTorque =
+                s.value("maxTorque", 0.0f);
+
+            xpbd::add_angularServo(
+                cluster,
+                i1, i2, i3, i4,
+                targetAngle,
+                kp,
+                kd,
+                maxTorque);
         }
     }
 

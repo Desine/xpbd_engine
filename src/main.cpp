@@ -88,7 +88,7 @@ void spawn_many(
         for (size_t j = 0; j < amountY; ++j)
         {
             float y = pos.y + spacingY * j;
-            world.enqueue_command(Commands::spawn_from_json(name, {x, y}));
+            world.enqueue_command(xpbd::spawn_from_json_command(name, {x, y}));
         }
     }
 }
@@ -96,14 +96,15 @@ void spawn_many(
 int main()
 {
     json_body_loader::folder = std::filesystem::current_path().generic_string() + "/body/";
-    //std::println("folder {}", json_body_loader::folder);
+    // std::println("folder {}", json_body_loader::folder);
 
     xpbd::World world;
-    world.enqueue_command(Commands::init());
-    world.enqueue_command(Commands::spawn_from_json("ground", {0, -10}));
+    world.enqueue_command(xpbd::init_command());
+    world.enqueue_command(xpbd::spawn_from_json_command("ground", {0, -10}));
     bool paused = world.updateState == xpbd::World::UpdateState::Paused;
     bool reversePass = world.reversePass;
     int drawThickness = 1;
+    int targetVelocity;
 
     xpbd::Cluster clusterDraw;
 
@@ -117,8 +118,6 @@ int main()
     while (renderer::window.isOpen())
     {
         FrameMark;
-        sf::Time deltaTime = clock.restart();
-
         while (const auto event = renderer::window.pollEvent())
         {
             ImGui::SFML::ProcessEvent(renderer::window, *event);
@@ -168,31 +167,11 @@ int main()
                     float spacingY = 2;
                     spawn_many(world, position, amountX, amountY, spacingX, spacingY, "balloon");
                 }
-                if (keyReleased->code == sf::Keyboard::Key::E)
-                {
-                    size_t amountX = 10;
-                    size_t amountY = 10;
-                    float spacingX = 1;
-                    float spacingY = 1;
-                    for (size_t i = 0; i < amountX; ++i)
-                    {
-                        float x = position.x - amountX * spacingX * 0.5 + spacingX * i;
-                        for (size_t j = 0; j < amountY; ++j)
-                        {
-                            float y = position.y + spacingY * j;
-                            const float radius = 0.5f;
-                            const size_t segments = 6;
-                            const float mass = 10;
-                            const float compliance = 0.001f;
-                            world.enqueue_command(Commands::spawn_polygon({x, y}, radius, segments, mass, compliance));
-                        }
-                    }
-                }
                 if (keyReleased->code == sf::Keyboard::Key::C)
                 {
-                    size_t amountX = 30;
+                    size_t amountX = 10;
                     size_t amountY = 1;
-                    float spacingX = 1;
+                    float spacingX = 0.5f;
                     float spacingY = 1;
                     for (size_t i = 0; i < amountX; ++i)
                     {
@@ -200,37 +179,37 @@ int main()
                         for (size_t j = 0; j < amountY; ++j)
                         {
                             float y = position.y + spacingY * j;
-                            const float radius = 0.5f;
+                            const float radius = 0.2f;
                             const size_t segments = 6;
                             const float mass = 10;
-                            const float compliance = 0.001f;
-                            world.enqueue_command(Commands::spawn_polygon({x, y}, radius, segments, mass, compliance));
+                            const float compliance = 0.0001f;
+                            world.enqueue_command(xpbd::spawn_polygon_command({x, y}, radius, segments, mass, compliance));
                         }
                     }
                 }
 
                 if (keyReleased->code == sf::Keyboard::Key::A)
-                    world.enqueue_command(Commands::spawn_from_json("car", position));
+                    world.enqueue_command(xpbd::spawn_from_json_command("car", position));
                 if (keyReleased->code == sf::Keyboard::Key::S)
-                    world.enqueue_command(Commands::spawn_from_json("balloon", position));
+                    world.enqueue_command(xpbd::spawn_from_json_command("balloon", position));
                 if (keyReleased->code == sf::Keyboard::Key::D)
                 {
-                    float radius = 0.5f;
+                    float radius = 0.2f;
                     size_t segments = 6;
                     float mass = 5;
                     float compliance = 0.001f;
-                    world.enqueue_command(Commands::spawn_polygon(position, radius, segments, mass, compliance));
+                    world.enqueue_command(xpbd::spawn_polygon_command(position, radius, segments, mass, compliance));
                 }
                 if (keyReleased->code == sf::Keyboard::Key::F)
-                    world.enqueue_command(Commands::spawn_from_json("person", position));
+                    world.enqueue_command(xpbd::spawn_from_json_command("person", position));
                 if (keyReleased->code == sf::Keyboard::Key::G)
-                    world.enqueue_command(Commands::spawn_from_json("square", position));
+                    world.enqueue_command(xpbd::spawn_from_json_command("square", position));
 
                 // clear world
                 if (keyReleased->code == sf::Keyboard::Key::R)
                 {
-                    world.enqueue_command(Commands::init());
-                    world.enqueue_command(Commands::spawn_from_json("ground", {0, -10}));
+                    world.enqueue_command(xpbd::init_command());
+                    world.enqueue_command(xpbd::spawn_from_json_command("ground", {0, -10}));
                 }
                 // pause / resume
                 if (keyReleased->code == sf::Keyboard::Key::Space)
@@ -278,6 +257,22 @@ int main()
         // ImGui::SliderInt("spatialHashing_cellSize: ", &cellSize, 30, 1000);
         // world.spatialHashAABB.cellSize = cellSize;
         ImGui::SliderInt("Draw thickness", &drawThickness, 1, 10);
+        if(ImGui::SliderInt("targetVelocity", &targetVelocity, -100, 100)){
+            if (world.cluster.angularMotors.size() > 1)
+            {
+                xpbd::update_angularMotor_command motor1;
+                motor1.index = 0;
+                motor1.motor = world.cluster.angularMotors[0];
+                motor1.motor.targetVelocity = targetVelocity;
+                world.enqueue_command(motor1);
+
+                xpbd::update_angularMotor_command motor2;         
+                motor2.index = 1;
+                motor2.motor = world.cluster.angularMotors[1];
+                motor2.motor.targetVelocity = targetVelocity;
+                world.enqueue_command(motor2);
+            }
+        }
 
         ImGui::End();
         ImGui::EndFrame();

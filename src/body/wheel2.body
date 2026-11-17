@@ -3,7 +3,7 @@
   "Particles": [
     { "pos": [0.0, 0.0], "mass": 5, "id": "wheel2" },
 
-    { "pos": [0.400000, 0.000000], "mass": 1 },
+    { "pos": [0.400000, 0.000000], "mass": 1, "id": "wheel2_motor_ref"  },
     { "pos": [0.346410, 0.200000], "mass": 1 },
     { "pos": [0.200000, 0.346410], "mass": 1 },
     { "pos": [0.000000, 0.400000], "mass": 1 },
@@ -77,8 +77,8 @@
       "staticFriction": 0.6,
       "kineticFriction": 0.8,
       "compliance": 0.000005,
-      "layer": 0,
-      "mask": 0
+      "layer": 2,
+      "mask": 1
     }
   ]
 }

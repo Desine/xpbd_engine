@@ -54,15 +54,15 @@ namespace xpbd
         if (reversePass)
         {
             for (auto it = dc.rbegin(); it != dc.rend(); it++)
-                solve_distance_constraint(p, *it, dt);
+                solve_distanceConstraint(p, *it, dt);
         }
         else
         {
             for (auto &c : dc)
-                solve_distance_constraint(p, c, dt);
+                solve_distanceConstraint(p, c, dt);
         }
     }
-    void solve_distance_constraint(Particles &p, DistanceConstraint &dc, float dt)
+    void solve_distanceConstraint(Particles &p, DistanceConstraint &dc, float dt)
     {
         size_t i1 = dc.i1;
         size_t i2 = dc.i2;
@@ -93,7 +93,7 @@ namespace xpbd
         p1 += w1 * correction;
         p2 -= w2 * correction;
     }
-    void apply_distance_constraints_damping(Particles &p, std::vector<DistanceConstraint> &dc, float dt)
+    void apply_distanceConstraints_damping(Particles &p, std::vector<DistanceConstraint> &dc, float dt)
     {
         // does not work
         for (size_t i = 0; i < dc.size(); ++i)
@@ -134,10 +134,10 @@ namespace xpbd
     void solve_angleConstraints(Particles &p, std::vector<AngleConstraint> &ac, float dt)
     {
         for (auto &c : ac)
-            solve_angle_constraint(p, c, dt);
+            solve_angleConstraint(p, c, dt);
     }
 
-    void solve_angle_constraint(Particles &p, AngleConstraint &ac, float dt)
+    void solve_angleConstraint(Particles &p, AngleConstraint &ac, float dt)
     {
         size_t i1 = ac.i1, i2 = ac.i2, i3 = ac.i3, i4 = ac.i4;
 
@@ -202,9 +202,9 @@ namespace xpbd
     void solve_volumeConstraints(Particles &p, std::vector<VolumeConstraint> &vc, float dt)
     {
         for (auto &c : vc)
-            solve_volume_constraint(p, c, dt);
+            solve_volumeConstraint(p, c, dt);
     }
-    void solve_volume_constraint(Particles &p, VolumeConstraint &vc, float dt)
+    void solve_volumeConstraint(Particles &p, VolumeConstraint &vc, float dt)
     {
         std::vector<size_t> &indices = vc.indices;
         size_t N = indices.size();
@@ -247,7 +247,7 @@ namespace xpbd
     void generate_colliderPoints_aabbs(
         std::vector<AABB> &out,
         const Particles &p,
-        const std::vector<ColliderPoints> &colliderPoints)
+        const std::vector<PointsCollider> &colliderPoints)
     {
         out.clear();
         out.reserve(colliderPoints.size());
@@ -460,8 +460,8 @@ namespace xpbd
     }
 
     void apply_pointEdgeCollisionConstraints_kinetic_friction(
-        Particles &p, 
-        std::vector<PointEdgeCollisionConstraints> &pecc, 
+        Particles &p,
+        std::vector<PointEdgeCollisionConstraints> &pecc,
         float dt)
     {
         for (auto &c : pecc)
@@ -528,6 +528,153 @@ namespace xpbd
             Ve0 -= we0 * (1.0f - t) * deltaV;
             Ve1 -= we1 * t * deltaV;
         }
+    }
+
+    bool get_angularData(
+        const Particles &p,
+        size_t i1, size_t i2,
+        size_t i3, size_t i4,
+        AngularData &data)
+    {
+        glm::vec2 dir1 = p.pos[i2] - p.pos[i1];
+        glm::vec2 dir2 = p.pos[i4] - p.pos[i3];
+
+        float len1Sq = glm::dot(dir1, dir1);
+        float len2Sq = glm::dot(dir2, dir2);
+
+        if (len1Sq < 1e-6f || len2Sq < 1e-6f)
+            return false;
+
+        data.grad1 = Utils::perpCCW2d(dir1) / len1Sq;
+        data.grad2 = Utils::perpCCW2d(dir2) / len2Sq;
+
+        data.invI1 =
+            (p.w[i1] + p.w[i2]) *
+            glm::dot(data.grad1, data.grad1);
+
+        data.invI2 =
+            (p.w[i3] + p.w[i4]) *
+            glm::dot(data.grad2, data.grad2);
+
+        data.invI = data.invI1 + data.invI2;
+
+        if (data.invI < 1e-6f)
+            return false;
+
+        data.angle = Utils::relative_angle_rad(dir1, dir2);
+
+        data.omega =
+            glm::dot(p.vel[i4] - p.vel[i3], data.grad2) -
+            glm::dot(p.vel[i2] - p.vel[i1], data.grad1);
+
+        return true;
+    }
+    void apply_angular_velocity_correction(
+        Particles &p,
+        size_t i1, size_t i2,
+        size_t i3, size_t i4,
+        float deltaL)
+    {
+        AngularData data;
+
+        if (!get_angularData(
+                p, i1, i2, i3, i4, data))
+            return;
+
+        float lambda = deltaL / data.invI;
+
+        glm::vec2 correction1 = data.grad1 * lambda;
+        glm::vec2 correction2 = data.grad2 * lambda;
+
+        p.vel[i1] += p.w[i1] * correction1;
+        p.vel[i2] -= p.w[i2] * correction1;
+
+        p.vel[i3] -= p.w[i3] * correction2;
+        p.vel[i4] += p.w[i4] * correction2;
+    }
+    void apply_torque(
+        Particles &p,
+        size_t i1, size_t i2,
+        size_t i3, size_t i4,
+        float torque,
+        float dt)
+    {
+        apply_angular_velocity_correction(
+            p, i1, i2, i3, i4,
+            torque * dt);
+    }
+
+    void solve_angularMotor(
+        Particles &p,
+        const AngularMotor &motor,
+        float dt)
+    {
+        AngularData data;
+
+        if (!get_angularData(
+                p,
+                motor.i1, motor.i2,
+                motor.i3, motor.i4,
+                data))
+            return;
+
+        // Желаемое изменение относительной угловой скорости
+        float deltaOmega = motor.targetVelocity - data.omega;
+
+        // Необходимый угловой импульс
+        float deltaL = deltaOmega / data.invI;
+
+        // Ограничение максимального момента
+        float maxImpulse = motor.maxTorque * dt;
+
+        deltaL = std::clamp(
+            deltaL,
+            -maxImpulse,
+            maxImpulse);
+
+        apply_angular_velocity_correction(
+            p,
+            motor.i1, motor.i2,
+            motor.i3, motor.i4,
+            deltaL);
+    }
+    void solve_angularServo(
+        Particles &p,
+        const AngularServo &servo,
+        float dt)
+    {
+        AngularData data;
+
+        if (!get_angularData(
+                p,
+                servo.i1, servo.i2,
+                servo.i3, servo.i4,
+                data))
+            return;
+
+        // Ошибка угла с учетом перехода через +/- PI
+        float angleError = servo.targetAngle - data.angle;
+
+        angleError = std::atan2(
+            std::sin(angleError),
+            std::cos(angleError));
+
+        // PD-регулятор
+        float torque =
+            servo.kp * angleError -
+            servo.kd * data.omega;
+
+        torque = std::clamp(
+            torque,
+            -servo.maxTorque,
+            servo.maxTorque);
+
+        apply_torque(
+            p,
+            servo.i1, servo.i2,
+            servo.i3, servo.i4,
+            torque,
+            dt);
     }
 
     // Class World
@@ -665,7 +812,7 @@ namespace xpbd
             }
 
             // until polygons_size: polygon/polygon // after: point/polygon
-            std::vector<ColliderPoints> combinedColliderPoints;
+            std::vector<PointsCollider> combinedColliderPoints;
             combinedColliderPoints.reserve(polygons_size + points_size);
             combinedColliderPoints.insert(combinedColliderPoints.end(), cluster.polygonColliders.begin(), cluster.polygonColliders.end());
             combinedColliderPoints.insert(combinedColliderPoints.end(), cluster.pointsColliders.begin(), cluster.pointsColliders.end());
@@ -729,6 +876,21 @@ namespace xpbd
             update_velocities(cluster.particles, substep_time);
             apply_pointEdgeCollisionConstraints_kinetic_friction(cluster.particles, pecc, substep_time);
             // apply_distance_constraints_damping(particles, distanceConstraints, substep_time);
+
+            for (auto &motor : cluster.angularMotors)
+            {
+                solve_angularMotor(
+                    cluster.particles,
+                    motor,
+                    substep_time);
+            }
+            for (auto &servo : cluster.angularServos)
+            {
+                solve_angularServo(
+                    cluster.particles,
+                    servo,
+                    substep_time);
+            }
         }
     }
 
@@ -745,18 +907,20 @@ namespace xpbd
 
         cluster.distanceConstraints.clear();
         cluster.distanceConstraints.reserve(5000);
-
         cluster.angleConstraints.clear();
         cluster.angleConstraints.reserve(5000);
-
         cluster.volumeConstraints.clear();
         cluster.volumeConstraints.reserve(1000);
 
         cluster.polygonColliders.clear();
         cluster.polygonColliders.reserve(1000);
-
         cluster.pointsColliders.clear();
         cluster.pointsColliders.reserve(1000);
+
+        cluster.angularMotors.clear();
+        cluster.angularMotors.reserve(100);
+        cluster.angularServos.clear();
+        cluster.angularServos.reserve(100);
 
         // polygonColliders_aabbs.reserve(1000);
         // pointsColliders_aabbs.reserve(1000);
@@ -790,14 +954,14 @@ namespace xpbd
         merge_clusters(cluster, clusterAdd);
     }
 
-    void World::enqueue_command(Commands::Command variant)
+    void World::enqueue_command(Command variant)
     {
         std::lock_guard<std::mutex> lk(commandQueueMutex);
         commandQueue.push(variant);
     }
     void World::execute_enqueued_commands()
     {
-        std::queue<Commands::Command> local;
+        std::queue<Command> local;
         {
             std::lock_guard<std::mutex> lk(commandQueueMutex);
             std::swap(local, commandQueue);
@@ -805,32 +969,44 @@ namespace xpbd
 
         while (!local.empty())
         {
-            Commands::Command cmd = std::move(local.front());
+            Command cmd = std::move(local.front());
             local.pop();
 
             std::visit([this](auto &&arg)
                        {
                     using T = std::decay_t<decltype(arg)>;
 
-                    if constexpr (std::is_same_v<T, Commands::init>)
+                    if constexpr (std::is_same_v<T, init_command>)
                         init();
-                    else if constexpr (std::is_same_v<T, Commands::set_tickRate>)
+                    else if constexpr (std::is_same_v<T, set_tickRate_command>)
                         set_tickRate(arg.tickRate);
-                    else if constexpr (std::is_same_v<T, Commands::add_particle>)
+                    else if constexpr (std::is_same_v<T, add_particle_command>)
                         add_particle(cluster, arg.pos, arg.mass, arg.vel);
-                    else if constexpr (std::is_same_v<T, Commands::add_distance_constraint>)
-                        add_distance_constraint(cluster, arg.i1, arg.i2, arg.compliance, arg.restDist);
-                    else if constexpr (std::is_same_v<T, Commands::add_volume_constraint>)
-                        add_volume_constraint(cluster, arg.indices, arg.compliance, arg.restPressure);
-                    else if constexpr (std::is_same_v<T, Commands::add_polygon_collider>)
-                        add_polygon_collider(cluster, arg.indices, arg.staticFriction, arg.kineticFriction,
-                                            arg.compliance, arg.layer, arg.mask);
-                    else if constexpr (std::is_same_v<T, Commands::add_points_collider>)
-                        add_points_collider(cluster, arg.indices, arg.staticFriction, arg.kineticFriction,
-                                            arg.compliance, arg.layer, arg.mask);
-                    else if constexpr (std::is_same_v<T, Commands::spawn_from_json>)
+                    else if constexpr (std::is_same_v<T, add_distanceConstraint_command>)
+                        add_distanceConstraint(cluster, arg.constraint.i1, arg.constraint.i2, arg.constraint.compliance, arg.constraint.restDist);
+                    else if constexpr (std::is_same_v<T, add_volumeConstraint_command>)
+                        add_volumeConstraint(cluster, arg.constraint.indices, arg.constraint.compliance, arg.constraint.restVolume);
+                    
+                        else if constexpr (std::is_same_v<T, add_polygonCollider_command>)
+                        add_polygonCollider(cluster, arg.collider.indices, arg.collider.staticFriction, arg.collider.kineticFriction,
+                                            arg.collider.compliance, arg.collider.layer, arg.collider.mask);
+                    else if constexpr (std::is_same_v<T, add_pointsCollider_command>)
+                        add_pointsCollider(cluster, arg.collider.indices, arg.collider.staticFriction, arg.collider.kineticFriction,
+                                            arg.collider.compliance, arg.collider.layer, arg.collider.mask);
+
+                    else if constexpr (std::is_same_v<T, add_angularMotor_command>)
+                        add_angularMotor(cluster, arg.motor.i1, arg.motor.i2, arg.motor.i3, arg.motor.i4, arg.motor.targetVelocity, arg.motor.maxTorque);
+                    else if constexpr (std::is_same_v<T, update_angularMotor_command>)
+                        update_angularMotor(cluster, arg.index, arg.motor.targetVelocity, arg.motor.maxTorque);
+                    
+                    else if constexpr (std::is_same_v<T, add_angularServo_command>)
+                        add_angularServo(cluster, arg.servo.i1, arg.servo.i2, arg.servo.i3, arg.servo.i4, arg.servo.targetAngle, arg.servo.kp, arg.servo.kd, arg.servo.maxTorque);            
+                    else if constexpr (std::is_same_v<T, update_angularServo_command>)
+                        update_angularServo(cluster, arg.index, arg.servo.targetAngle, arg.servo.kp, arg.servo.kd, arg.servo.maxTorque);
+                        
+                    else if constexpr (std::is_same_v<T, spawn_from_json_command>)
                         spawn_from_json(arg.name, arg.position);
-                    else if constexpr (std::is_same_v<T, Commands::spawn_polygon>)
+                    else if constexpr (std::is_same_v<T, spawn_polygon_command>)
                         spawn_polygon(arg.pos, arg.radius, arg.segments, arg.mass, arg.compliance); }, cmd);
         }
     }
@@ -853,7 +1029,7 @@ namespace xpbd
 
         // Distance constraints
         into.distanceConstraints.reserve(into.distanceConstraints.size() + from.distanceConstraints.size());
-        for (auto dc : from.distanceConstraints)
+        for (auto &dc : from.distanceConstraints)
         {
             dc.i1 += offset;
             dc.i2 += offset;
@@ -862,7 +1038,7 @@ namespace xpbd
 
         // Angle constraints
         into.angleConstraints.reserve(into.angleConstraints.size() + from.angleConstraints.size());
-        for (auto ac : from.angleConstraints)
+        for (auto &ac : from.angleConstraints)
         {
             ac.i1 += offset;
             ac.i2 += offset;
@@ -873,29 +1049,51 @@ namespace xpbd
 
         // Volume constraints
         into.volumeConstraints.reserve(into.volumeConstraints.size() + from.volumeConstraints.size());
-        for (auto vc : from.volumeConstraints)
+        for (auto &vc : from.volumeConstraints)
         {
             for (auto &idx : vc.indices)
                 idx += offset;
-            into.volumeConstraints.push_back(std::move(vc));
+            into.volumeConstraints.push_back(vc);
         }
 
         // Polygon colliders
         into.polygonColliders.reserve(into.polygonColliders.size() + from.polygonColliders.size());
-        for (auto pc : from.polygonColliders)
+        for (auto &pc : from.polygonColliders)
         {
             for (auto &idx : pc.indices)
                 idx += offset;
-            into.polygonColliders.push_back(std::move(pc));
+            into.polygonColliders.push_back(pc);
         }
 
         // Points colliders
         into.pointsColliders.reserve(into.pointsColliders.size() + from.pointsColliders.size());
-        for (auto pc : from.pointsColliders)
+        for (auto &pc : from.pointsColliders)
         {
             for (auto &idx : pc.indices)
                 idx += offset;
-            into.pointsColliders.push_back(std::move(pc));
+            into.pointsColliders.push_back(pc);
+        }
+
+        // Angular motors
+        into.angularMotors.reserve(into.angularMotors.size() + from.angularMotors.size());
+        for (auto &am : from.angularMotors)
+        {
+            am.i1 += offset;
+            am.i2 += offset;
+            am.i3 += offset;
+            am.i4 += offset;
+            into.angularMotors.push_back(am);
+        }
+
+        // Angular servos
+        into.angularServos.reserve(into.angularServos.size() + from.angularServos.size());
+        for (auto &as : from.angularServos)
+        {
+            as.i1 += offset;
+            as.i2 += offset;
+            as.i3 += offset;
+            as.i4 += offset;
+            into.angularServos.push_back(as);
         }
 
         from = Cluster();
@@ -914,11 +1112,11 @@ namespace xpbd
         cluster.particles.w.emplace_back(w);
     }
 
-    void add_distance_constraint(Cluster &cluster, size_t i1, size_t i2, float compliance)
+    void add_distanceConstraint(Cluster &cluster, size_t i1, size_t i2, float compliance)
     {
-        add_distance_constraint(cluster, i1, i2, compliance, glm::distance(cluster.particles.pos[i1], cluster.particles.pos[i2]));
+        add_distanceConstraint(cluster, i1, i2, compliance, glm::distance(cluster.particles.pos[i1], cluster.particles.pos[i2]));
     }
-    void add_distance_constraint(Cluster &cluster, size_t i1, size_t i2, float compliance, float restDist)
+    void add_distanceConstraint(Cluster &cluster, size_t i1, size_t i2, float compliance, float restDist)
     {
         float compressionDamping = 0.5f;
         float extensionDamping = 0.5f;
@@ -926,7 +1124,7 @@ namespace xpbd
         cluster.distanceConstraints.emplace_back(i1, i2, restDist, compressionDamping, extensionDamping, compliance, lambda);
     }
 
-    void add_angle_constraint(Cluster &cluster, size_t i1, size_t i2, size_t i3, size_t i4, float compliance)
+    void add_angleConstraint(Cluster &cluster, size_t i1, size_t i2, size_t i3, size_t i4, float compliance)
     {
         glm::vec2 v1 = cluster.particles.pos[i1];
         glm::vec2 v2 = cluster.particles.pos[i2];
@@ -934,34 +1132,82 @@ namespace xpbd
         glm::vec2 v4 = cluster.particles.pos[i4];
 
         float restAngle = Utils::relative_angle_rad(v2 - v1, v4 - v3);
-        add_angle_constraint(cluster, i1, i2, i3, i4, compliance, restAngle);
+        add_angleConstraint(cluster, i1, i2, i3, i4, compliance, restAngle);
     }
-    void add_angle_constraint(Cluster &cluster, size_t i1, size_t i2, size_t i3, size_t i4, float compliance, float restAngle)
+    void add_angleConstraint(Cluster &cluster, size_t i1, size_t i2, size_t i3, size_t i4, float compliance, float restAngle)
     {
         float lambda = 0;
         cluster.angleConstraints.emplace_back(i1, i2, i3, i4, compliance, restAngle, lambda);
     }
 
-    void add_volume_constraint(Cluster &cluster, const std::vector<size_t> &indices, float compliance)
+    void add_volumeConstraint(Cluster &cluster, const std::vector<size_t> &indices, float compliance)
     {
         float restVolume = compute_polygon_area(cluster.particles, indices);
         float lambda = 0;
         cluster.volumeConstraints.emplace_back(indices, restVolume, compliance, lambda);
     }
-    void add_volume_constraint(Cluster &cluster, const std::vector<size_t> &indices, float compliance, float restPressure)
+    void add_volumeConstraint(Cluster &cluster, const std::vector<size_t> &indices, float compliance, float restVolume)
     {
-        float restVolume = compute_polygon_area(cluster.particles, indices) * restPressure;
         float lambda = 0;
         cluster.volumeConstraints.emplace_back(indices, restVolume, compliance, lambda);
     }
-    void add_polygon_collider(Cluster &cluster, const std::vector<size_t> &indices, float staticFriction, float kineticFriction, float compliance, int8_t layer, int8_t mask)
+    void add_polygonCollider(Cluster &cluster, const std::vector<size_t> &indices, float staticFriction, float kineticFriction, float compliance, int8_t layer, int8_t mask)
     {
         cluster.polygonColliders.emplace_back(indices, staticFriction, kineticFriction, compliance, layer, mask);
     }
-    void add_points_collider(Cluster &cluster, const std::vector<size_t> &indices, float staticFriction, float kineticFriction, float compliance, int8_t layer, int8_t mask)
+    void add_pointsCollider(Cluster &cluster, const std::vector<size_t> &indices, float staticFriction, float kineticFriction, float compliance, int8_t layer, int8_t mask)
     {
         cluster.pointsColliders.emplace_back(indices, staticFriction, kineticFriction, compliance, layer, mask);
     }
+    void add_angularMotor(
+        Cluster &cluster,
+        size_t i1, size_t i2,
+        size_t i3, size_t i4,
+        float targetVelocity,
+        float maxTorque)
+    {
+        cluster.angularMotors.emplace_back(i1, i2, i3, i4, targetVelocity, maxTorque);
+    }
+    void update_angularMotor(
+        Cluster &cluster,
+        size_t index,
+        float targetVelocity,
+        float maxTorque)
+    {
+        if (index >= cluster.angularMotors.size())
+            return;
+
+        cluster.angularMotors[index].targetVelocity = targetVelocity;
+        cluster.angularMotors[index].maxTorque = maxTorque;
+    }
+    void add_angularServo(
+        Cluster &cluster,
+        size_t i1, size_t i2,
+        size_t i3, size_t i4,
+        float targetAngle,
+        float kp,
+        float kd,
+        float maxTorque)
+    {
+        cluster.angularServos.emplace_back(i1, i2, i3, i4, targetAngle, kp, kd, maxTorque);
+    }
+    void update_angularServo(
+        Cluster &cluster,
+        size_t index,
+        float targetAngle,
+        float kp,
+        float kd,
+        float maxTorque)
+    {
+        if (index >= cluster.angularServos.size())
+            return;
+
+        cluster.angularServos[index].targetAngle = targetAngle;
+        cluster.angularServos[index].kp = kp;
+        cluster.angularServos[index].kd = kd;
+        cluster.angularServos[index].maxTorque = maxTorque;
+    }
+
     void spawn_from_json(Cluster &cluster, const std::string &name, const glm::vec2 &position)
     {
         json_body_loader::load(cluster, name, position);
@@ -987,11 +1233,11 @@ namespace xpbd
 
         for (int i = 0; i < segments; ++i)
         {
-            add_distance_constraint(cluster, start + i, start + (i + 1) % segments, compliance);
-            add_angle_constraint(cluster, start + i, start + (i + 1) % segments, start + (i + 1) % segments, start + (i + 2) % segments, compliance);
+            add_distanceConstraint(cluster, start + i, start + (i + 1) % segments, compliance);
+            add_angleConstraint(cluster, start + i, start + (i + 1) % segments, start + (i + 1) % segments, start + (i + 2) % segments, compliance);
         }
 
-        add_volume_constraint(cluster, ids, compliance);
+        add_volumeConstraint(cluster, ids, compliance);
 
         float staticFriction = 0.4f;
         float kineticFriction = 0.3f;
@@ -999,7 +1245,7 @@ namespace xpbd
         int8_t layer = 1;
         int8_t mask = 1;
 
-        add_polygon_collider(cluster, ids, staticFriction, kineticFriction, 0.0001f, layer, mask);
+        add_polygonCollider(cluster, ids, staticFriction, kineticFriction, 0.0f, layer, mask);
     }
 
 }
