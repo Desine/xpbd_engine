@@ -139,7 +139,8 @@ namespace xpbd
 
     void solve_angleConstraint(Particles &p, AngleConstraint &ac, float dt)
     {
-        size_t i1 = ac.i1, i2 = ac.i2, i3 = ac.i3, i4 = ac.i4;
+        size_t i1 = ac.i1, i2 = ac.i2;
+        size_t i3 = ac.i3, i4 = ac.i4;
 
         glm::vec2 dir1 = p.pos[i2] - p.pos[i1];
         glm::vec2 dir2 = p.pos[i4] - p.pos[i3];
@@ -149,13 +150,30 @@ namespace xpbd
         if (len1Sq < 1e-6f || len2Sq < 1e-6f)
             return;
 
-        float C = Utils::relative_angle_rad(dir1, dir2) - ac.restAngle;
-        C = std::atan2(std::sin(C), std::cos(C));
+        float angle = Utils::relative_angle_rad(dir1, dir2);
+        angle = std::atan2(std::sin(angle), std::cos(angle));
+
+        float minAngle = std::atan2(std::sin(ac.minAngle), std::cos(ac.minAngle));
+        float maxAngle = std::atan2(std::sin(ac.maxAngle), std::cos(ac.maxAngle));
+
+        float C = 0.0f;
+
+        if (angle < minAngle)
+            C = angle - minAngle;
+        else if (angle > maxAngle)
+            C = angle - maxAngle;
+        else
+        {
+            // Inside allowed range
+            ac.lambda = 0.0f;
+            return;
+        }
 
         glm::vec2 grad1 = Utils::perpCCW2d(dir1) / len1Sq;
         glm::vec2 grad2 = Utils::perpCCW2d(dir2) / len2Sq;
 
-        float w1 = p.w[i1], w2 = p.w[i2], w3 = p.w[i3], w4 = p.w[i4];
+        float w1 = p.w[i1], w2 = p.w[i2];
+        float w3 = p.w[i3], w4 = p.w[i4];
 
         float alphaTilde = ac.compliance / (dt * dt);
         float denom =
@@ -685,8 +703,10 @@ namespace xpbd
     }
     World::~World()
     {
-        std::lock_guard<std::mutex> lk(updateMutex);
-        updateState = UpdateState::Stopped;
+        {
+            std::lock_guard<std::mutex> lk(updateMutex);
+            updateState = UpdateState::Stopped;
+        }
         updateCv.notify_all();
         if (updateThread.joinable())
             updateThread.join();
@@ -696,6 +716,7 @@ namespace xpbd
     {
         std::lock_guard<std::mutex> lk(updateMutex);
         updateState = UpdateState::Paused;
+        updateCv.notify_all();
     }
 
     void World::resume_update()
@@ -711,6 +732,13 @@ namespace xpbd
         std::lock_guard<std::mutex> lk(updateMutex);
         updateState = UpdateState::StepOnce;
         nextUpdateTimePoint = std::chrono::steady_clock::now();
+        updateCv.notify_all();
+    }
+
+    void World::stop_update()
+    {
+        std::lock_guard<std::mutex> lk(updateMutex);
+        updateState = UpdateState::Stopped;
         updateCv.notify_all();
     }
 
@@ -984,10 +1012,12 @@ namespace xpbd
                         add_particle(cluster, arg.pos, arg.mass, arg.vel);
                     else if constexpr (std::is_same_v<T, add_distanceConstraint_command>)
                         add_distanceConstraint(cluster, arg.constraint.i1, arg.constraint.i2, arg.constraint.compliance, arg.constraint.restDist);
+                    else if constexpr (std::is_same_v<T, add_angleConstraint_command>)
+                        add_angleConstraint(cluster, arg.constraint.i1, arg.constraint.i2, arg.constraint.i3, arg.constraint.i4, arg.constraint.compliance, arg.constraint.minAngle, arg.constraint.maxAngle);
                     else if constexpr (std::is_same_v<T, add_volumeConstraint_command>)
                         add_volumeConstraint(cluster, arg.constraint.indices, arg.constraint.compliance, arg.constraint.restVolume);
                     
-                        else if constexpr (std::is_same_v<T, add_polygonCollider_command>)
+                    else if constexpr (std::is_same_v<T, add_polygonCollider_command>)
                         add_polygonCollider(cluster, arg.collider.indices, arg.collider.staticFriction, arg.collider.kineticFriction,
                                             arg.collider.compliance, arg.collider.layer, arg.collider.mask);
                     else if constexpr (std::is_same_v<T, add_pointsCollider_command>)
@@ -1132,12 +1162,18 @@ namespace xpbd
         glm::vec2 v4 = cluster.particles.pos[i4];
 
         float restAngle = Utils::relative_angle_rad(v2 - v1, v4 - v3);
-        add_angleConstraint(cluster, i1, i2, i3, i4, compliance, restAngle);
+        float lambda = 0;
+        cluster.angleConstraints.emplace_back(i1, i2, i3, i4, restAngle, restAngle, compliance, lambda);
     }
     void add_angleConstraint(Cluster &cluster, size_t i1, size_t i2, size_t i3, size_t i4, float compliance, float restAngle)
     {
         float lambda = 0;
-        cluster.angleConstraints.emplace_back(i1, i2, i3, i4, compliance, restAngle, lambda);
+        cluster.angleConstraints.emplace_back(i1, i2, i3, i4, restAngle, restAngle, compliance, lambda);
+    }
+    void add_angleConstraint(Cluster &cluster, size_t i1, size_t i2, size_t i3, size_t i4, float compliance, float minAngle, float maxAngle)
+    {
+        float lambda = 0;
+        cluster.angleConstraints.emplace_back(i1, i2, i3, i4, minAngle, maxAngle, compliance, lambda);
     }
 
     void add_volumeConstraint(Cluster &cluster, const std::vector<size_t> &indices, float compliance)
@@ -1234,7 +1270,7 @@ namespace xpbd
         for (int i = 0; i < segments; ++i)
         {
             add_distanceConstraint(cluster, start + i, start + (i + 1) % segments, compliance);
-            add_angleConstraint(cluster, start + i, start + (i + 1) % segments, start + (i + 1) % segments, start + (i + 2) % segments, compliance);
+            // add_angleConstraint(cluster, start + i, start + (i + 1) % segments, start + (i + 1) % segments, start + (i + 2) % segments, compliance);
         }
 
         add_volumeConstraint(cluster, ids, compliance);

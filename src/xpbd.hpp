@@ -37,8 +37,9 @@ namespace xpbd
     {
         size_t i1, i2;
         size_t i3, i4;
+        float minAngle;
+        float maxAngle;
         float compliance;
-        float restAngle;
         float lambda;
     };
     struct VolumeConstraint
@@ -48,6 +49,7 @@ namespace xpbd
         float compliance;
         float lambda;
     };
+    
     struct PointsCollider
     {
         std::vector<size_t> indices;
@@ -152,7 +154,10 @@ namespace xpbd
     {
         DistanceConstraint constraint;
     };
-
+    struct add_angleConstraint_command
+    {
+        AngleConstraint constraint;
+    };
     struct add_volumeConstraint_command
     {
         VolumeConstraint constraint;
@@ -272,6 +277,7 @@ namespace xpbd
         void pause_update();
         void resume_update();
         void step_once_update();
+        void stop_update();
 
         void init();
 
@@ -290,6 +296,7 @@ namespace xpbd
     void add_distanceConstraint(Cluster &cluster, size_t i1, size_t i2, float compliance, float restDist);
     void add_angleConstraint(Cluster &cluster, size_t i1, size_t i2, size_t i3, size_t i4, float compliance);
     void add_angleConstraint(Cluster &cluster, size_t i1, size_t i2, size_t i3, size_t i4, float compliance, float restAngle);
+    void add_angleConstraint(Cluster &cluster, size_t i1, size_t i2, size_t i3, size_t i4, float compliance, float minAngle, float maxAngle);
     void add_volumeConstraint(Cluster &cluster, const std::vector<size_t> &indices, float compliance);
     void add_volumeConstraint(Cluster &cluster, const std::vector<size_t> &indices, float compliance, float restPressure);
 

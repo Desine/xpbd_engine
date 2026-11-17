@@ -31,17 +31,17 @@
       {"i1": 8, "i2": 10, "compliance": 0.0}
   ],
   "AngleConstraints": [
-      {"i1": 0, "i2": 1, "i3": 1, "i4": 2, "compliance": 0.01},
+      {"i1": 0, "i2": 1, "i3": 1, "i4": 2, "compliance": 0.001, "minAngle": -20,"maxAngle": 20},
 
       {"i1": 1, "i2": 0, "i3": 0, "i4": 3, "compliance": 0.0005, "restAngle": 20},
       {"i1": 1, "i2": 0, "i3": 0, "i4": 4, "compliance": 0.0005, "restAngle": -20},
-      {"i1": 0, "i2": 3, "i3": 3, "i4": 5, "compliance": 0.001, "restAngle": 20},
-      {"i1": 0, "i2": 4, "i3": 4, "i4": 6, "compliance": 0.001, "restAngle": -20},
+      {"i1": 0, "i2": 3, "i3": 3, "i4": 5, "compliance": 0.001, "minAngle": -10,"maxAngle": 20},
+      {"i1": 0, "i2": 4, "i3": 4, "i4": 6, "compliance": 0.001, "minAngle": -20,"maxAngle": 10},
 
       {"i1": 1, "i2": 0, "i3": 1, "i4": 7, "compliance": 0.0001, "restAngle": -90},
       {"i1": 1, "i2": 0, "i3": 1, "i4": 8, "compliance": 0.0001, "restAngle": 90},
-      {"i1": 1, "i2": 7, "i3": 7, "i4": 9, "compliance": 0.0001, "restAngle": -80},
-      {"i1": 1, "i2": 8, "i3": 8, "i4": 10, "compliance": 0.0001, "restAngle": 80}
+      {"i1": 1, "i2": 7, "i3": 7, "i4": 9, "compliance": 0.0001, "minAngle": -100,"maxAngle": -70},
+      {"i1": 1, "i2": 8, "i3": 8, "i4": 10, "compliance": 0.0001, "minAngle": 70,"maxAngle": 100}
   ],
   "PointsColliders": [
     {

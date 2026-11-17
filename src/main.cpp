@@ -167,6 +167,8 @@ int main()
                     float spacingY = 2;
                     spawn_many(world, position, amountX, amountY, spacingX, spacingY, "balloon");
                 }
+                if (keyReleased->code == sf::Keyboard::Key::Z)
+                    world.enqueue_command(xpbd::spawn_from_json_command("wheel", position));
                 if (keyReleased->code == sf::Keyboard::Key::C)
                 {
                     size_t amountX = 10;
@@ -182,7 +184,7 @@ int main()
                             const float radius = 0.2f;
                             const size_t segments = 6;
                             const float mass = 10;
-                            const float compliance = 0.0001f;
+                            const float compliance = 0.0f;
                             world.enqueue_command(xpbd::spawn_polygon_command({x, y}, radius, segments, mass, compliance));
                         }
                     }
@@ -197,7 +199,7 @@ int main()
                     float radius = 0.2f;
                     size_t segments = 6;
                     float mass = 5;
-                    float compliance = 0.001f;
+                    float compliance = 0.0f;
                     world.enqueue_command(xpbd::spawn_polygon_command(position, radius, segments, mass, compliance));
                 }
                 if (keyReleased->code == sf::Keyboard::Key::F)
@@ -302,6 +304,7 @@ int main()
         ImGui::SFML::Render(renderer::window);
         renderer::window.display();
     }
+    world.stop_update();
 
     ImGui::SFML::Shutdown();
     renderer::window.close();

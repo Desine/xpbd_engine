@@ -24,13 +24,15 @@ std::optional<size_t> get_index_by_id(xpbd::Cluster &cluster, std::string id)
 
 size_t get_index(xpbd::Cluster &cluster, const nlohmann::json_abi_v3_11_3::json &element, size_t base_index)
 {
+    size_t index = 0;
     if (element.is_string())
     {
         if (auto idFound = get_index_by_id(cluster, element.get<std::string>()))
-            return idFound.value();
+            index = idFound.value();
     }
     else
-        return element.get<size_t>() + base_index;
+        index = element.get<size_t>() + base_index;
+    return index;
 }
 
 bool json_body_loader::load(xpbd::Cluster &cluster, const std::string &filename, glm::vec2 offset = {0.0f, 0.0f})
@@ -103,8 +105,14 @@ bool json_body_loader::load(xpbd::Cluster &cluster, const std::string &filename,
             size_t i3 = get_index(cluster, ac["i3"], base_index);
             size_t i4 = get_index(cluster, ac["i4"], base_index);
             float compliance = ac.value("compliance", 0.0f);
-            if (ac.contains("restAngle"))
-                xpbd::add_angleConstraint(cluster, i1, i2, i3, i4, compliance, glm::radians(ac["restAngle"].get<float>()));
+            if (ac.contains("minAngle") && ac.contains("maxAngle"))
+            {
+                float minAngle = glm::radians(ac.value("minAngle", 0.0f));
+                float maxAngle = glm::radians(ac.value("maxAngle", 0.0f));
+                xpbd::add_angleConstraint(cluster, i1, i2, i3, i4, compliance, minAngle, maxAngle);
+            }
+            else if (ac.contains("restAngle"))
+                xpbd::add_angleConstraint(cluster, i1, i2, i3, i4, compliance, glm::radians(ac.value("restAngle", 0.0f)));
             else
                 xpbd::add_angleConstraint(cluster, i1, i2, i3, i4, compliance);
         }
