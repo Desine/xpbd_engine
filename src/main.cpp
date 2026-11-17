@@ -269,13 +269,13 @@ int main()
                 xpbd::update_angularMotor_command motor1;
                 motor1.index = 0;
                 motor1.motor = world.cluster.angularMotors[0];
-                motor1.motor.targetVelocity = targetVelocity;
+                motor1.motor.targetRPM = targetVelocity;
                 world.enqueue_command(motor1);
 
                 xpbd::update_angularMotor_command motor2;
                 motor2.index = 1;
                 motor2.motor = world.cluster.angularMotors[1];
-                motor2.motor.targetVelocity = targetVelocity;
+                motor2.motor.targetRPM = targetVelocity;
                 world.enqueue_command(motor2);
             }
         }
@@ -308,7 +308,6 @@ int main()
         ImGui::SFML::Render(renderer::window);
         renderer::window.display();
     }
-    world.stop_update();
 
     ImGui::SFML::Shutdown();
     renderer::window.close();

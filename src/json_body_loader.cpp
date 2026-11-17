@@ -12,7 +12,6 @@ inline glm::vec2 get_vec2(const nlohmann::json &p, const char *key, glm::vec2 de
     auto j = p.value(key, nlohmann::json::array({def.x, def.y}));
     return {j[0].get<float>(), j[1].get<float>()};
 }
-
 std::optional<size_t> get_index_by_id(xpbd::Cluster &cluster, std::string id)
 {
     auto result = std::find_if(cluster.particleIds.begin(), cluster.particleIds.end(), [&id](const auto &p)
@@ -21,7 +20,6 @@ std::optional<size_t> get_index_by_id(xpbd::Cluster &cluster, std::string id)
         return result->second;
     return std::nullopt;
 }
-
 size_t get_index(xpbd::Cluster &cluster, const nlohmann::json_abi_v3_11_3::json &element, size_t base_index)
 {
     size_t index = 0;
@@ -67,11 +65,12 @@ bool json_body_loader::load(xpbd::Cluster &cluster, const std::string &filename,
     if (j.contains("Particles") && j["Particles"].is_array())
     {
         glm::vec2 j_offset = get_vec2(j, "offset");
+        glm::vec2 j_velocity = get_vec2(j, "velocity");
 
         for (const auto &&[index, p] : std::views::enumerate(j["Particles"]))
         {
             glm::vec2 pos = get_vec2(p, "pos") + offset + j_offset;
-            glm::vec2 vel = get_vec2(p, "vel");
+            glm::vec2 vel = get_vec2(p, "vel") + j_velocity;
             float mass = p.value("mass", 0.0f);
             xpbd::add_particle(cluster, pos, mass, vel);
 
@@ -186,16 +185,13 @@ bool json_body_loader::load(xpbd::Cluster &cluster, const std::string &filename,
             size_t i3 = get_index(cluster, m["i3"], base_index);
             size_t i4 = get_index(cluster, m["i4"], base_index);
 
-            float targetVelocity =
-                m.value("targetVelocity", 0.0f);
-
-            float maxTorque =
-                m.value("maxTorque", 100.0f);
+            float targetRPM = m.value("targetRPM", 0.0f);
+            float maxTorque = m.value("maxTorque", 100.0f);
 
             xpbd::add_angularMotor(
                 cluster,
                 i1, i2, i3, i4,
-                targetVelocity,
+                targetRPM,
                 maxTorque);
         }
     }
@@ -210,17 +206,10 @@ bool json_body_loader::load(xpbd::Cluster &cluster, const std::string &filename,
             size_t i3 = get_index(cluster, s["i3"], base_index);
             size_t i4 = get_index(cluster, s["i4"], base_index);
 
-            float targetAngle =
-                s.value("targetAngle", 0.0f);
-
-            float kp =
-                s.value("kp", 0.0f);
-
-            float kd =
-                s.value("kd", 0.0f);
-
-            float maxTorque =
-                s.value("maxTorque", 0.0f);
+            float targetAngle = glm::radians(s.value("targetAngle", 0.0f));
+            float kp = s.value("kp", 0.0f);
+            float kd = s.value("kd", 0.0f);
+            float maxTorque = s.value("maxTorque", 0.0f);
 
             xpbd::add_angularServo(
                 cluster,

@@ -8,8 +8,8 @@
 
     {"pos": [0, -0.45], "mass": 5},
     {"pos": [0, -0.45], "mass": 5},
-    {"pos": [0, -0.95], "mass": 5, "vel": [2, 0]},
-    {"pos": [0, -0.95], "mass": 5, "vel": [-3, 0]},
+    {"pos": [0, -0.95], "mass": 5},
+    {"pos": [0, -0.95], "mass": 5},
 
     {"pos": [0, 0.35], "mass": 3},
     {"pos": [0, 0.35], "mass": 3},
@@ -33,8 +33,8 @@
   "AngleConstraints": [
       {"i1": 0, "i2": 1, "i3": 1, "i4": 2, "compliance": 0.001, "minAngle": -5,"maxAngle": 5},
 
-      {"i1": 1, "i2": 0, "i3": 0, "i4": 3, "compliance": 0.0005, "minAngle": 10, "maxAngle": 140},
-      {"i1": 1, "i2": 0, "i3": 0, "i4": 4, "compliance": 0.0005, "minAngle": 10, "maxAngle": 140},
+      {"i1": 1, "i2": 0, "i3": 0, "i4": 3, "compliance": 0.0005, "minAngle": -10, "maxAngle": 140},
+      {"i1": 1, "i2": 0, "i3": 0, "i4": 4, "compliance": 0.0005, "minAngle": -10, "maxAngle": 140},
       {"i1": 0, "i2": 3, "i3": 3, "i4": 5, "compliance": 0.001, "minAngle": -130, "maxAngle": 0},
       {"i1": 0, "i2": 4, "i3": 4, "i4": 6, "compliance": 0.001, "minAngle": -130, "maxAngle": 0},
 
@@ -50,5 +50,15 @@
       "kineticFriction": 0.3,
       "compliance": 0.0
     }
+  ],
+  "AngularServos": [
+    {"i1": 1, "i2": 0, "i3": 0, "i4": 3, "targetAngle":  -5, "kp": 1000, "kd": 30, "maxTorque": 1000},
+    {"i1": 1, "i2": 0, "i3": 0, "i4": 4, "targetAngle":  40, "kp": 1000, "kd": 30, "maxTorque": 1000 },
+    {"i1": 0, "i2": 3, "i3": 3, "i4": 5, "targetAngle": -20, "kp": 1000, "kd": 30, "maxTorque": 1000 },
+    {"i1": 0, "i2": 4, "i3": 4, "i4": 6, "targetAngle": -40, "kp": 1000, "kd": 30, "maxTorque": 1000 },
+    {"i1": 1, "i2": 0, "i3": 1, "i4": 7, "targetAngle":   60, "kp":  300, "kd": 30, "maxTorque": 500 },
+    {"i1": 1, "i2": 0, "i3": 1, "i4": 8, "targetAngle":   70, "kp":  300, "kd": 30, "maxTorque": 500 },
+    {"i1": 1, "i2": 7, "i3": 7, "i4": 9, "targetAngle":   80, "kp":  300, "kd": 30, "maxTorque": 500 },
+    {"i1": 1, "i2": 8, "i3": 8, "i4": 10,"targetAngle":   80, "kp":  300, "kd": 30, "maxTorque": 500 }
   ]
 }

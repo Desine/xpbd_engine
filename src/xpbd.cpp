@@ -655,13 +655,12 @@ namespace xpbd
                 data))
             return;
 
-        // Желаемое изменение относительной угловой скорости
-        float deltaOmega = motor.targetVelocity - data.omega;
+        constexpr float RPM_TO_RAD = 2.0f * 3.14159265359f / 60.0f;
 
-        // Необходимый угловой импульс
+        float targetOmega = motor.targetRPM * RPM_TO_RAD;
+
+        float deltaOmega = targetOmega - data.omega;
         float deltaL = deltaOmega / data.invI;
-
-        // Ограничение максимального момента
         float maxImpulse = motor.maxTorque * dt;
 
         deltaL = std::clamp(
@@ -689,14 +688,12 @@ namespace xpbd
                 data))
             return;
 
-        // Ошибка угла с учетом перехода через +/- PI
         float angleError = servo.targetAngle - data.angle;
 
         angleError = std::atan2(
             std::sin(angleError),
             std::cos(angleError));
 
-        // PD-регулятор
         float torque =
             servo.kp * angleError -
             servo.kd * data.omega;
@@ -769,8 +766,9 @@ namespace xpbd
         while (updateState != UpdateState::Stopped)
         {
             updateCv.wait(update_lk, [this]
-                          { return updateState != UpdateState::Paused &&
-                                   updateState != UpdateState::Stopped; });
+                          { return updateState == UpdateState::Running ||
+                                   updateState == UpdateState::StepOnce ||
+                                   updateState == UpdateState::Stopped; });
             if (updateState == UpdateState::Stopped)
                 break;
 
@@ -794,8 +792,7 @@ namespace xpbd
 
             nextUpdateTimePoint += deltaTick;
             updateCv.wait_until(update_lk, nextUpdateTimePoint, [this]
-                                { return updateState != UpdateState::Running &&
-                                         updateState != UpdateState::Stopped; });
+                                { return updateState != UpdateState::Running; });
         }
     }
 
@@ -1044,9 +1041,9 @@ namespace xpbd
                                             arg.collider.compliance, arg.collider.layer, arg.collider.mask);
 
                     else if constexpr (std::is_same_v<T, add_angularMotor_command>)
-                        add_angularMotor(cluster, arg.motor.i1, arg.motor.i2, arg.motor.i3, arg.motor.i4, arg.motor.targetVelocity, arg.motor.maxTorque);
+                        add_angularMotor(cluster, arg.motor.i1, arg.motor.i2, arg.motor.i3, arg.motor.i4, arg.motor.targetRPM, arg.motor.maxTorque);
                     else if constexpr (std::is_same_v<T, update_angularMotor_command>)
-                        update_angularMotor(cluster, arg.index, arg.motor.targetVelocity, arg.motor.maxTorque);
+                        update_angularMotor(cluster, arg.index, arg.motor.targetRPM, arg.motor.maxTorque);
                     
                     else if constexpr (std::is_same_v<T, add_angularServo_command>)
                         add_angularServo(cluster, arg.servo.i1, arg.servo.i2, arg.servo.i3, arg.servo.i4, arg.servo.targetAngle, arg.servo.kp, arg.servo.kd, arg.servo.maxTorque);            
@@ -1232,7 +1229,7 @@ namespace xpbd
         if (index >= cluster.angularMotors.size())
             return;
 
-        cluster.angularMotors[index].targetVelocity = targetVelocity;
+        cluster.angularMotors[index].targetRPM = targetVelocity;
         cluster.angularMotors[index].maxTorque = maxTorque;
     }
     void add_angularServo(

@@ -49,7 +49,7 @@ namespace xpbd
         float compliance;
         float lambda;
     };
-    
+
     struct PointsCollider
     {
         std::vector<size_t> indices;
@@ -108,7 +108,7 @@ namespace xpbd
     {
         size_t i1, i2;
         size_t i3, i4;
-        float targetVelocity;
+        float targetRPM;
         float maxTorque;
     };
     struct AngularServo
