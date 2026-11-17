@@ -12,7 +12,7 @@
     {
       "indices": [0, 1, 2, 3, 4, 5],
       "staticFriction": 0.1,
-      "kineticFriction": 0.3,
+      "kineticFriction": 0.1,
       "compliance": 0.0
     }
   ]

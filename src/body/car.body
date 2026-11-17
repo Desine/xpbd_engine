@@ -53,7 +53,7 @@
   "PolygonColliders": [
     {
       "indices": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-      "staticFriction": 0.2,
+      "staticFriction": 0.1,
       "kineticFriction": 0.3,
       "compliance": 0.000001,
       "layer": 2,
