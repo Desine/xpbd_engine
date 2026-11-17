@@ -216,8 +216,11 @@ int main()
                 // pause / resume
                 if (keyReleased->code == sf::Keyboard::Key::Space)
                 {
-                    paused ? world.resume_update() : world.pause_update();
-                    paused = !paused;
+                    if (world.updateState == xpbd::World::UpdateState::Paused || world.updateState == xpbd::World::UpdateState::StepOnce)
+                        world.resume_update();
+                    else
+                        world.pause_update();
+                    paused = world.updateState == xpbd::World::UpdateState::Paused;
                 }
             }
         }
@@ -259,7 +262,8 @@ int main()
         // ImGui::SliderInt("spatialHashing_cellSize: ", &cellSize, 30, 1000);
         // world.spatialHashAABB.cellSize = cellSize;
         ImGui::SliderInt("Draw thickness", &drawThickness, 1, 10);
-        if(ImGui::SliderInt("targetVelocity", &targetVelocity, -100, 100)){
+        if (ImGui::SliderInt("targetVelocity", &targetVelocity, -100, 100))
+        {
             if (world.cluster.angularMotors.size() > 1)
             {
                 xpbd::update_angularMotor_command motor1;
@@ -268,7 +272,7 @@ int main()
                 motor1.motor.targetVelocity = targetVelocity;
                 world.enqueue_command(motor1);
 
-                xpbd::update_angularMotor_command motor2;         
+                xpbd::update_angularMotor_command motor2;
                 motor2.index = 1;
                 motor2.motor = world.cluster.angularMotors[1];
                 motor2.motor.targetVelocity = targetVelocity;

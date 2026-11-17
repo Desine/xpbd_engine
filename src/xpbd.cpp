@@ -150,24 +150,43 @@ namespace xpbd
         if (len1Sq < 1e-6f || len2Sq < 1e-6f)
             return;
 
+        constexpr float TWO_PI = M_PI * 2.0f;
         float angle = Utils::relative_angle_rad(dir1, dir2);
-        angle = std::atan2(std::sin(angle), std::cos(angle));
+        if (angle < 0.0f)
+            angle += TWO_PI;
 
-        float minAngle = std::atan2(std::sin(ac.minAngle), std::cos(ac.minAngle));
-        float maxAngle = std::atan2(std::sin(ac.maxAngle), std::cos(ac.maxAngle));
+        float minAngle = std::fmod(ac.minAngle, TWO_PI);
+        float maxAngle = std::fmod(ac.maxAngle, TWO_PI);
 
-        float C = 0.0f;
+        if (minAngle < 0.0f)
+            minAngle += TWO_PI;
+        if (maxAngle < 0.0f)
+            maxAngle += TWO_PI;
 
-        if (angle < minAngle)
-            C = angle - minAngle;
-        else if (angle > maxAngle)
-            C = angle - maxAngle;
+        bool inside;
+        if (minAngle <= maxAngle)
+            inside = angle >= minAngle && angle <= maxAngle;
         else
+            inside = angle >= minAngle || angle <= maxAngle;
+        if (inside)
         {
-            // Inside allowed range
             ac.lambda = 0.0f;
             return;
         }
+
+        auto signedAngleDiff = [&](float a, float b)
+        {
+            return std::atan2(std::sin(a - b), std::cos(a - b));
+        };
+
+        float diffMin = signedAngleDiff(angle, minAngle);
+        float diffMax = signedAngleDiff(angle, maxAngle);
+
+        float C;
+        if (std::abs(diffMin) < std::abs(diffMax))
+            C = diffMin;
+        else
+            C = diffMax;
 
         glm::vec2 grad1 = Utils::perpCCW2d(dir1) / len1Sq;
         glm::vec2 grad2 = Utils::perpCCW2d(dir2) / len2Sq;
