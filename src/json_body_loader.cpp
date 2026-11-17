@@ -20,7 +20,7 @@ std::optional<size_t> get_index_by_id(xpbd::Cluster &cluster, std::string id)
         return result->second;
     return std::nullopt;
 }
-size_t get_index(xpbd::Cluster &cluster, const nlohmann::json_abi_v3_11_3::json &element, size_t base_index)
+size_t get_index(xpbd::Cluster &cluster, const nlohmann::json &element, size_t base_index)
 {
     size_t index = 0;
     if (element.is_string())

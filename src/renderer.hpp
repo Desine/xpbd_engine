@@ -4,9 +4,9 @@
 
 namespace renderer
 {
-    static int width = 2000;
-    static int height = 2000;
-    static float scale = 1.0f;
+    extern int width;
+    extern int height;
+    extern float scale;
 
     extern sf::RenderWindow window;
     extern sf::View view;

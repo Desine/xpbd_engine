@@ -1,7 +1,4 @@
 #include "profiler.hpp"
-#include "../tracy/public/TracyClient.cpp"
-
-
 
 
 /*

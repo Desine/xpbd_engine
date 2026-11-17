@@ -1,0 +1,140 @@
+module(name = "xpbd_engine", version = "0.1.0")
+
+bazel_dep(name = "rules_cc", version = "0.2.28")
+
+new_local_repository = use_repo_rule(
+    "@bazel_tools//tools/build_defs/repo:local.bzl",
+    "new_local_repository",
+)
+
+# --------------------------------------------------
+# GLM
+# --------------------------------------------------
+
+new_local_repository(
+    name = "glm_src",
+    path = "include/glm",
+    build_file_content = """
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+cc_library(
+    name = "glm",
+    hdrs = glob([
+        "glm/**/*.hpp",
+        "glm/**/*.inl",
+        "glm/**/*.h",
+    ], allow_empty = True),
+    includes = ["."],
+    visibility = ["//visibility:public"],
+)
+""",
+)
+
+# --------------------------------------------------
+# Dear ImGui
+# --------------------------------------------------
+
+new_local_repository(
+    name = "imgui_src",
+    path = "include/imgui",
+    build_file_content = """
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+cc_library(
+    name = "imgui",
+    srcs = [
+        "imgui.cpp",
+        "imgui_draw.cpp",
+        "imgui_tables.cpp",
+        "imgui_widgets.cpp",
+    ],
+    hdrs = [
+        "imgui.h",
+        "imconfig.h",
+        "imgui_internal.h",
+        "imstb_rectpack.h",
+        "imstb_textedit.h",
+        "imstb_truetype.h",
+    ],
+    includes = ["."],
+    visibility = ["//visibility:public"],
+)
+""",
+)
+
+# --------------------------------------------------
+# Tracy
+# --------------------------------------------------
+
+new_local_repository(
+    name = "tracy_src",
+    path = "include/tracy",
+    build_file_content = """
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+cc_library(
+    name = "tracy",
+    srcs = [
+        "public/TracyClient.cpp",
+    ],
+    hdrs = glob([
+        "public/**/*.h",
+        "public/**/*.hpp",
+    ]),
+    textual_hdrs = glob([
+        "public/**/*.cpp",
+    ]),
+    includes = ["public"],
+    defines = ["TRACY_ENABLE"],
+    linkopts = [
+        "-pthread",
+        "-ldl",
+    ],
+    visibility = ["//visibility:public"],
+)
+""",
+)
+
+# --------------------------------------------------
+# ImGui-SFML
+# --------------------------------------------------
+
+new_local_repository(
+    name = "imgui_sfml_src",
+    path = "include/imgui-sfml",
+    build_file_content = """
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+cc_library(
+    name = "imgui_sfml",
+    srcs = ["imgui-SFML.cpp"],
+    hdrs = glob(["*.h"]),
+    includes = ["."],
+    deps = [
+        "@imgui_src//:imgui",
+    ],
+    visibility = ["//visibility:public"],
+)
+""",
+)
+
+# --------------------------------------------------
+# nlohmann/json (single header)
+# --------------------------------------------------
+
+new_local_repository(
+    name = "nlohmann_json",
+    path = "include/nlohmann",
+    build_file_content = """
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+cc_library(
+    name = "json",
+    hdrs = [
+        "json.hpp",
+    ],
+    includes = ["."],
+    visibility = ["//visibility:public"],
+)
+""",
+)

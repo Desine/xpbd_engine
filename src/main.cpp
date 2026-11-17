@@ -10,7 +10,7 @@
 #include "json_body_loader.hpp"
 
 #include "utils.hpp"
-#include "profiler.hpp"
+// #include "profiler.hpp"
 
 void draw_worldDraw(xpbd::Cluster clusterDraw, glm::vec2 offset = {0.0f, 0.0f})
 {
@@ -104,7 +104,7 @@ int main()
     bool paused = world.updateState == xpbd::World::UpdateState::Paused;
     bool reversePass = world.reversePass;
     int drawThickness = 1;
-    int targetVelocity;
+    int targetRPM;
 
     xpbd::Cluster clusterDraw;
 
@@ -117,7 +117,7 @@ int main()
     sf::Clock clock;
     while (renderer::window.isOpen())
     {
-        FrameMark;
+        // FrameMark;
         while (const auto event = renderer::window.pollEvent())
         {
             ImGui::SFML::ProcessEvent(renderer::window, *event);
@@ -251,31 +251,23 @@ int main()
         }
         if (ImGui::Button("Step once"))
             world.step_once_update();
-        // ImGui::SliderFloat("timeScale", &world.timeScale, 0.01f, 50, "%.3f");
-        // size_t min_value = 1;
-        // size_t max_value = 20;
-        // ImGui::SliderScalar("substeps", ImGuiDataType_U64, &world.substeps, &min_value, &max_value, "%zu", ImGuiSliderFlags_None);
-        // ImGui::SliderScalar("iterations", ImGuiDataType_U64, &world.iterations, &min_value, &max_value, "%zu", ImGuiSliderFlags_None);
         // ImGui::SliderFloat("gravity.x", &world.gravity.x, -20, 20);
         // ImGui::SliderFloat("gravity.y", &world.gravity.y, -20, 20);
-        // int cellSize = world.spatialHashAABB.cellSize;
-        // ImGui::SliderInt("spatialHashing_cellSize: ", &cellSize, 30, 1000);
-        // world.spatialHashAABB.cellSize = cellSize;
         ImGui::SliderInt("Draw thickness", &drawThickness, 1, 10);
-        if (ImGui::SliderInt("targetVelocity", &targetVelocity, -100, 100))
+        if (ImGui::SliderInt("targetRPM", &targetRPM, -1000, 1000))
         {
             if (world.cluster.angularMotors.size() > 1)
             {
                 xpbd::update_angularMotor_command motor1;
                 motor1.index = 0;
                 motor1.motor = world.cluster.angularMotors[0];
-                motor1.motor.targetRPM = targetVelocity;
+                motor1.motor.targetRPM = targetRPM;
                 world.enqueue_command(motor1);
 
                 xpbd::update_angularMotor_command motor2;
                 motor2.index = 1;
                 motor2.motor = world.cluster.angularMotors[1];
-                motor2.motor.targetRPM = targetVelocity;
+                motor2.motor.targetRPM = targetRPM;
                 world.enqueue_command(motor2);
             }
         }
@@ -286,7 +278,7 @@ int main()
         renderer::window.clear();
         if (draw)
         {
-            ZoneScoped;
+            // ZoneScoped;
             if (world.newFrame)
             {
                 world.newFrame = false;
@@ -294,7 +286,7 @@ int main()
                 std::swap(clusterDraw, world.clusterDraw);
             }
             float angleStep = 2.0f * float(M_PI) / drawThickness;
-            for (int i = 0; i < drawThickness; ++i)
+            for (size_t i = 0; i < size_t(drawThickness); ++i)
             {
                 float angle = i * angleStep;
                 glm::vec2 dir = glm::vec2(cosf(angle), sinf(angle));

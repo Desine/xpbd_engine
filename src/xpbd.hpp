@@ -6,6 +6,9 @@
 #include <chrono>
 #include <queue>
 #include <functional>
+#include <variant>
+#include <thread>
+#include <queue>
 
 #include "spatial_hashing.hpp"
 

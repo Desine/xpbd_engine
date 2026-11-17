@@ -9,7 +9,7 @@
 #include "utils.hpp"
 #include "renderer.hpp"
 
-#include "profiler.hpp"
+// #include "profiler.hpp"
 #include "json_body_loader.hpp"
 
 namespace xpbd
@@ -798,7 +798,7 @@ namespace xpbd
 
     void World::step()
     {
-        ZoneScoped;
+        // ZoneScoped;
 
         size_t polygons_size = cluster.polygonColliders.size();
         size_t points_size = cluster.pointsColliders.size();
@@ -1270,11 +1270,10 @@ namespace xpbd
             segments = 3;
 
         size_t start = cluster.particles.pos.size();
-        size_t end = start + segments;
         std::vector<size_t> ids;
 
         float angleStep = 2.0f * float(M_PI) / segments;
-        for (int i = 0; i < segments; ++i)
+        for (size_t i = 0; i < segments; ++i)
         {
             float angle = i * angleStep;
             glm::vec2 dir = glm::vec2(cosf(angle), sinf(angle));
@@ -1283,7 +1282,7 @@ namespace xpbd
             ids.emplace_back(start + i);
         }
 
-        for (int i = 0; i < segments; ++i)
+        for (size_t i = 0; i < segments; ++i)
         {
             add_distanceConstraint(cluster, start + i, start + (i + 1) % segments, compliance);
             // add_angleConstraint(cluster, start + i, start + (i + 1) % segments, start + (i + 1) % segments, start + (i + 2) % segments, compliance);

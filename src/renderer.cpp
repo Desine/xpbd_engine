@@ -4,6 +4,10 @@
 
 namespace renderer
 {
+    int width = 2000;
+    int height = 2000;
+    float scale = 1.0f;
+
     sf::RenderWindow window;
     sf::View view;
     sf::Color color;
@@ -62,7 +66,7 @@ namespace renderer
     }
     void draw_segmented_line(const std::vector<glm::vec2> &points)
     {
-        for (int d = 1; d < points.size(); d++)
+        for (size_t d = 1; d < points.size(); d++)
             draw_line(points[d], points[d - 1]);
     }
     void draw_segmented_loop(const std::vector<glm::vec2> &points)
