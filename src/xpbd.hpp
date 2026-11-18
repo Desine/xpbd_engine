@@ -12,11 +12,6 @@
 
 #include "spatial_hashing.hpp"
 
-namespace Commands
-{
-
-}
-
 namespace xpbd
 {
     struct Particles

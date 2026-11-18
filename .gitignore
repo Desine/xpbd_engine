@@ -1,3 +1,2 @@
-exe
-imgui.ini
+/imgui.ini
 /bazel-*
