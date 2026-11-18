@@ -154,7 +154,7 @@ int main()
                 if (keyReleased->code == sf::Keyboard::Key::Q)
                 {
                     size_t amountX = 5;
-                    size_t amountY = 5;
+                    size_t amountY = 1;
                     float spacingX = 3;
                     float spacingY = 2;
                     spawn_many(world, position, amountX, amountY, spacingX, spacingY, "car");

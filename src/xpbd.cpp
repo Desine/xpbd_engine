@@ -78,7 +78,17 @@ namespace xpbd
         if (len < 1e-6f)
             return;
 
-        float C = len - dc.restDist;
+        float C = 0.0f;
+        if (len < dc.minDist)
+            C = len - dc.minDist;
+        else if (len > dc.maxDist)
+            C = len - dc.maxDist;
+        else
+        {
+            dc.lambda = 0.0f;
+            return;
+        }
+
         glm::vec2 grad = delta / len;
 
         float alphaTilde = dc.compliance / (dt * dt);
@@ -95,40 +105,6 @@ namespace xpbd
     }
     void apply_distanceConstraints_damping(Particles &p, std::vector<DistanceConstraint> &dc, float dt)
     {
-        // does not work
-        for (size_t i = 0; i < dc.size(); ++i)
-        {
-            size_t i1 = dc[i].i1;
-            size_t i2 = dc[i].i2;
-            if (i1 >= p.pos.size() || i2 >= p.pos.size())
-                continue;
-
-            glm::vec2 delta = p.pos[i1] - p.pos[i2];
-            float len = glm::length(delta);
-            if (len < 1e-6f)
-                continue;
-
-            glm::vec2 dir = delta / len;
-            float rest = dc[i].restDist;
-            float C = len - rest;
-
-            float w1 = p.w[i];
-            float w2 = p.w[i];
-            float wSum = w1 + w2;
-            if (wSum < 1e-6f)
-                continue;
-
-            glm::vec2 relVel = p.vel[i1] - p.vel[i2];
-            float relVelAlongConstraint = glm::dot(relVel, dir);
-
-            float damping = (C < 0.0f) ? dc[i].compressionDamping : dc[i].extensionDamping;
-
-            float impulseMag = -damping * relVelAlongConstraint;
-            glm::vec2 impulse = impulseMag * dir;
-
-            p.vel[i1] += w1 / wSum * impulse;
-            p.vel[i2] -= w2 / wSum * impulse;
-        }
     }
 
     void solve_angleConstraints(Particles &p, std::vector<AngleConstraint> &ac, float dt)
@@ -941,40 +917,30 @@ namespace xpbd
     void World::init()
     {
         cluster.particles.pos.clear();
-        cluster.particles.pos.reserve(5000);
+        cluster.particles.pos.reserve(1000);
         cluster.particles.prev.clear();
-        cluster.particles.prev.reserve(5000);
+        cluster.particles.prev.reserve(1000);
         cluster.particles.vel.clear();
-        cluster.particles.vel.reserve(5000);
+        cluster.particles.vel.reserve(1000);
         cluster.particles.w.clear();
-        cluster.particles.w.reserve(5000);
+        cluster.particles.w.reserve(1000);
 
         cluster.distanceConstraints.clear();
-        cluster.distanceConstraints.reserve(5000);
+        cluster.distanceConstraints.reserve(1000);
         cluster.angleConstraints.clear();
-        cluster.angleConstraints.reserve(5000);
+        cluster.angleConstraints.reserve(1000);
         cluster.volumeConstraints.clear();
-        cluster.volumeConstraints.reserve(1000);
+        cluster.volumeConstraints.reserve(100);
 
         cluster.polygonColliders.clear();
-        cluster.polygonColliders.reserve(1000);
+        cluster.polygonColliders.reserve(100);
         cluster.pointsColliders.clear();
-        cluster.pointsColliders.reserve(1000);
+        cluster.pointsColliders.reserve(100);
 
         cluster.angularMotors.clear();
         cluster.angularMotors.reserve(100);
         cluster.angularServos.clear();
         cluster.angularServos.reserve(100);
-
-        // polygonColliders_aabbs.reserve(1000);
-        // pointsColliders_aabbs.reserve(1000);
-
-        // polygonsHash.reserve(1000);
-
-        // combinedColliderPoints.reserve(2000);
-        // combinedAABB.reserve(2000);
-
-        // pecc.reserve(5000);
     }
 
     void World::set_tickRate(size_t tickRate)
@@ -1027,7 +993,7 @@ namespace xpbd
                     else if constexpr (std::is_same_v<T, add_particle_command>)
                         add_particle(cluster, arg.pos, arg.mass, arg.vel);
                     else if constexpr (std::is_same_v<T, add_distanceConstraint_command>)
-                        add_distanceConstraint(cluster, arg.constraint.i1, arg.constraint.i2, arg.constraint.compliance, arg.constraint.restDist);
+                        add_distanceConstraint(cluster, arg.constraint.i1, arg.constraint.i2, arg.constraint.compliance, arg.constraint.minDist, arg.constraint.maxDist);
                     else if constexpr (std::is_same_v<T, add_angleConstraint_command>)
                         add_angleConstraint(cluster, arg.constraint.i1, arg.constraint.i2, arg.constraint.i3, arg.constraint.i4, arg.constraint.compliance, arg.constraint.minAngle, arg.constraint.maxAngle);
                     else if constexpr (std::is_same_v<T, add_volumeConstraint_command>)
@@ -1145,31 +1111,30 @@ namespace xpbd
         from = Cluster();
     }
 
-    void add_particle(Cluster &cluster, const glm::vec2 &pos, float mass)
-    {
-        add_particle(cluster, pos, mass, {0, 0});
-    }
-    void add_particle(Cluster &cluster, const glm::vec2 &pos, float mass, const glm::vec2 &vel)
+    void add_particle(Cluster &cluster, const glm::vec2 &pos, float mass, glm::vec2 vel = {0, 0})
     {
         cluster.particles.pos.emplace_back(pos);
         cluster.particles.prev.emplace_back(pos);
         cluster.particles.vel.emplace_back(vel);
-        float w = mass == 0 ? 0 : 1 / mass;
-        cluster.particles.w.emplace_back(w);
+        cluster.particles.w.emplace_back(mass == 0 ? 0 : 1 / mass);
     }
 
-    void add_distanceConstraint(Cluster &cluster, size_t i1, size_t i2, float compliance)
-    {
-        add_distanceConstraint(cluster, i1, i2, compliance, glm::distance(cluster.particles.pos[i1], cluster.particles.pos[i2]));
-    }
-    void add_distanceConstraint(Cluster &cluster, size_t i1, size_t i2, float compliance, float restDist)
+    void add_distanceConstraint(Cluster &cluster, size_t i1, size_t i2, float compliance, float minDist, float maxDist)
     {
         float compressionDamping = 0.5f;
         float extensionDamping = 0.5f;
-        float lambda = 0;
-        cluster.distanceConstraints.emplace_back(i1, i2, restDist, compressionDamping, extensionDamping, compliance, lambda);
+        cluster.distanceConstraints.emplace_back(i1, i2, minDist, maxDist, compressionDamping, extensionDamping, compliance);
+    }
+    void add_distanceConstraint(Cluster &cluster, size_t i1, size_t i2, float compliance)
+    {
+        float restDist = glm::distance(cluster.particles.pos[i1], cluster.particles.pos[i2]);
+        add_distanceConstraint(cluster, i1, i2, compliance, restDist, restDist);
     }
 
+    void add_angleConstraint(Cluster &cluster, size_t i1, size_t i2, size_t i3, size_t i4, float compliance, float minAngle, float maxAngle)
+    {
+        cluster.angleConstraints.emplace_back(i1, i2, i3, i4, minAngle, maxAngle, compliance);
+    }
     void add_angleConstraint(Cluster &cluster, size_t i1, size_t i2, size_t i3, size_t i4, float compliance)
     {
         glm::vec2 v1 = cluster.particles.pos[i1];
@@ -1178,31 +1143,19 @@ namespace xpbd
         glm::vec2 v4 = cluster.particles.pos[i4];
 
         float restAngle = Utils::relative_angle_rad(v2 - v1, v4 - v3);
-        float lambda = 0;
-        cluster.angleConstraints.emplace_back(i1, i2, i3, i4, restAngle, restAngle, compliance, lambda);
-    }
-    void add_angleConstraint(Cluster &cluster, size_t i1, size_t i2, size_t i3, size_t i4, float compliance, float restAngle)
-    {
-        float lambda = 0;
-        cluster.angleConstraints.emplace_back(i1, i2, i3, i4, restAngle, restAngle, compliance, lambda);
-    }
-    void add_angleConstraint(Cluster &cluster, size_t i1, size_t i2, size_t i3, size_t i4, float compliance, float minAngle, float maxAngle)
-    {
-        float lambda = 0;
-        cluster.angleConstraints.emplace_back(i1, i2, i3, i4, minAngle, maxAngle, compliance, lambda);
+        add_angleConstraint(cluster, i1, i2, i3, i4, compliance, restAngle, restAngle);
     }
 
+    void add_volumeConstraint(Cluster &cluster, const std::vector<size_t> &indices, float compliance, float restVolume)
+    {
+        cluster.volumeConstraints.emplace_back(indices, restVolume, compliance);
+    }
     void add_volumeConstraint(Cluster &cluster, const std::vector<size_t> &indices, float compliance)
     {
         float restVolume = compute_polygon_area(cluster.particles, indices);
-        float lambda = 0;
-        cluster.volumeConstraints.emplace_back(indices, restVolume, compliance, lambda);
+        add_volumeConstraint(cluster, indices, compliance, restVolume);
     }
-    void add_volumeConstraint(Cluster &cluster, const std::vector<size_t> &indices, float compliance, float restVolume)
-    {
-        float lambda = 0;
-        cluster.volumeConstraints.emplace_back(indices, restVolume, compliance, lambda);
-    }
+
     void add_polygonCollider(Cluster &cluster, const std::vector<size_t> &indices, float staticFriction, float kineticFriction, float compliance, int8_t layer, int8_t mask)
     {
         cluster.polygonColliders.emplace_back(indices, staticFriction, kineticFriction, compliance, layer, mask);
@@ -1298,5 +1251,4 @@ namespace xpbd
 
         add_polygonCollider(cluster, ids, staticFriction, kineticFriction, 0.0f, layer, mask);
     }
-
 }

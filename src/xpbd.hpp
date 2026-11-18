@@ -30,11 +30,12 @@ namespace xpbd
     {
         size_t i1;
         size_t i2;
-        float restDist;
+        float minDist;
+        float maxDist;
         float compressionDamping;
         float extensionDamping;
         float compliance;
-        float lambda;
+        float lambda = 0.0f;
     };
     struct AngleConstraint
     {
@@ -43,14 +44,14 @@ namespace xpbd
         float minAngle;
         float maxAngle;
         float compliance;
-        float lambda;
+        float lambda = 0.0f;
     };
     struct VolumeConstraint
     {
         std::vector<size_t> indices;
         float restVolume;
         float compliance;
-        float lambda;
+        float lambda = 0.0f;
     };
 
     struct PointsCollider
@@ -93,8 +94,8 @@ namespace xpbd
         float staticFriction;
         float kineticFriction;
         float compliance;
-        float lambdaN;
-        float lambdaT;
+        float lambdaN = 0.0f;
+        float lambdaT = 0.0f;
     };
 
     struct AngularData
@@ -293,12 +294,11 @@ namespace xpbd
 
     void merge_clusters(Cluster &into, Cluster &from);
 
-    void add_particle(Cluster &cluster, const glm::vec2 &pos, const float mass, const glm::vec2 &vel);
+    void add_particle(Cluster &cluster, const glm::vec2 &pos, float mass, glm::vec2 vel);
 
     void add_distanceConstraint(Cluster &cluster, size_t i1, size_t i2, float compliance);
-    void add_distanceConstraint(Cluster &cluster, size_t i1, size_t i2, float compliance, float restDist);
+    void add_distanceConstraint(Cluster &cluster, size_t i1, size_t i2, float compliance, float minDist, float maxDist);
     void add_angleConstraint(Cluster &cluster, size_t i1, size_t i2, size_t i3, size_t i4, float compliance);
-    void add_angleConstraint(Cluster &cluster, size_t i1, size_t i2, size_t i3, size_t i4, float compliance, float restAngle);
     void add_angleConstraint(Cluster &cluster, size_t i1, size_t i2, size_t i3, size_t i4, float compliance, float minAngle, float maxAngle);
     void add_volumeConstraint(Cluster &cluster, const std::vector<size_t> &indices, float compliance);
     void add_volumeConstraint(Cluster &cluster, const std::vector<size_t> &indices, float compliance, float restPressure);

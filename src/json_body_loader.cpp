@@ -87,8 +87,17 @@ bool json_body_loader::load(xpbd::Cluster &cluster, const std::string &filename,
             size_t i1 = get_index(cluster, dc["i1"], base_index);
             size_t i2 = get_index(cluster, dc["i2"], base_index);
             float compliance = dc.value("compliance", 0.0f);
-            if (dc.contains("restDistance"))
-                xpbd::add_distanceConstraint(cluster, i1, i2, compliance, dc["restDistance"].get<float>());
+            if (dc.contains("minDist") && dc.contains("maxDist"))
+            {
+                float minDist = dc.value("minDist", 0.0f);
+                float maxDist = dc.value("maxDist", 0.0f);
+                xpbd::add_distanceConstraint(cluster, i1, i2, compliance, minDist, maxDist);
+            }
+            else if (dc.contains("restDist"))
+            {
+                float restDist = dc.value("restDist", 0.0f);
+                xpbd::add_distanceConstraint(cluster, i1, i2, compliance, restDist, restDist);
+            }
             else
                 xpbd::add_distanceConstraint(cluster, i1, i2, compliance);
         }
@@ -111,7 +120,10 @@ bool json_body_loader::load(xpbd::Cluster &cluster, const std::string &filename,
                 xpbd::add_angleConstraint(cluster, i1, i2, i3, i4, compliance, minAngle, maxAngle);
             }
             else if (ac.contains("restAngle"))
-                xpbd::add_angleConstraint(cluster, i1, i2, i3, i4, compliance, glm::radians(ac.value("restAngle", 0.0f)));
+            {
+                float restAngle = glm::radians(ac.value("restAngle", 0.0f));
+                xpbd::add_angleConstraint(cluster, i1, i2, i3, i4, compliance, restAngle, restAngle);
+            }
             else
                 xpbd::add_angleConstraint(cluster, i1, i2, i3, i4, compliance);
         }
