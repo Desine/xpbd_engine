@@ -1,6 +1,7 @@
 #ifndef XPBD
 #define XPBD
 #include "glm/glm.hpp"
+#include <cstddef>
 #include <vector>
 #include <condition_variable>
 #include <chrono>
@@ -302,7 +303,9 @@ namespace xpbd
     void add_pointsCollider(Cluster &cluster, const std::vector<size_t> &indices, float staticFriction, float kineticFriction, float compliance, int8_t layer, int8_t mask);
 
     void add_angularMotor(Cluster &cluster, size_t i1, size_t i2, size_t i3, size_t i4, float targetVelocity, float maxTorque);
+    void update_angularMotor(Cluster &cluster, size_t index, float targetVelocity, float maxTorque);
     void add_angularServo(Cluster &cluster, size_t i1, size_t i2, size_t i3, size_t i4, float targetAngle, float kp, float kd, float maxTorque);
+    void update_angularServo(Cluster &cluster, size_t index, float targetAngle, float kp, float kd, float maxTorque);
 
     void spawn_from_json(Cluster &cluster, const std::string &name, const glm::vec2 &position);
     void spawn_polygon(Cluster &cluster, glm::vec2 pos, float radius, size_t segments, float mass, float compliance);

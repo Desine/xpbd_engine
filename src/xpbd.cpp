@@ -3,13 +3,11 @@
 #include <algorithm>
 #include <omp.h>
 #include <thread>
-#include <thread>
-#include <print>
 
 #include "utils.hpp"
 #include "renderer.hpp"
 
-// #include "profiler.hpp"
+#include "tracy/Tracy.hpp"
 #include "json_body_loader.hpp"
 
 namespace xpbd
@@ -774,7 +772,7 @@ namespace xpbd
 
     void World::step()
     {
-        // ZoneScoped;
+        ZoneScoped;
 
         size_t polygons_size = cluster.polygonColliders.size();
         size_t points_size = cluster.pointsColliders.size();

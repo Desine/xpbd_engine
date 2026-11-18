@@ -1,21 +1,6 @@
 load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
 
-cc_library(
-    name = "sfml",
-    linkopts = [
-        "-lgomp",
-        "-lsfml-graphics",
-        "-lsfml-window",
-        "-lsfml-system",
-        "-lsfml-audio",
-        "-lsfml-network",
-        "-lGL",
-        "-fopenmp",
-        "-pthread",
-        "-ldl",
-    ],
-    visibility = ["//visibility:public"],
-)
+
 
 cc_binary(
     name = "exe",

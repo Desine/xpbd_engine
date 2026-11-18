@@ -1,16 +1,13 @@
 #include "imgui.h"
 #include "imgui-SFML.h"
 #include <SFML/Graphics.hpp>
-#include "glm/glm.hpp"
-
-#include <print>
 
 #include "renderer.hpp"
 #include "xpbd.hpp"
 #include "json_body_loader.hpp"
 
 #include "utils.hpp"
-// #include "profiler.hpp"
+#include "tracy/Tracy.hpp"
 
 void draw_worldDraw(xpbd::Cluster clusterDraw, glm::vec2 offset = {0.0f, 0.0f})
 {
@@ -117,7 +114,7 @@ int main()
     sf::Clock clock;
     while (renderer::window.isOpen())
     {
-        // FrameMark;
+        FrameMark;
         while (const auto event = renderer::window.pollEvent())
         {
             ImGui::SFML::ProcessEvent(renderer::window, *event);
@@ -188,7 +185,7 @@ int main()
                             world.enqueue_command(xpbd::spawn_polygon_command({x, y}, radius, segments, mass, compliance));
                         }
                     }
-                }
+                }   
 
                 if (keyReleased->code == sf::Keyboard::Key::A)
                     world.enqueue_command(xpbd::spawn_from_json_command("car", position));
@@ -278,7 +275,7 @@ int main()
         renderer::window.clear();
         if (draw)
         {
-            // ZoneScoped;
+            ZoneScoped;
             if (world.newFrame)
             {
                 world.newFrame = false;

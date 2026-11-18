@@ -1,2 +1,7 @@
-/imgui.ini
-/bazel-*
+bazel-*
+
+imgui.ini
+compile_commands.json
+
+.vscode/
+.cache/
