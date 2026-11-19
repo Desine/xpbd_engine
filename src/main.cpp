@@ -48,22 +48,17 @@ void ShowFpsGraph(float newFps)
     const size_t n = 120;
     static float hist[n] = {0};
     static int writePos = 0;
+    static int displayOffset = 0;
     static bool scroll = true;
 
     writePos = (writePos + 1) % n;
     hist[writePos] = newFps;
 
-    float toDraw[n];
-    for (size_t i = 0; i < n; ++i)
-        toDraw[i] = hist[(writePos + 1 + i) % n];
+    if (scroll)
+        displayOffset = (writePos + 1) % n;
 
-    int valuesOffset = scroll ? 0 : 0; // см. ниже — оба 0, разница в другом
-
-    float minV = 0.0f;
-    float maxV = 60.0f;
-
-    ImGui::PlotLines("FPS", toDraw, (int)n, valuesOffset,
-                     nullptr, minV, maxV, ImVec2(0, 150));
+    ImGui::PlotLines("FPS", hist, (int)n, displayOffset,
+                     nullptr, 0.0f, 60.0f, ImVec2(0, 150));
 
     if (ImGui::Button("toggle fps scroll"))
         scroll = !scroll;
@@ -185,7 +180,7 @@ int main()
                             world.enqueue_command(xpbd::spawn_polygon_command({x, y}, radius, segments, mass, compliance));
                         }
                     }
-                }   
+                }
 
                 if (keyReleased->code == sf::Keyboard::Key::A)
                     world.enqueue_command(xpbd::spawn_from_json_command("car", position));
