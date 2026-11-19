@@ -339,5 +339,5 @@ namespace xpbd
     void add_PointEdgeCollisionConstraints_from_PointsPolygonCollision(std::vector<PointEdgeCollisionConstraints> &pecc, const Particles &p, const PointsPolygonCollision &collision);
     void solve_pointEdgeCollisionConstraints(Particles &p, std::vector<PointEdgeCollisionConstraints> &pecc, float dt);
     void apply_pointEdgeCollisionConstraints_kinetic_friction(Particles &p, const std::vector<PointEdgeCollisionConstraints> &pecc, float dt);
-}
+} // namespace xpbd
 #endif // XPBD

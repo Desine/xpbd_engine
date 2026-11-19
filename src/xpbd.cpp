@@ -1242,4 +1242,4 @@ namespace xpbd
 
         add_polygonCollider(cluster, ids, staticFriction, kineticFriction, 0.0f, layer, mask);
     }
-}
+} // namespace xpbd
