@@ -92,15 +92,15 @@ bool json_body_loader::load(xpbd::Cluster &cluster, const std::string &filename,
             {
                 float minDist = dc.value("minDist", 0.0f);
                 float maxDist = dc.value("maxDist", 0.0f);
-                xpbd::add_distanceConstraint(cluster, i1, i2, compliance, minDist, maxDist);
+                xpbd::add_distance_constraint(cluster, i1, i2, compliance, minDist, maxDist);
             }
             else if (dc.contains("restDist"))
             {
                 float restDist = dc.value("restDist", 0.0f);
-                xpbd::add_distanceConstraint(cluster, i1, i2, compliance, restDist, restDist);
+                xpbd::add_distance_constraint(cluster, i1, i2, compliance, restDist, restDist);
             }
             else
-                xpbd::add_distanceConstraint(cluster, i1, i2, compliance);
+                xpbd::add_distance_constraint(cluster, i1, i2, compliance);
         }
     }
 
@@ -118,15 +118,15 @@ bool json_body_loader::load(xpbd::Cluster &cluster, const std::string &filename,
             {
                 float minAngle = glm::radians(ac.value("minAngle", 0.0f));
                 float maxAngle = glm::radians(ac.value("maxAngle", 0.0f));
-                xpbd::add_angleConstraint(cluster, i1, i2, i3, i4, compliance, minAngle, maxAngle);
+                xpbd::add_angle_constraint(cluster, i1, i2, i3, i4, compliance, minAngle, maxAngle);
             }
             else if (ac.contains("restAngle"))
             {
                 float restAngle = glm::radians(ac.value("restAngle", 0.0f));
-                xpbd::add_angleConstraint(cluster, i1, i2, i3, i4, compliance, restAngle, restAngle);
+                xpbd::add_angle_constraint(cluster, i1, i2, i3, i4, compliance, restAngle, restAngle);
             }
             else
-                xpbd::add_angleConstraint(cluster, i1, i2, i3, i4, compliance);
+                xpbd::add_angle_constraint(cluster, i1, i2, i3, i4, compliance);
         }
     }
 
@@ -143,10 +143,10 @@ bool json_body_loader::load(xpbd::Cluster &cluster, const std::string &filename,
             if (vc.contains("restPressure"))
             {
                 float restVolume = compute_polygon_area(cluster.particles, indices) * vc.value("restPressure", 1.0f);
-                xpbd::add_volumeConstraint(cluster, indices, compliance, restVolume);
+                xpbd::add_volume_constraint(cluster, indices, compliance, restVolume);
             }
             else
-                xpbd::add_volumeConstraint(cluster, indices, compliance);
+                xpbd::add_volume_constraint(cluster, indices, compliance);
         }
     }
 
@@ -165,7 +165,7 @@ bool json_body_loader::load(xpbd::Cluster &cluster, const std::string &filename,
             int8_t layer = cc.value("layer", 1);
             int8_t mask = cc.value("mask", 1);
 
-            xpbd::add_polygonCollider(cluster, indices, staticFriction, kineticFriction, compliance, layer, mask);
+            xpbd::add_polygon_collider(cluster, indices, staticFriction, kineticFriction, compliance, layer, mask);
         }
     }
 
@@ -184,7 +184,7 @@ bool json_body_loader::load(xpbd::Cluster &cluster, const std::string &filename,
             int8_t layer = cc.value("layer", 1);
             int8_t mask = cc.value("mask", 1);
 
-            xpbd::add_pointsCollider(cluster, indices, staticFriction, kineticFriction, compliance, layer, mask);
+            xpbd::add_points_collider(cluster, indices, staticFriction, kineticFriction, compliance, layer, mask);
         }
     }
 
@@ -201,7 +201,7 @@ bool json_body_loader::load(xpbd::Cluster &cluster, const std::string &filename,
             float targetRPM = m.value("targetRPM", 0.0f);
             float maxTorque = m.value("maxTorque", 100.0f);
 
-            xpbd::add_angularMotor(
+            xpbd::add_angular_motor(
                 cluster,
                 i1, i2, i3, i4,
                 targetRPM,
@@ -224,7 +224,7 @@ bool json_body_loader::load(xpbd::Cluster &cluster, const std::string &filename,
             float kd = s.value("kd", 0.0f);
             float maxTorque = s.value("maxTorque", 0.0f);
 
-            xpbd::add_angularServo(
+            xpbd::add_angular_servo(
                 cluster,
                 i1, i2, i3, i4,
                 targetAngle,

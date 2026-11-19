@@ -1,12 +1,7 @@
-#ifndef JSON_BODY_LOADER
-#define JSON_BODY_LOADER
+#pragma once
 #include <string>
 #include "glm/glm.hpp"
-
-namespace xpbd
-{
-    struct Cluster;
-}
+#include "core/cluster.hpp"
 
 namespace json_body_loader
 {
@@ -15,4 +10,3 @@ namespace json_body_loader
 
     bool load(xpbd::Cluster &cluster, const std::string &filename, glm::vec2 offset);
 }
-#endif // JSON_BODY_LOADER

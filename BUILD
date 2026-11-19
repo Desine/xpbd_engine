@@ -16,9 +16,9 @@ cc_library(
 cc_binary(
     name = "exe",
     srcs = glob([
-        "src/*.cpp",
-        "src/*.h",
-        "src/*.hpp",
+        "xpbd/**/*.cpp",
+        "xpbd/**/*.h",
+        "xpbd/**/*.hpp",
     ], allow_empty = True),
     deps = [
         ":sfml",

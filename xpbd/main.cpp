@@ -1,11 +1,12 @@
 #include "imgui.h"
 #include "imgui-SFML.h"
 #include <SFML/Graphics.hpp>
+#include <vector>
+#include "glm/glm.hpp"
 
-#include "renderer.hpp"
 #include "xpbd.hpp"
+#include "renderer.hpp"
 #include "json_body_loader.hpp"
-
 #include "utils.hpp"
 #include "tracy/Tracy.hpp"
 
@@ -250,13 +251,13 @@ int main()
         {
             if (world.cluster.angularMotors.size() > 1)
             {
-                xpbd::update_angularMotor_command motor1;
+                xpbd::update_angular_motor_command motor1;
                 motor1.index = 0;
                 motor1.motor = world.cluster.angularMotors[0];
                 motor1.motor.targetRPM = targetRPM;
                 world.enqueue_command(motor1);
 
-                xpbd::update_angularMotor_command motor2;
+                xpbd::update_angular_motor_command motor2;
                 motor2.index = 1;
                 motor2.motor = world.cluster.angularMotors[1];
                 motor2.motor.targetRPM = targetRPM;
