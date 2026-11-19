@@ -1,6 +1,17 @@
 load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
 
 
+cc_library(
+    name = "sfml",
+    linkopts = [
+        "-lsfml-graphics",
+        "-lsfml-window",
+        "-lsfml-system",
+        "-lsfml-audio",
+        "-lsfml-network",
+    ],
+    visibility = ["//visibility:public"],
+)
 
 cc_binary(
     name = "exe",
@@ -10,14 +21,13 @@ cc_binary(
         "src/*.hpp",
     ], allow_empty = True),
     deps = [
-        "@sfml_src//:sfml",
+        ":sfml",
         "@glm_src//:glm",
         "@imgui_src//:imgui",
         "@imgui_sfml_src//:imgui_sfml",
         "@tracy_src//:tracy",
         "@nlohmann_json//:json",
     ],
-    defines = ["SFML_STATIC"],
     copts = [
         "-std=c++26",
         "-fopenmp",

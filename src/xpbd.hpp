@@ -237,13 +237,13 @@ namespace xpbd
         Cluster clusterAdd;
         std::mutex clusterAddMutex;
 
-        // std::vector<AABB> polygonColliders_aabbs;
-        // std::vector<AABB> pointsColliders_aabbs;
+        std::vector<AABB> polygonColliders_aabbs;
+        std::vector<AABB> pointsColliders_aabbs;
         SpatialHashAABB spatialHashAABB;
-        // std::vector<PolygonCache> polygonsHash;
-        // std::vector<ColliderPoints> combinedColliderPoints;
-        // std::vector<AABB> combinedAABB;
-        // std::vector<PointEdgeCollisionConstraints> pecc;
+        std::vector<PointsCollider> combinedPointsColliders;
+        std::vector<AABB> combinedAABB;
+        std::vector<PointEdgeCollisionConstraints> pecc;
+        std::vector<size_t> overlapping_aabb_ids;
 
         Cluster clusterDraw;
         std::mutex clusterDrawMutex;

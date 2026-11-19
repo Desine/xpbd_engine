@@ -15,12 +15,6 @@ http_archive(
     build_file = "//:libraries.BUILD",
 )
 http_archive(
-    name = "sfml_src",
-    urls = ["https://github.com/SFML/SFML/archive/refs/tags/3.0.0.tar.gz"],
-    strip_prefix = "SFML-3.0.0",
-    build_file = "//:libraries.BUILD",
-)
-http_archive(
     name = "imgui_src",
     urls = ["https://github.com/ocornut/imgui/archive/f5befd2d29e66809cd1110a152e375a7f1981f06.tar.gz"],
     strip_prefix = "imgui-f5befd2d29e66809cd1110a152e375a7f1981f06",
