@@ -41,5 +41,4 @@ namespace xpbd{
 
     void spawn_from_json(Cluster &cluster, const std::string &name, const glm::vec2 &position);
     void spawn_polygon(Cluster &cluster, glm::vec2 pos, float radius, size_t segments, float mass, float compliance);
-
 }
