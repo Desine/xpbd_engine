@@ -23,18 +23,15 @@ namespace xpbd
 
     struct ParticleStorage
     {
-        Particles data;
+        Particles particles;
         ObjectPool<ParticleTag> handles;
 
         ParticleId add(
             const glm::vec2 &pos,
             float mass,
             const glm::vec2 &vel);
-
         bool remove(ParticleId id);
-
         std::optional<uint32_t> get_index(ParticleId id) const;
-
         bool contains(ParticleId id) const;
     };
 } // namespace xpbd

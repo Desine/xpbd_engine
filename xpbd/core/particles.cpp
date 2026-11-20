@@ -13,12 +13,12 @@ namespace xpbd
         float mass,
         const glm::vec2 &vel)
     {
-        uint32_t index = static_cast<uint32_t>(data.pos.size());
+        uint32_t index = static_cast<uint32_t>(particles.pos.size());
 
-        data.pos.push_back(pos);
-        data.prev.push_back(pos);
-        data.vel.push_back(vel);
-        data.w.push_back(mass > 0.f ? 1.f / mass : 0.f);
+        particles.pos.push_back(pos);
+        particles.prev.push_back(pos);
+        particles.vel.push_back(vel);
+        particles.w.push_back(mass > 0.f ? 1.f / mass : 0.f);
 
         return handles.create(index);
     }
@@ -31,24 +31,24 @@ namespace xpbd
             return false;
 
         uint32_t index = *indexOpt;
-        uint32_t last = static_cast<uint32_t>(data.pos.size() - 1);
+        uint32_t last = static_cast<uint32_t>(particles.pos.size() - 1);
 
         if (index != last)
         {
             auto movedId = handles.get_handle(last);
 
-            data.pos[index] = data.pos[last];
-            data.prev[index] = data.prev[last];
-            data.vel[index] = data.vel[last];
-            data.w[index] = data.w[last];
+            particles.pos[index] = particles.pos[last];
+            particles.prev[index] = particles.prev[last];
+            particles.vel[index] = particles.vel[last];
+            particles.w[index] = particles.w[last];
 
             handles.update_dense_index(*movedId, index);
         }
 
-        data.pos.pop_back();
-        data.prev.pop_back();
-        data.vel.pop_back();
-        data.w.pop_back();
+        particles.pos.pop_back();
+        particles.prev.pop_back();
+        particles.vel.pop_back();
+        particles.w.pop_back();
 
         return handles.remove(id);
     }

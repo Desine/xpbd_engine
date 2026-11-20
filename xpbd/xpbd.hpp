@@ -20,8 +20,6 @@
 #include "solver/spatial_hashing.hpp"
 
 namespace xpbd{
-    void merge_clusters(Cluster &into, Cluster &from);
-
     void add_particle(Cluster &cluster, const glm::vec2 &pos, float mass, glm::vec2 vel);
 
     void add_distance_constraint(Cluster &cluster, size_t i1, size_t i2, float compliance);

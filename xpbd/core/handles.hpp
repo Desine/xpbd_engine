@@ -31,7 +31,8 @@ namespace xpbd
     struct DistanceConstraintTag {};
     struct AngleConstraintTag {};
     struct VolumeConstraintTag {};
-    struct ColliderTag {};
+    struct PointsColliderTag {};
+    struct PolygonColliderTag {};
     struct MotorTag {};
     struct ServoTag {};
 
@@ -40,7 +41,8 @@ namespace xpbd
     using DistanceConstraintId = Handle<DistanceConstraintTag>;
     using AngleConstraintId = Handle<AngleConstraintTag>;
     using VolumeConstraintId = Handle<VolumeConstraintTag>;
-    using ColliderId = Handle<ColliderTag>;
+    using PointsColliderId = Handle<PointsColliderTag>;
+    using PolygonColliderId = Handle<PolygonColliderTag>;
     using MotorId = Handle<MotorTag>;
     using ServoId = Handle<ServoTag>;
 }
