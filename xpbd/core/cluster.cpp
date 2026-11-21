@@ -14,17 +14,11 @@ namespace xpbd
         if (&into == &from)
             return;
 
-        const size_t offset = into.particles.pos.size();
+        const size_t offset = into.particles.size();
 
         // Particles
-        into.particles.pos.insert(into.particles.pos.end(),
-                                  from.particles.pos.begin(), from.particles.pos.end());
-        into.particles.prev.insert(into.particles.prev.end(),
-                                   from.particles.prev.begin(), from.particles.prev.end());
-        into.particles.vel.insert(into.particles.vel.end(),
-                                  from.particles.vel.begin(), from.particles.vel.end());
-        into.particles.w.insert(into.particles.w.end(),
-                                from.particles.w.begin(), from.particles.w.end());
+        into.particles.insert(into.particles.end(),
+                                  from.particles.begin(), from.particles.end());
 
         // Distance constraints
         into.distanceConstraints.reserve(into.distanceConstraints.size() + from.distanceConstraints.size());

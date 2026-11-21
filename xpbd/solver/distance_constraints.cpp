@@ -6,7 +6,7 @@
 namespace xpbd
 {
 
-    void solve_distance_constraints(Particles &p, std::vector<DistanceConstraint> &dc, float dt, bool reversePass)
+    void solve_distance_constraints(std::vector<Particle> &p, std::vector<DistanceConstraint> &dc, float dt, bool reversePass)
     {
         if (reversePass)
         {
@@ -19,16 +19,16 @@ namespace xpbd
                 solve_distance_constraint(p, c, dt);
         }
     }
-    void solve_distance_constraint(Particles &p, DistanceConstraint &dc, float dt)
+    void solve_distance_constraint(std::vector<Particle> &p, DistanceConstraint &dc, float dt)
     {
         size_t i1 = dc.i1;
         size_t i2 = dc.i2;
 
-        glm::vec2 &p1 = p.pos[i1];
-        glm::vec2 &p2 = p.pos[i2];
+        glm::vec2 &p1 = p[i1].pos;
+        glm::vec2 &p2 = p[i2].pos;
 
-        float w1 = p.w[i1];
-        float w2 = p.w[i2];
+        float w1 = p[i1].w;
+        float w2 = p[i2].w;
 
         glm::vec2 delta = p1 - p2;
         float len = glm::length(delta);

@@ -31,26 +31,25 @@ namespace xpbd
     class SpatialHashAABB
     {
     public:
-        size_t cellSize;
+        float cellSize;
         size_t tableReserve;
         size_t bucketReserve;
         size_t outIdsReserve;
         ankerl::unordered_dense::map<CellCoord, std::vector<size_t>, CellCoordHash> idTable;
         ankerl::unordered_dense::map<size_t, AABB> aabbTable;
 
-        explicit SpatialHashAABB(size_t cellSize = 5, size_t tableReserve = 1024, size_t bucketReserve = 32, size_t outIdsReserve = 10)
+        explicit SpatialHashAABB(float cellSize = 1, size_t tableReserve = 64, size_t bucketReserve = 4, size_t outIdsReserve = 16)
             : cellSize(cellSize), tableReserve(tableReserve), bucketReserve(bucketReserve), outIdsReserve(outIdsReserve)
         {
             clear();
+            idTable.reserve(tableReserve);
+            aabbTable.reserve(tableReserve);
         }
 
         void clear()
         {
             idTable.clear();
-            idTable.reserve(tableReserve);
-
             aabbTable.clear();
-            aabbTable.reserve(tableReserve);
         }
 
         void add_aabb(const AABB &aabb, size_t id)
@@ -63,11 +62,11 @@ namespace xpbd
                 for (int cx = startX; cx <= endX; ++cx)
                 {
                     auto &bucket = idTable[CellCoord{cx, cy}];
-                    bucket.reserve(bucketReserve);
+                    if (bucket.empty()) bucket.reserve(bucketReserve);
                     bucket.emplace_back(id);
                 }
             }
-            aabbTable.insert({id, aabb});
+            aabbTable.insert_or_assign(id, aabb);
         }
 
         void get_overlapping_aabb_ids(std::vector<size_t> &out, const AABB &aabb) const
@@ -82,6 +81,7 @@ namespace xpbd
                 for (int x = startX; x <= endX; ++x)
                 {
                     auto idT = idTable.find(CellCoord{x, y});
+                    if (idT == idTable.end()) continue;
                     for (size_t id : idT->second)
                     {
                         auto aabbT = aabbTable.find(id);
@@ -107,17 +107,15 @@ namespace xpbd
                 for (int x = startX; x <= endX; ++x)
                 {
                     auto idT = idTable.find(CellCoord{x, y});
-                    if (idT != idTable.end())
+                    if (idT == idTable.end()) continue;
+                    for (size_t id : idT->second)
                     {
-                        for (size_t id : idT->second)
+                        if (id == excludeId)
+                            continue;
+                        auto aabbT = aabbTable.find(id);
+                        if (aabbT != aabbTable.end() && layer_mask_collide(aabb, aabbT->second) && aabb.intersects(aabbT->second))
                         {
-                            if (id == excludeId)
-                                continue;
-                            auto aabbT = aabbTable.find(id);
-                            if (aabbT != aabbTable.end() && layer_mask_collide(aabb, aabbT->second) && aabb.intersects(aabbT->second))
-                            {
-                                out.emplace_back(id);
-                            }
+                            out.emplace_back(id);
                         }
                     }
                 }
@@ -126,7 +124,7 @@ namespace xpbd
         }
 
     private:
-        static bool layer_mask_collide(AABB points, AABB polygon)
+        static bool layer_mask_collide(const AABB &points, const AABB &polygon)
         {
             return points.mask & polygon.layer || points.layer & polygon.mask;
         }

@@ -3,6 +3,6 @@
 
 namespace xpbd
 {
-    void iterate(Particles &p, float dt, const glm::vec2 &gravity);
-    void update_velocities(Particles &p, float dt);
+    void iterate(std::vector<Particle> &p, float dt, const glm::vec2 &gravity);
+    void update_velocities(std::vector<Particle> &p, float dt);
 } // namespace xpbd

@@ -159,7 +159,7 @@ namespace xpbd
 
                 cache.positions.resize(polygonIndices.size());
                 for (size_t i = 0; i < n; ++i)
-                    cache.positions[i] = cluster.particles.pos[polygonIndices[i]];
+                    cache.positions[i] = cluster.particles[polygonIndices[i]].pos;
 
                 cache.edges.resize(n);
                 cache.edgesLen2.resize(n);
@@ -242,14 +242,8 @@ namespace xpbd
 
     void World::init()
     {
-        cluster.particles.pos.clear();
-        cluster.particles.pos.reserve(1000);
-        cluster.particles.prev.clear();
-        cluster.particles.prev.reserve(1000);
-        cluster.particles.vel.clear();
-        cluster.particles.vel.reserve(1000);
-        cluster.particles.w.clear();
-        cluster.particles.w.reserve(1000);
+        cluster.particles.clear();
+        cluster.particles.reserve(1000);
 
         cluster.distanceConstraints.clear();
         cluster.distanceConstraints.reserve(1000);

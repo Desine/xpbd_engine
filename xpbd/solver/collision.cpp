@@ -8,7 +8,7 @@ namespace xpbd
 {
     void generate_collider_points_aabbs(
         std::vector<AABB> &out,
-        const Particles &p,
+        const std::vector<Particle> &p,
         const std::vector<PointsCollider> &colliderPoints)
     {
         out.clear();
@@ -26,7 +26,7 @@ namespace xpbd
 
             for (auto i : c.indices)
             {
-                glm::vec2 pos = p.pos[i];
+                glm::vec2 pos = p[i].pos;
                 if (pos.x < current.l)
                     current.l = pos.x;
                 if (pos.x > current.r)
@@ -67,7 +67,7 @@ namespace xpbd
     }
     void get_point_edge_collisions_of_points_inside_polygon(
         std::vector<PointEdgeCollision> &out,
-        const Particles &p,
+        const std::vector<Particle> &p,
         const std::vector<size_t> &pointIndices,
         const std::vector<size_t> &polygonIndices,
         const PolygonCache &cache)
@@ -81,7 +81,7 @@ namespace xpbd
 
         for (size_t pid : pointIndices)
         {
-            const glm::vec2 &point = p.pos[pid];
+            const glm::vec2 &point = p[pid].pos;
 
             if (!point_in_polygon(point, polygonPositions))
                 continue;
@@ -114,13 +114,13 @@ namespace xpbd
     }
     void add_point_edge_collision_constraints_from_points_polygon_collision(
         std::vector<PointEdgeCollisionConstraints> &pecc,
-        const Particles &particles,
+        const std::vector<Particle> &particles,
         const PointsPolygonCollision &collision)
     {
         std::vector<size_t> filteredPointIndices;
         filteredPointIndices.reserve(collision.points.size());
         for (auto i : collision.points)
-            if (collision.box.contains_point(particles.pos[i]))
+            if (collision.box.contains_point(particles[i].pos))
                 filteredPointIndices.emplace_back(i);
 
         if (filteredPointIndices.empty())
@@ -136,7 +136,7 @@ namespace xpbd
     }
 
     void solve_point_edge_collision_constraints(
-        Particles &p,
+        std::vector<Particle> &p,
         std::vector<PointEdgeCollisionConstraints> &pecc,
         float dt)
     {
@@ -146,16 +146,16 @@ namespace xpbd
             size_t ie0 = c.edge1;
             size_t ie1 = c.edge2;
 
-            glm::vec2 &P = p.pos[ip];
-            glm::vec2 &Pprev = p.prev[ip];
-            glm::vec2 &E0 = p.pos[ie0];
-            glm::vec2 &E1 = p.pos[ie1];
-            glm::vec2 &E0prev = p.prev[ie0];
-            glm::vec2 &E1prev = p.prev[ie1];
+            glm::vec2 &P = p[ip].pos;
+            glm::vec2 &Pprev = p[ip].prev;
+            glm::vec2 &E0 = p[ie0].pos;
+            glm::vec2 &E1 = p[ie1].pos;
+            glm::vec2 &E0prev = p[ie0].prev;
+            glm::vec2 &E1prev = p[ie1].prev;
 
-            float wp = p.w[ip];
-            float we0 = p.w[ie0];
-            float we1 = p.w[ie1];
+            float wp = p[ip].w;
+            float we0 = p[ie0].w;
+            float we1 = p[ie1].w;
 
             glm::vec2 edge = E1 - E0;
             float edgeLengthSq = glm::dot(edge, edge);
@@ -221,7 +221,7 @@ namespace xpbd
         }
     }
 
-    void apply_point_edge_collision_constraints_kinetic_friction(Particles &p, const std::vector<PointEdgeCollisionConstraints> &pecc, float dt)
+    void apply_point_edge_collision_constraints_kinetic_friction(std::vector<Particle> &p, const std::vector<PointEdgeCollisionConstraints> &pecc, float dt)
     {
         for (auto &c : pecc)
         {
@@ -229,17 +229,17 @@ namespace xpbd
             size_t ie0 = c.edge1;
             size_t ie1 = c.edge2;
 
-            glm::vec2 &P = p.pos[ip];
-            glm::vec2 &E0 = p.pos[ie0];
-            glm::vec2 &E1 = p.pos[ie1];
+            glm::vec2 &P = p[ip].pos;
+            glm::vec2 &E0 = p[ie0].pos;
+            glm::vec2 &E1 = p[ie1].pos;
 
-            glm::vec2 &Vp = p.vel[ip];
-            glm::vec2 &Ve0 = p.vel[ie0];
-            glm::vec2 &Ve1 = p.vel[ie1];
+            glm::vec2 &Vp = p[ip].vel;
+            glm::vec2 &Ve0 = p[ie0].vel;
+            glm::vec2 &Ve1 = p[ie1].vel;
 
-            float wp = p.w[ip];
-            float we0 = p.w[ie0];
-            float we1 = p.w[ie1];
+            float wp = p[ip].w;
+            float we0 = p[ie0].w;
+            float we1 = p[ie1].w;
 
             // Closest point on edge
             glm::vec2 edge = E1 - E0;

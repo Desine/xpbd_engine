@@ -3,7 +3,7 @@ load("@rules_foreign_cc//foreign_cc:defs.bzl", "cmake")
 
 config_setting(
     name = "tracy_enabled",
-    define_values = {"tracy": "false"},
+    values = {"define": "tracy_enable=true"},
 )
 
 
@@ -72,7 +72,10 @@ cc_library(
     ], allow_empty = True),
     includes = ["public"],
     defines = select({
-        ":tracy_enabled": ["TRACY_ENABLE"],
+        ":tracy_enabled": [
+            "TRACY_ENABLE",
+            #'TRACY_DEFAULT_HOST=\\"127.0.0.1\\"',
+        ],
         "//conditions:default": [],
     }),
     linkopts = select({

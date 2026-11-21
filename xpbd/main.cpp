@@ -15,11 +15,11 @@ void draw_worldDraw(xpbd::Cluster clusterDraw, glm::vec2 offset = {0.0f, 0.0f})
 {
     float circleSize = 0.03f;
     renderer::set_color(sf::Color::Red);
-    for (auto p : clusterDraw.particles.pos)
-        renderer::draw_circle(p, circleSize);
+    for (auto p : clusterDraw.particles)
+        renderer::draw_circle(p.pos, circleSize);
 
     for (size_t i = 0; i < clusterDraw.distanceConstraints.size(); ++i)
-        renderer::draw_line(clusterDraw.particles.pos[clusterDraw.distanceConstraints[i].i1] + offset, clusterDraw.particles.pos[clusterDraw.distanceConstraints[i].i2] + offset);
+        renderer::draw_line(clusterDraw.particles[clusterDraw.distanceConstraints[i].i1].pos + offset, clusterDraw.particles[clusterDraw.distanceConstraints[i].i2].pos + offset);
 
     renderer::set_color(sf::Color::Green);
     for (auto &pc : clusterDraw.polygonColliders)
@@ -28,7 +28,7 @@ void draw_worldDraw(xpbd::Cluster clusterDraw, glm::vec2 offset = {0.0f, 0.0f})
         points.reserve(pc.indices.size());
 
         for (auto id : pc.indices)
-            points.emplace_back(clusterDraw.particles.pos[id] + offset);
+            points.emplace_back(clusterDraw.particles[id].pos + offset);
 
         renderer::draw_segmented_loop(points);
     }
@@ -36,7 +36,7 @@ void draw_worldDraw(xpbd::Cluster clusterDraw, glm::vec2 offset = {0.0f, 0.0f})
     renderer::set_color(sf::Color::Green);
     for (auto &pc : clusterDraw.pointsColliders)
         for (auto id : pc.indices)
-            renderer::draw_circle(clusterDraw.particles.pos[id], circleSize);
+            renderer::draw_circle(clusterDraw.particles[id].pos, circleSize);
 }
 
 void draw_collisions(std::vector<xpbd::PointsPolygonCollision> collisions)
@@ -100,6 +100,14 @@ int main()
     int drawThickness = 1;
     int targetRPM;
 
+
+    glm::vec2 spawn_pos(0.0f, -5.0f);
+    spawn_many(world, spawn_pos, 5, 2, 3, 2, "car");
+    spawn_pos = {0.0f, 0.0f};
+    spawn_many(world, spawn_pos, 5, 10, 3, 2, "balloon");
+
+
+
     xpbd::Cluster clusterDraw;
 
     renderer::setup_window();
@@ -111,7 +119,7 @@ int main()
     sf::Clock clock;
     while (renderer::window.isOpen())
     {
-        FrameMark;
+        // FrameMark;
         while (const auto event = renderer::window.pollEvent())
         {
             ImGui::SFML::ProcessEvent(renderer::window, *event);

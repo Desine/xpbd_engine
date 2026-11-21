@@ -8,10 +8,7 @@ namespace xpbd
 {
     void add_particle(Cluster &cluster, const glm::vec2 &pos, float mass, glm::vec2 vel = {0, 0})
     {
-        cluster.particles.pos.emplace_back(pos);
-        cluster.particles.prev.emplace_back(pos);
-        cluster.particles.vel.emplace_back(vel);
-        cluster.particles.w.emplace_back(mass == 0 ? 0 : 1 / mass);
+        cluster.particles.emplace_back(pos, pos, vel, mass == 0 ? 0 : 1 / mass);
     }
 
     void add_distance_constraint(Cluster &cluster, size_t i1, size_t i2, float compliance, float minDist, float maxDist)
@@ -22,7 +19,7 @@ namespace xpbd
     }
     void add_distance_constraint(Cluster &cluster, size_t i1, size_t i2, float compliance)
     {
-        float restDist = glm::distance(cluster.particles.pos[i1], cluster.particles.pos[i2]);
+        float restDist = glm::distance(cluster.particles[i1].pos, cluster.particles[i2].pos);
         add_distance_constraint(cluster, i1, i2, compliance, restDist, restDist);
     }
 
@@ -32,10 +29,10 @@ namespace xpbd
     }
     void add_angle_constraint(Cluster &cluster, size_t i1, size_t i2, size_t i3, size_t i4, float compliance)
     {
-        glm::vec2 v1 = cluster.particles.pos[i1];
-        glm::vec2 v2 = cluster.particles.pos[i2];
-        glm::vec2 v3 = cluster.particles.pos[i3];
-        glm::vec2 v4 = cluster.particles.pos[i4];
+        glm::vec2 v1 = cluster.particles[i1].pos;
+        glm::vec2 v2 = cluster.particles[i2].pos;
+        glm::vec2 v3 = cluster.particles[i3].pos;
+        glm::vec2 v4 = cluster.particles[i4].pos;
 
         float restAngle = Utils::relative_angle_rad(v2 - v1, v4 - v3);
         add_angle_constraint(cluster, i1, i2, i3, i4, compliance, restAngle, restAngle);
@@ -117,7 +114,7 @@ namespace xpbd
         if (segments < 3)
             segments = 3;
 
-        size_t start = cluster.particles.pos.size();
+        size_t start = cluster.particles.size();
         std::vector<size_t> ids;
 
         float angleStep = 2.0f * float(M_PI) / segments;

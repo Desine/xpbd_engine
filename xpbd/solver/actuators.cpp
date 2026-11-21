@@ -3,17 +3,18 @@
 #include "xpbd/core/actuators.hpp"
 #include "../utils.hpp"
 #include "glm/glm.hpp"
+#include <vector>
 
 namespace xpbd
 {
     bool get_angularData(
-        const Particles &p,
+        const std::vector<Particle> &p,
         size_t i1, size_t i2,
         size_t i3, size_t i4,
         AngularData &data)
     {
-        glm::vec2 dir1 = p.pos[i2] - p.pos[i1];
-        glm::vec2 dir2 = p.pos[i4] - p.pos[i3];
+        glm::vec2 dir1 = p[i2].pos - p[i1].pos;
+        glm::vec2 dir2 = p[i4].pos - p[i3].pos;
 
         float len1Sq = glm::dot(dir1, dir1);
         float len2Sq = glm::dot(dir2, dir2);
@@ -25,11 +26,11 @@ namespace xpbd
         data.grad2 = Utils::perpCCW2d(dir2) / len2Sq;
 
         data.invI1 =
-            (p.w[i1] + p.w[i2]) *
+            (p[i1].w + p[i2].w) *
             glm::dot(data.grad1, data.grad1);
 
         data.invI2 =
-            (p.w[i3] + p.w[i4]) *
+            (p[i3].w + p[i4].w) *
             glm::dot(data.grad2, data.grad2);
 
         data.invI = data.invI1 + data.invI2;
@@ -40,13 +41,13 @@ namespace xpbd
         data.angle = Utils::relative_angle_rad(dir1, dir2);
 
         data.omega =
-            glm::dot(p.vel[i4] - p.vel[i3], data.grad2) -
-            glm::dot(p.vel[i2] - p.vel[i1], data.grad1);
+            glm::dot(p[i4].vel - p[i3].vel, data.grad2) -
+            glm::dot(p[i2].vel - p[i1].vel, data.grad1);
 
         return true;
     }
     void apply_angular_velocity_correction(
-        Particles &p,
+        std::vector<Particle> &p,
         size_t i1, size_t i2,
         size_t i3, size_t i4,
         float deltaL)
@@ -62,14 +63,14 @@ namespace xpbd
         glm::vec2 correction1 = data.grad1 * lambda;
         glm::vec2 correction2 = data.grad2 * lambda;
 
-        p.vel[i1] += p.w[i1] * correction1;
-        p.vel[i2] -= p.w[i2] * correction1;
+        p[i1].vel += p[i1].w * correction1;
+        p[i2].vel -= p[i2].w * correction1;
 
-        p.vel[i3] -= p.w[i3] * correction2;
-        p.vel[i4] += p.w[i4] * correction2;
+        p[i3].vel -= p[i3].w * correction2;
+        p[i4].vel += p[i4].w * correction2;
     }
     void apply_torque(
-        Particles &p,
+        std::vector<Particle> &p,
         size_t i1, size_t i2,
         size_t i3, size_t i4,
         float torque,
@@ -81,7 +82,7 @@ namespace xpbd
     }
 
     void solve_angularMotor(
-        Particles &p,
+        std::vector<Particle> &p,
         const AngularMotor &motor,
         float dt)
     {
@@ -114,7 +115,7 @@ namespace xpbd
             deltaL);
     }
     void solve_angularServo(
-        Particles &p,
+        std::vector<Particle> &p,
         const AngularServo &servo,
         float dt)
     {

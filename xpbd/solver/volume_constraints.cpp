@@ -19,25 +19,25 @@ namespace xpbd
         }
         return 0.5f * area;
     }
-    float compute_polygon_area(const Particles &p, const std::vector<size_t> &indices)
+    float compute_polygon_area(const std::vector<Particle> &p, const std::vector<size_t> &indices)
     {
         float area = 0.0f;
         size_t n = indices.size();
         for (size_t i = 0, j = n - 1; i < n; j = i++)
         {
-            const glm::vec2 &p0 = p.pos[indices[j]];
-            const glm::vec2 &p1 = p.pos[indices[i]];
+            const glm::vec2 &p0 = p[indices[j]].pos;
+            const glm::vec2 &p1 = p[indices[i]].pos;
             area += Utils::cross(p0, p1);
         }
         return 0.5f * area;
     }
 
-    void solve_volume_constraints(Particles &p, std::vector<VolumeConstraint> &vc, float dt)
+    void solve_volume_constraints(std::vector<Particle> &p, std::vector<VolumeConstraint> &vc, float dt)
     {
         for (auto &c : vc)
             solve_volume_constraint(p, c, dt);
     }
-    void solve_volume_constraint(Particles &p, VolumeConstraint &vc, float dt)
+    void solve_volume_constraint(std::vector<Particle> &p, VolumeConstraint &vc, float dt)
     {
         std::vector<size_t> &indices = vc.indices;
         size_t N = indices.size();
@@ -50,13 +50,13 @@ namespace xpbd
 
         for (size_t i = 0; i < N; ++i)
         {
-            const glm::vec2 &pi_prev = p.pos[indices[(i + N - 1) % N]];
-            const glm::vec2 &pi_next = p.pos[indices[(i + 1) % N]];
+            const glm::vec2 &pi_prev = p[indices[(i + N - 1) % N]].pos;
+            const glm::vec2 &pi_next = p[indices[(i + 1) % N]].pos;
 
             glm::vec2 grad = 0.5f * Utils::perpCW2d(pi_next - pi_prev);
             grads[i] = grad;
 
-            float wi = p.w[indices[i]];
+            float wi = p[indices[i]].w;
             denom += wi * glm::dot(grad, grad);
         }
 
@@ -71,9 +71,9 @@ namespace xpbd
         for (size_t i = 0; i < N; ++i)
         {
             uint32_t idx = indices[i];
-            float wi = p.w[idx];
+            float wi = p[idx].w;
 
-            p.pos[idx] += wi * deltaLambda * grads[i];
+            p[idx].pos += wi * deltaLambda * grads[i];
         }
     } 
     void reset_volume_constraints_lambdas(std::vector<VolumeConstraint> &vc)

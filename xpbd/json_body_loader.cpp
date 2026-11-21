@@ -60,7 +60,7 @@ bool json_body_loader::load(xpbd::Cluster &cluster, const std::string &filename,
         }
     }
 
-    size_t base_index = cluster.particles.pos.size(); // offset for constraint indices
+    size_t base_index = cluster.particles.size(); // offset for constraint indices
 
     // Load Particles
     if (j.contains("Particles") && j["Particles"].is_array())

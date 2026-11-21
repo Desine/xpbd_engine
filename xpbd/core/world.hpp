@@ -19,11 +19,11 @@ namespace xpbd
     class World
     {
     public:
-        size_t substeps = 20;
+        size_t substeps = 10;
         size_t iterations = 1;
         glm::vec2 gravity = {0, -9.8f};
         float timeScale = 1.f;
-        float tickRate = 30.f;
+        float tickRate = 60.f;
         std::chrono::duration<double> deltaTick;
         bool reversePass = false;
 

@@ -14,7 +14,7 @@ namespace xpbd
         std::vector<Entity> entities;
 
         std::vector<std::pair<std::string, size_t>> particleIds;
-        Particles particles;
+        std::vector<Particle> particles;
         std::vector<DistanceConstraint> distanceConstraints;
         std::vector<AngleConstraint> angleConstraints;
         std::vector<VolumeConstraint> volumeConstraints;
