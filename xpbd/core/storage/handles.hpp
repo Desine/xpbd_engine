@@ -4,7 +4,7 @@
 
 namespace xpbd
 {
-    template<typename Tag>
+    template <typename Tag>
     struct Handle
     {
         static constexpr uint32_t invalidIndex =
@@ -13,28 +13,32 @@ namespace xpbd
         uint32_t index = invalidIndex;
         uint32_t generation = 0;
 
-        bool valid() const
+        bool valid() const noexcept
         {
             return index != invalidIndex;
         }
 
-        explicit operator bool() const
+        bool operator==(const Handle &other) const
         {
-            return valid();
+            return index == other.index &&
+                   generation == other.generation;
         }
 
-        bool operator==(const Handle&) const = default;
+        bool operator!=(const Handle &other) const
+        {
+            return !(*this == other);
+        }
     };
 
-    struct EntityTag {};
-    struct ParticleTag {};
-    struct DistanceConstraintTag {};
-    struct AngleConstraintTag {};
-    struct VolumeConstraintTag {};
-    struct PointsColliderTag {};
-    struct PolygonColliderTag {};
-    struct MotorTag {};
-    struct ServoTag {};
+    struct EntityTag;
+    struct ParticleTag;
+    struct DistanceConstraintTag;
+    struct AngleConstraintTag;
+    struct VolumeConstraintTag;
+    struct PointsColliderTag;
+    struct PolygonColliderTag;
+    struct AngularMotorTag;
+    struct AngularServoTag;
 
     using EntityId = Handle<EntityTag>;
     using ParticleId = Handle<ParticleTag>;
@@ -43,6 +47,6 @@ namespace xpbd
     using VolumeConstraintId = Handle<VolumeConstraintTag>;
     using PointsColliderId = Handle<PointsColliderTag>;
     using PolygonColliderId = Handle<PolygonColliderTag>;
-    using MotorId = Handle<MotorTag>;
-    using ServoId = Handle<ServoTag>;
-}
+    using AngularMotorId = Handle<AngularMotorTag>;
+    using AngularServoId = Handle<AngularServoTag>;
+} // namespace xpbd

@@ -1,7 +1,8 @@
 #pragma once
 #include "angle_constraints.hpp"
-#include "xpbd/core/particles.hpp"
+#include "xpbd/core/particle.hpp"
 #include "xpbd/core/constraints.hpp"
+
 #include <vector>
 
 namespace xpbd

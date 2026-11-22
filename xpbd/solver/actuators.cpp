@@ -1,7 +1,8 @@
 #include "actuators.hpp"
-#include "xpbd/core/particles.hpp"
+#include "xpbd/core/particle.hpp"
 #include "xpbd/core/actuators.hpp"
 #include "../utils.hpp"
+
 #include "glm/glm.hpp"
 #include <vector>
 

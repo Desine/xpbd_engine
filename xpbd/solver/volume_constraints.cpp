@@ -1,7 +1,8 @@
 #include "volume_constraints.hpp"
-#include "xpbd/core/particles.hpp"
+#include "xpbd/core/particle.hpp"
 #include "xpbd/core/constraints.hpp"
 #include "../utils.hpp"
+
 #include <vector>
 
 

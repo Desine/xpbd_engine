@@ -1,11 +1,4 @@
 #pragma once
-#include "glm/glm.hpp"
-#include <vector>
-#include <condition_variable>
-#include <chrono>
-#include <queue>
-#include <thread>
-
 #include "types.hpp"
 #include "constraints.hpp"
 #include "colliders.hpp"
@@ -13,6 +6,13 @@
 #include "cluster.hpp"
 #include "commands.hpp"
 #include "../solver/spatial_hashing.hpp"
+
+#include "glm/glm.hpp"
+#include <vector>
+#include <condition_variable>
+#include <chrono>
+#include <queue>
+#include <thread>
 
 namespace xpbd
 {

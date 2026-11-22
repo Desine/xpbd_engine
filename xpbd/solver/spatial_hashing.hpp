@@ -1,10 +1,12 @@
 #pragma once
 #include "xpbd/core/types.hpp"
+
 #include "glm/glm.hpp"
 #include <vector>
 #include <cmath>
 #include <algorithm>
 #include <ankerl/unordered_dense.h>
+
 namespace xpbd
 {
     struct CellCoord

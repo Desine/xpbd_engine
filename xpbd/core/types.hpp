@@ -1,5 +1,6 @@
 #pragma once
 #include "glm/glm.hpp"
+
 namespace xpbd
 {
     struct AABB

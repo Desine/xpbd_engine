@@ -1,7 +1,8 @@
 #pragma once
-#include <string>
-#include "glm/glm.hpp"
 #include "core/cluster.hpp"
+
+#include "glm/glm.hpp"
+#include <string>
 
 namespace json_body_loader
 {

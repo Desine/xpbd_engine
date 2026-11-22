@@ -3,7 +3,7 @@
 #include <vector>
 
 #include "core/types.hpp"
-#include "core/particles.hpp"
+#include "core/particle.hpp"
 #include "core/constraints.hpp"
 #include "core/colliders.hpp"
 #include "core/actuators.hpp"

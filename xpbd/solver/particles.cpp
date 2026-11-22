@@ -1,4 +1,5 @@
-#include "xpbd/core/particles.hpp"
+#include "xpbd/core/particle.hpp"
+
 #include <vector>
 
 namespace xpbd

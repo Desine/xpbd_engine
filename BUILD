@@ -1,4 +1,4 @@
-load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test")
 
 
 cc_library(
@@ -15,11 +15,15 @@ cc_library(
 
 cc_binary(
     name = "exe",
-    srcs = glob([
-        "xpbd/**/*.cpp",
-        "xpbd/**/*.h",
-        "xpbd/**/*.hpp",
-    ], allow_empty = True),
+    srcs = glob(
+        include = [
+            "xpbd/**/*.cpp",
+            "xpbd/**/*.hpp",
+            "xpbd/**/*.h"
+        ],
+        exclude = [
+            "xpbd/tests/*",
+        ], allow_empty = True),
     deps = [
         ":sfml",
         "@glm_src//:glm",
@@ -45,5 +49,28 @@ cc_binary(
         "-lfreetype",
         "-lpthread",
         "-ldl",
+    ],
+)
+
+
+
+cc_library(
+    name = "storage",
+    hdrs = glob([
+        "xpbd/core/storage/*.hpp",
+    ]),
+    visibility = ["//visibility:public"],
+)
+
+cc_test(
+    name = "storage_test",
+    srcs = [
+        "xpbd/tests/storage_test.cpp",
+    ],
+    deps = [
+        ":storage",
+    ],
+    copts = [
+        "-std=c++26",
     ],
 )

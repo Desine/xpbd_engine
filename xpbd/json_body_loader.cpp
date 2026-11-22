@@ -1,9 +1,10 @@
 #include "json_body_loader.hpp"
+#include "xpbd.hpp"
+
 #include "nlohmann/json.hpp"
 #include <fstream>
 #include <print>
 
-#include "xpbd.hpp"
 
 std::string json_body_loader::folder = "";
 const std::string json_body_loader::extension = ".body";

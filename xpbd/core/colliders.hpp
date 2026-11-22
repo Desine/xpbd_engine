@@ -1,7 +1,9 @@
 #pragma once
+#include "types.hpp"
+
 #include "glm/glm.hpp"
 #include <vector>
-#include "types.hpp"
+
 namespace xpbd
 {
     struct PointsCollider

@@ -1,7 +1,8 @@
 #include "collision.hpp"
-#include "xpbd/core/particles.hpp"
+#include "xpbd/core/particle.hpp"
 #include "xpbd/core/colliders.hpp"
 #include "../utils.hpp"
+
 #include <vector>
 
 namespace xpbd

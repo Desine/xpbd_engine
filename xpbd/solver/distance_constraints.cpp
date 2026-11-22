@@ -1,6 +1,7 @@
 #include "distance_constraints.hpp"
-#include "xpbd/core/particles.hpp"
+#include "xpbd/core/particle.hpp"
 #include "xpbd/core/constraints.hpp"
+
 #include <vector>
 
 namespace xpbd
@@ -60,7 +61,7 @@ namespace xpbd
         p1 += w1 * correction;
         p2 -= w2 * correction;
     }
-    void apply_distance_constraints_damping(Particles &p, std::vector<DistanceConstraint> &dc, float dt)
+    void apply_distance_constraints_damping(std::vector<Particle> &p, std::vector<DistanceConstraint> &dc, float dt)
     {
     }
 

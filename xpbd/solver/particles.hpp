@@ -1,5 +1,5 @@
 #pragma once
-#include "xpbd/core/particles.hpp"
+#include "xpbd/core/particle.hpp"
 
 namespace xpbd
 {

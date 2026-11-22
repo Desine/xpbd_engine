@@ -1,9 +1,11 @@
+#include "xpbd/core/types.hpp"
+
+#include "glm/glm.hpp"
 #include <vector>
 #include <cmath>
 #include <algorithm>
 #include <ankerl/unordered_dense.h>
-#include "glm/glm.hpp"
-#include "xpbd/core/types.hpp"
+
 namespace xpbd
 {
     struct CellCoord

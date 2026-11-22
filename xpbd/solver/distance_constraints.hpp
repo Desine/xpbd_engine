@@ -1,6 +1,7 @@
 #pragma once
-#include "xpbd/core/particles.hpp"
+#include "xpbd/core/particle.hpp"
 #include "xpbd/core/constraints.hpp"
+
 #include <vector>
 
 namespace xpbd
