@@ -1,7 +1,6 @@
 #include "xpbd.hpp"
 #include "renderer.hpp"
 #include "json_body_loader.hpp"
-#include "utils.hpp"
 
 #include "imgui.h"
 #include "imgui-SFML.h"
@@ -11,8 +10,7 @@
 #include <vector>
 #include "tracy/Tracy.hpp"
 
-
-void draw_worldDraw(xpbd::Cluster clusterDraw, glm::vec2 offset = {0.0f, 0.0f})
+void draw_worldDraw(xpbd::cluster::Cluster clusterDraw, glm::vec2 offset = {0.0f, 0.0f})
 {
     float circleSize = 0.03f;
     renderer::set_color(sf::Color::Red);
@@ -91,25 +89,20 @@ void spawn_many(
 int main()
 {
     json_body_loader::folder = std::filesystem::current_path().generic_string() + "/body/";
-    // std::println("folder {}", json_body_loader::folder);
 
     xpbd::World world;
     world.enqueue_command(xpbd::init_command());
     world.enqueue_command(xpbd::spawn_from_json_command("ground", {0, -10}));
     bool paused = world.updateState == xpbd::World::UpdateState::Paused;
-    bool reversePass = world.reversePass;
     int drawThickness = 1;
-    int targetRPM;
-
+    int targetRPM = 0;
 
     glm::vec2 spawn_pos(0.0f, -5.0f);
     spawn_many(world, spawn_pos, 5, 2, 3, 2, "car");
     spawn_pos = {0.0f, 0.0f};
     spawn_many(world, spawn_pos, 5, 10, 3, 2, "balloon");
 
-
-
-    xpbd::Cluster clusterDraw;
+    xpbd::cluster::Cluster clusterDraw;
 
     renderer::setup_window();
     renderer::setup_view();
@@ -184,10 +177,10 @@ int main()
                         for (size_t j = 0; j < amountY; ++j)
                         {
                             float y = position.y + spacingY * j;
-                            const float radius = 0.2f;
+                            const float radius = 0.15f;
                             const size_t segments = 6;
                             const float mass = 10;
-                            const float compliance = 0.0f;
+                            const float compliance = 0.000001f;
                             world.enqueue_command(xpbd::spawn_polygon_command({x, y}, radius, segments, mass, compliance));
                         }
                     }
@@ -199,10 +192,10 @@ int main()
                     world.enqueue_command(xpbd::spawn_from_json_command("balloon", position));
                 if (keyReleased->code == sf::Keyboard::Key::D)
                 {
-                    float radius = 0.2f;
+                    float radius = 0.15f;
                     size_t segments = 6;
                     float mass = 5;
-                    float compliance = 0.0f;
+                    float compliance = 0.000001f;
                     world.enqueue_command(xpbd::spawn_polygon_command(position, radius, segments, mass, compliance));
                 }
                 if (keyReleased->code == sf::Keyboard::Key::F)
@@ -247,31 +240,23 @@ int main()
             paused ? world.resume_update() : world.pause_update();
             paused = !paused;
         }
-        if (ImGui::Button(reversePass ? "Reverse pass is on" : "Reverse pass is off"))
-        {
-            reversePass ? world.reversePass = false : world.reversePass = true;
-            reversePass = !reversePass;
-        }
         if (ImGui::Button("Step once"))
             world.step_once_update();
         // ImGui::SliderFloat("gravity.x", &world.gravity.x, -20, 20);
         // ImGui::SliderFloat("gravity.y", &world.gravity.y, -20, 20);
         ImGui::SliderInt("Draw thickness", &drawThickness, 1, 10);
-        if (ImGui::SliderInt("targetRPM", &targetRPM, -1000, 1000))
+        if (ImGui::SliderInt("targetRPM", &targetRPM, -2000, 2000))
         {
-            if (world.cluster.angularMotors.size() > 1)
             {
-                xpbd::update_angular_motor_command motor1;
-                motor1.index = 0;
-                motor1.motor = world.cluster.angularMotors[0];
-                motor1.motor.targetRPM = targetRPM;
-                world.enqueue_command(motor1);
-
-                xpbd::update_angular_motor_command motor2;
-                motor2.index = 1;
-                motor2.motor = world.cluster.angularMotors[1];
-                motor2.motor.targetRPM = targetRPM;
-                world.enqueue_command(motor2);
+                std::lock_guard<std::mutex> lock(world.sceneMutex);
+                for (size_t i = 0; i < world.scene.angular_motor_storage.size(); ++i)
+                {
+                    auto *motor = world.scene.angular_motor_storage.at(i);
+                    const auto id = world.scene.angular_motor_storage.handle_at(i);
+                    if (motor && id)
+                        world.scene.update_angular_motor(
+                            *id, targetRPM, motor->maxTorque);
+                }
             }
         }
 
@@ -282,9 +267,8 @@ int main()
         if (draw)
         {
             ZoneScoped;
-            if (world.newFrame)
+            if (world.newFrame.exchange(false))
             {
-                world.newFrame = false;
                 std::lock_guard<std::mutex> lk(world.clusterDrawMutex);
                 std::swap(clusterDraw, world.clusterDraw);
             }

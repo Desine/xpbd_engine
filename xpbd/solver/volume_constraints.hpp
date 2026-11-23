@@ -1,14 +1,14 @@
 #pragma once
 #include "xpbd/core/particle.hpp"
 #include "xpbd/core/constraints.hpp"
+#include "xpbd/core/storage/component_storage.hpp"
 
 #include <vector>
 
 namespace xpbd
 {
-    float compute_polygon_area(const std::vector<glm::vec2> &positions);
-    float compute_polygon_area(const std::vector<Particle> &p, const std::vector<size_t> &indices);
-    void solve_volume_constraint(std::vector<Particle> &p, VolumeConstraint &vc, float dt);
-    void solve_volume_constraints(std::vector<Particle> &p, std::vector<VolumeConstraint> &vc, float dt);
-    void reset_volume_constraints_lambdas(std::vector<VolumeConstraint> &vc);
+float polygon_area(const ParticleStorage &storage, const std::vector<ParticleId> &ids);
+void solve_volume_constraints(ParticleStorage &p, VolumeConstraintStorage &vc, float dt);
+void solve_volume_constraint(ParticleStorage &p, VolumeConstraint &vc, float dt);
+void reset_volume_constraints_lambdas(VolumeConstraintStorage &vc);
 } // namespace xpbd

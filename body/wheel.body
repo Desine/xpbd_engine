@@ -57,7 +57,7 @@
       "staticFriction": 0.6,
       "kineticFriction": 0.8,
       "compliance": 0.000005,
-      "layer": 2,
+      "layer": 4,
       "mask": 1
     }
   ]

@@ -9,5 +9,5 @@ namespace json_body_loader
     extern std::string folder;
     extern const std::string extension;
 
-    bool load(xpbd::Cluster &cluster, const std::string &filename, glm::vec2 offset);
+    xpbd::cluster::Cluster* load(const std::string &filename, glm::vec2 offset = {0.0f, 0.0f});
 }

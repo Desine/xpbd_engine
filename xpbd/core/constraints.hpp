@@ -1,4 +1,6 @@
 #pragma once
+#include "storage/handles.hpp"
+
 #include "glm/glm.hpp"
 #include <vector>
 
@@ -6,8 +8,8 @@ namespace xpbd
 {
     struct DistanceConstraint
     {
-        size_t i1;
-        size_t i2;
+        ParticleId id1;
+        ParticleId id2;
         float minDist;
         float maxDist;
         float compressionDamping;
@@ -17,8 +19,8 @@ namespace xpbd
     };
     struct AngleConstraint
     {
-        size_t i1, i2;
-        size_t i3, i4;
+        ParticleId id1, id2;
+        ParticleId id3, id4;
         float minAngle;
         float maxAngle;
         float compliance;
@@ -26,8 +28,9 @@ namespace xpbd
     };
     struct VolumeConstraint
     {
-        std::vector<size_t> indices;
-        float restVolume;
+        std::vector<ParticleId> indices;
+        float volume;
+        float restPressure = 1.0f;
         float compliance;
         float lambda = 0.0f;
     };

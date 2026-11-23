@@ -1,85 +1,114 @@
 #include "volume_constraints.hpp"
 #include "xpbd/core/particle.hpp"
 #include "xpbd/core/constraints.hpp"
+#include "xpbd/core/storage/component_storage.hpp"
 #include "../utils.hpp"
 
 #include <vector>
 
-
 namespace xpbd
 {
-    float compute_polygon_area(const std::vector<glm::vec2> &positions)
+float polygon_area(
+    const ParticleStorage &storage,
+    const std::vector<ParticleId> &ids)
+{
+    if (ids.size() < 3)
+        return 0.0f;
+
+    float area = 0.0f;
+
+    for (size_t i = 0; i < ids.size(); ++i)
     {
-        float area = 0.0f;
-        size_t n = positions.size();
-        for (size_t i = 0, j = n - 1; i < n; j = i++)
-        {
-            const glm::vec2 &p0 = positions[j];
-            const glm::vec2 &p1 = positions[i];
-            area += Utils::cross(p0, p1);
-        }
-        return 0.5f * area;
-    }
-    float compute_polygon_area(const std::vector<Particle> &p, const std::vector<size_t> &indices)
-    {
-        float area = 0.0f;
-        size_t n = indices.size();
-        for (size_t i = 0, j = n - 1; i < n; j = i++)
-        {
-            const glm::vec2 &p0 = p[indices[j]].pos;
-            const glm::vec2 &p1 = p[indices[i]].pos;
-            area += Utils::cross(p0, p1);
-        }
-        return 0.5f * area;
+        const auto *p1 = storage.get(ids[i]);
+        const auto *p2 = storage.get(ids[(i + 1) % ids.size()]);
+
+        if (!p1 || !p2)
+            return 0.0f;
+
+        area += Utils::cross(p1->pos, p2->pos);
     }
 
-    void solve_volume_constraints(std::vector<Particle> &p, std::vector<VolumeConstraint> &vc, float dt)
+    return area * 0.5f;
+}
+
+void solve_volume_constraints(
+    ParticleStorage &p,
+    VolumeConstraintStorage &vc,
+    float dt)
+{
+    for (size_t i = 0; i < vc.size(); ++i)
+        solve_volume_constraint(p, *vc.at(i), dt);
+}
+
+void solve_volume_constraint(
+    ParticleStorage &p,
+    VolumeConstraint &vc,
+    float dt)
+{
+    const std::vector<ParticleId> &indices = vc.indices;
+    size_t N = indices.size();
+
+    float volume = polygon_area(p, indices);
+    float C = volume - vc.volume * vc.restPressure;
+
+    float denom = 0.0f;
+    std::vector<glm::vec2> grads(N);
+
+    for (size_t i = 0; i < N; ++i)
     {
-        for (auto &c : vc)
-            solve_volume_constraint(p, c, dt);
-    }
-    void solve_volume_constraint(std::vector<Particle> &p, VolumeConstraint &vc, float dt)
-    {
-        std::vector<size_t> &indices = vc.indices;
-        size_t N = indices.size();
+        const Particle *particlePrev =
+            p.get(indices[(i + N - 1) % N]);
 
-        float volume = compute_polygon_area(p, indices);
-        float C = volume - vc.restVolume;
+        const Particle *particleNext =
+            p.get(indices[(i + 1) % N]);
 
-        float denom = 0.0f;
-        std::vector<glm::vec2> grads(N);
+        const Particle *particle =
+            p.get(indices[i]);
 
-        for (size_t i = 0; i < N; ++i)
-        {
-            const glm::vec2 &pi_prev = p[indices[(i + N - 1) % N]].pos;
-            const glm::vec2 &pi_next = p[indices[(i + 1) % N]].pos;
-
-            glm::vec2 grad = 0.5f * Utils::perpCW2d(pi_next - pi_prev);
-            grads[i] = grad;
-
-            float wi = p[indices[i]].w;
-            denom += wi * glm::dot(grad, grad);
-        }
-
-        float alphaTilde = vc.compliance / (dt * dt);
-        denom += alphaTilde;
-        if (denom < 1e-6f)
+        if (!particlePrev || !particleNext || !particle)
             return;
 
-        float deltaLambda = (-C - alphaTilde * vc.lambda) / denom;
-        vc.lambda += deltaLambda;
+        const glm::vec2 &pi_prev = particlePrev->pos;
+        const glm::vec2 &pi_next = particleNext->pos;
 
-        for (size_t i = 0; i < N; ++i)
-        {
-            uint32_t idx = indices[i];
-            float wi = p[idx].w;
+        glm::vec2 grad =
+            0.5f * Utils::perpCW2d(pi_next - pi_prev);
 
-            p[idx].pos += wi * deltaLambda * grads[i];
-        }
-    } 
-    void reset_volume_constraints_lambdas(std::vector<VolumeConstraint> &vc)
-    {
-        for (auto &c : vc)
-            c.lambda = 0;
+        grads[i] = grad;
+
+        float wi = particle->w;
+        denom += wi * glm::dot(grad, grad);
     }
+
+    float alphaTilde = vc.compliance / (dt * dt);
+    denom += alphaTilde;
+
+    if (denom < 1e-6f)
+        return;
+
+    float deltaLambda =
+        (-C - alphaTilde * vc.lambda) / denom;
+
+    vc.lambda += deltaLambda;
+
+    for (size_t i = 0; i < N; ++i)
+    {
+        Particle *particle = p.get(indices[i]);
+
+        if (!particle)
+            return;
+
+        float wi = particle->w;
+
+        particle->pos +=
+            wi * deltaLambda * grads[i];
+    }
+}
+
+void reset_volume_constraints_lambdas(
+    VolumeConstraintStorage &vc)
+{
+    for (size_t i = 0; i < vc.size(); ++i)
+        vc.at(i)->lambda = 0.0f;
+}
 } // namespace xpbd

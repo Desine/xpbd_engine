@@ -6,9 +6,8 @@
 #include <iostream>
 #include <type_traits>
 
-
-using namespace xpbd;
-
+namespace xpbd
+{
 
 int testsPassed = 0;
 
@@ -265,8 +264,11 @@ void test_dense_storage_clear()
     ++testsPassed;
 }
 
+} // namespace xpbd
+
 int main()
 {
+    using namespace xpbd;
     test_object_pool_create_and_contains();
     test_object_pool_swap_and_pop();
     test_object_pool_stale_handle();

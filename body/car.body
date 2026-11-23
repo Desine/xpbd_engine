@@ -67,7 +67,7 @@
         "i3": "wheel",
         "i4": "wheel_motor_ref",
 
-        "targetRPM": -1000.0,
+        "targetRPM": -2000.0,
         "maxTorque": 8000.0
     },
     {
@@ -76,7 +76,7 @@
         "i3": "wheel2",
         "i4": "wheel2_motor_ref",
 
-        "targetRPM": -1000.0,
+        "targetRPM": -2000.0,
         "maxTorque": 8000.0
     }
   ],

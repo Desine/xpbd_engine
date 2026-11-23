@@ -1,154 +1,173 @@
 #include "actuators.hpp"
 #include "xpbd/core/particle.hpp"
 #include "xpbd/core/actuators.hpp"
+#include "xpbd/core/storage/component_storage.hpp"
 #include "../utils.hpp"
 
 #include "glm/glm.hpp"
-#include <vector>
+#include <cmath>
 
 namespace xpbd
 {
-    bool get_angularData(
-        const std::vector<Particle> &p,
-        size_t i1, size_t i2,
-        size_t i3, size_t i4,
-        AngularData &data)
-    {
-        glm::vec2 dir1 = p[i2].pos - p[i1].pos;
-        glm::vec2 dir2 = p[i4].pos - p[i3].pos;
+bool get_angularData(
+    const ParticleStorage &p,
+    ParticleId i1, ParticleId i2,
+    ParticleId i3, ParticleId i4,
+    AngularData &data)
+{
+    const Particle *p1 = p.get(i1);
+    const Particle *p2 = p.get(i2);
+    const Particle *p3 = p.get(i3);
+    const Particle *p4 = p.get(i4);
 
-        float len1Sq = glm::dot(dir1, dir1);
-        float len2Sq = glm::dot(dir2, dir2);
+    if (!p1 || !p2 || !p3 || !p4)
+        return false;
 
-        if (len1Sq < 1e-6f || len2Sq < 1e-6f)
-            return false;
+    glm::vec2 dir1 = p2->pos - p1->pos;
+    glm::vec2 dir2 = p4->pos - p3->pos;
 
-        data.grad1 = Utils::perpCCW2d(dir1) / len1Sq;
-        data.grad2 = Utils::perpCCW2d(dir2) / len2Sq;
+    float len1Sq = glm::dot(dir1, dir1);
+    float len2Sq = glm::dot(dir2, dir2);
 
-        data.invI1 =
-            (p[i1].w + p[i2].w) *
-            glm::dot(data.grad1, data.grad1);
+    if (len1Sq < 1e-6f || len2Sq < 1e-6f)
+        return false;
 
-        data.invI2 =
-            (p[i3].w + p[i4].w) *
-            glm::dot(data.grad2, data.grad2);
+    data.grad1 = Utils::perpCCW2d(dir1) / len1Sq;
+    data.grad2 = Utils::perpCCW2d(dir2) / len2Sq;
 
-        data.invI = data.invI1 + data.invI2;
+    data.invI1 =
+        (p1->w + p2->w) *
+        glm::dot(data.grad1, data.grad1);
 
-        if (data.invI < 1e-6f)
-            return false;
+    data.invI2 =
+        (p3->w + p4->w) *
+        glm::dot(data.grad2, data.grad2);
 
-        data.angle = Utils::relative_angle_rad(dir1, dir2);
+    data.invI = data.invI1 + data.invI2;
 
-        data.omega =
-            glm::dot(p[i4].vel - p[i3].vel, data.grad2) -
-            glm::dot(p[i2].vel - p[i1].vel, data.grad1);
+    if (data.invI < 1e-6f)
+        return false;
 
-        return true;
-    }
-    void apply_angular_velocity_correction(
-        std::vector<Particle> &p,
-        size_t i1, size_t i2,
-        size_t i3, size_t i4,
-        float deltaL)
-    {
-        AngularData data;
+    data.angle = Utils::relative_angle_rad(dir1, dir2);
 
-        if (!get_angularData(
-                p, i1, i2, i3, i4, data))
-            return;
+    data.omega =
+        glm::dot(p4->vel - p3->vel, data.grad2) -
+        glm::dot(p2->vel - p1->vel, data.grad1);
 
-        float lambda = deltaL / data.invI;
+    return true;
+}
 
-        glm::vec2 correction1 = data.grad1 * lambda;
-        glm::vec2 correction2 = data.grad2 * lambda;
+void apply_angular_velocity_correction(
+    ParticleStorage &p,
+    ParticleId i1, ParticleId i2,
+    ParticleId i3, ParticleId i4,
+    float deltaL)
+{
+    AngularData data;
 
-        p[i1].vel += p[i1].w * correction1;
-        p[i2].vel -= p[i2].w * correction1;
+    if (!get_angularData(p, i1, i2, i3, i4, data))
+        return;
 
-        p[i3].vel -= p[i3].w * correction2;
-        p[i4].vel += p[i4].w * correction2;
-    }
-    void apply_torque(
-        std::vector<Particle> &p,
-        size_t i1, size_t i2,
-        size_t i3, size_t i4,
-        float torque,
-        float dt)
-    {
-        apply_angular_velocity_correction(
-            p, i1, i2, i3, i4,
-            torque * dt);
-    }
+    Particle *p1 = p.get(i1);
+    Particle *p2 = p.get(i2);
+    Particle *p3 = p.get(i3);
+    Particle *p4 = p.get(i4);
 
-    void solve_angularMotor(
-        std::vector<Particle> &p,
-        const AngularMotor &motor,
-        float dt)
-    {
-        AngularData data;
+    if (!p1 || !p2 || !p3 || !p4)
+        return;
 
-        if (!get_angularData(
-                p,
-                motor.i1, motor.i2,
-                motor.i3, motor.i4,
-                data))
-            return;
+    float lambda = deltaL / data.invI;
 
-        constexpr float RPM_TO_RAD = 2.0f * 3.14159265359f / 60.0f;
+    glm::vec2 correction1 = data.grad1 * lambda;
+    glm::vec2 correction2 = data.grad2 * lambda;
 
-        float targetOmega = motor.targetRPM * RPM_TO_RAD;
+    p1->vel += p1->w * correction1;
+    p2->vel -= p2->w * correction1;
 
-        float deltaOmega = targetOmega - data.omega;
-        float deltaL = deltaOmega / data.invI;
-        float maxImpulse = motor.maxTorque * dt;
+    p3->vel -= p3->w * correction2;
+    p4->vel += p4->w * correction2;
+}
 
-        deltaL = glm::clamp(
-            deltaL,
-            -maxImpulse,
-            maxImpulse);
+void apply_torque(
+    ParticleStorage &p,
+    ParticleId i1, ParticleId i2,
+    ParticleId i3, ParticleId i4,
+    float torque,
+    float dt)
+{
+    apply_angular_velocity_correction(
+        p, i1, i2, i3, i4,
+        torque * dt);
+}
 
-        apply_angular_velocity_correction(
+void solve_angularMotor(
+    ParticleStorage &p,
+    const AngularMotor &motor,
+    float dt)
+{
+    AngularData data;
+
+    if (!get_angularData(
             p,
-            motor.i1, motor.i2,
-            motor.i3, motor.i4,
-            deltaL);
-    }
-    void solve_angularServo(
-        std::vector<Particle> &p,
-        const AngularServo &servo,
-        float dt)
-    {
-        AngularData data;
+            motor.id1, motor.id2,
+            motor.id3, motor.id4,
+            data))
+        return;
 
-        if (!get_angularData(
-                p,
-                servo.i1, servo.i2,
-                servo.i3, servo.i4,
-                data))
-            return;
+    constexpr float RPM_TO_RAD = 2.0f * 3.14159265359f / 60.0f;
 
-        float angleError = servo.targetAngle - data.angle;
+    float targetOmega = motor.targetRPM * RPM_TO_RAD;
 
-        angleError = std::atan2(
-            std::sin(angleError),
-            std::cos(angleError));
+    float deltaOmega = targetOmega - data.omega;
+    float deltaL = deltaOmega / data.invI;
+    float maxImpulse = motor.maxTorque * dt;
 
-        float torque =
-            servo.kp * angleError -
-            servo.kd * data.omega;
+    deltaL = glm::clamp(
+        deltaL,
+        -maxImpulse,
+        maxImpulse);
 
-        torque = glm::clamp(
-            torque,
-            -servo.maxTorque,
-            servo.maxTorque);
+    apply_angular_velocity_correction(
+        p,
+        motor.id1, motor.id2,
+        motor.id3, motor.id4,
+        deltaL);
+}
 
-        apply_torque(
+void solve_angularServo(
+    ParticleStorage &p,
+    const AngularServo &servo,
+    float dt)
+{
+    AngularData data;
+
+    if (!get_angularData(
             p,
-            servo.i1, servo.i2,
-            servo.i3, servo.i4,
-            torque,
-            dt);
-    }
+            servo.id1, servo.id2,
+            servo.id3, servo.id4,
+            data))
+        return;
+
+    float angleError = servo.targetAngle - data.angle;
+
+    angleError = std::atan2(
+        std::sin(angleError),
+        std::cos(angleError));
+
+    float torque =
+        servo.kp * angleError -
+        servo.kd * data.omega;
+
+    torque = glm::clamp(
+        torque,
+        -servo.maxTorque,
+        servo.maxTorque);
+
+    apply_torque(
+        p,
+        servo.id1, servo.id2,
+        servo.id3, servo.id4,
+        torque,
+        dt);
+}
 } // namespace xpbd

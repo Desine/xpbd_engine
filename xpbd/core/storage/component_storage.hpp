@@ -9,49 +9,18 @@
 
 namespace xpbd
 {
-    using DistanceConstraintStorage =
-        DenseStorage<DistanceConstraint, DistanceConstraintTag>;
+    using EntityStorage = DenseStorage<Entity, EntityTag>;
 
-    using AngleConstraintStorage =
-        DenseStorage<AngleConstraint, AngleConstraintTag>;
+    using ParticleStorage = DenseStorage<Particle, ParticleTag>;
 
-    using VolumeConstraintStorage =
-        DenseStorage<VolumeConstraint, VolumeConstraintTag>;
+    using DistanceConstraintStorage = DenseStorage<DistanceConstraint, DistanceConstraintTag>;
+    using AngleConstraintStorage = DenseStorage<AngleConstraint, AngleConstraintTag>;
+    using VolumeConstraintStorage = DenseStorage<VolumeConstraint, VolumeConstraintTag>;
 
-    using PointsColliderStorage =
-        DenseStorage<PointsCollider, PointsColliderTag>;
+    using PointsColliderStorage = DenseStorage<PointsCollider, PointsColliderTag>;
+    using PolygonColliderStorage = DenseStorage<PointsCollider, PolygonColliderTag>;
 
-    using PolygonColliderStorage =
-        DenseStorage<PointsCollider, PolygonColliderTag>;
+    using AngularMotorStorage = DenseStorage<AngularMotor, AngularMotorTag>;
+    using AngularServoStorage = DenseStorage<AngularServo, AngularServoTag>;
 
-    using AngularMotorStorage =
-        DenseStorage<AngularMotor, AngularMotorTag>;
-
-    using AngularServoStorage =
-        DenseStorage<AngularServo, AngularServoTag>;
-
-    struct ParticleStorage : DenseStorage<Particle, ParticleTag>
-    {
-        ParticleId create(
-            const glm::vec2 &pos,
-            float mass,
-            const glm::vec2 &vel = {})
-        {
-            Particle particle{pos, pos, vel, mass > 0.f ? 1.f / mass : 0.f};
-
-            return DenseStorage::create(std::move(particle));
-        }
-    };
-
-    struct EntityStorage : DenseStorage<Entity, EntityTag>
-    {
-        EntityId create(Entity entity)
-        {
-            EntityId id = DenseStorage::create(std::move(entity));
-
-            get(id)->id = id;
-
-            return id;
-        }
-    };
 } // namespace xpbd

@@ -1,4 +1,6 @@
 #pragma once
+#include "storage/handles.hpp"
+
 #include "glm/glm.hpp"
 
 namespace xpbd
@@ -15,15 +17,15 @@ namespace xpbd
     };
     struct AngularMotor
     {
-        size_t i1, i2;
-        size_t i3, i4;
+        ParticleId id1, id2;
+        ParticleId id3, id4;
         float targetRPM;
         float maxTorque;
     };
     struct AngularServo
     {
-        size_t i1, i2;
-        size_t i3, i4;
+        ParticleId id1, id2;
+        ParticleId id3, id4;
         float targetAngle;
         float kp;
         float kd;

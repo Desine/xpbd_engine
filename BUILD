@@ -19,7 +19,6 @@ cc_binary(
         include = [
             "xpbd/**/*.cpp",
             "xpbd/**/*.hpp",
-            "xpbd/**/*.h"
         ],
         exclude = [
             "xpbd/tests/*",
@@ -58,7 +57,8 @@ cc_library(
     name = "storage",
     hdrs = glob([
         "xpbd/core/storage/*.hpp",
-    ]),
+        "xpbd/core/storage/*.cpp",
+    ], allow_empty = True),
     visibility = ["//visibility:public"],
 )
 

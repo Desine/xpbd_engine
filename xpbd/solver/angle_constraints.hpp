@@ -1,13 +1,13 @@
 #pragma once
-#include "angle_constraints.hpp"
 #include "xpbd/core/particle.hpp"
 #include "xpbd/core/constraints.hpp"
+#include "xpbd/core/storage/component_storage.hpp"
 
 #include <vector>
 
 namespace xpbd
 {
-    void solve_angle_constraint(std::vector<Particle> &p, AngleConstraint &ac, float dt);
-    void solve_angle_constraints(std::vector<Particle> &p, std::vector<AngleConstraint> &ac, float dt);
-    void reset_angle_constraints_lambdas(std::vector<AngleConstraint> &ac);
+void solve_angle_constraints(ParticleStorage &p, AngleConstraintStorage &ac, float dt);
+void solve_angle_constraint(ParticleStorage &p, AngleConstraint &ac, float dt);
+void reset_angle_constraints_lambdas(AngleConstraintStorage &ac);
 } // namespace xpbd
