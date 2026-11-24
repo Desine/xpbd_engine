@@ -241,8 +241,8 @@ void World::spawn_polygon(glm::vec2 pos, float radius, size_t segments, float ma
     for (size_t i = 0; i < segments; ++i)
         scene.add_distance_constraint(ids[i], ids[(i + 1) % segments], compliance);
     scene.add_volume_constraint(ids, compliance);
-    // scene.add_polygon_collider(ids, 0.4f, 0.3f, 0.0f, 1, 1);
-    scene.add_points_collider(ids, 0.4f, 0.3f, 0.0f, 1, 1);
+    scene.add_polygon_collider(ids, 0.4f, 0.3f, 0.0f, 1, 1);
+    // scene.add_points_collider(ids, 0.4f, 0.3f, 0.0f, 1, 1);
 }
 
 void World::enqueue_command(Command command)
@@ -275,6 +275,8 @@ void World::execute_enqueued_commands()
                            spawn_polygon(arg.pos, arg.radius, arg.segments, arg.mass, arg.compliance);
                        else if constexpr (std::is_same_v<T, remove_particle_command>)
                            scene.remove_particle(arg.id);
+                       else if constexpr (std::is_same_v<T, update_angular_motor_command>)
+                           scene.update_angular_motor(arg.id, arg.targetRPM, arg.maxTorque);
                        //
                    },
                    command);

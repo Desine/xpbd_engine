@@ -181,7 +181,7 @@ int main()
                             float y = position.y + spacingY * j;
                             const float radius = 0.15f;
                             const size_t segments = 6;
-                            const float mass = 10;
+                            const float mass = 100;
                             const float compliance = 0.000001f;
                             world.enqueue_command(xpbd::spawn_polygon_command({x, y}, radius, segments, mass, compliance));
                         }
@@ -196,7 +196,7 @@ int main()
                 {
                     float radius = 0.15f;
                     size_t segments = 6;
-                    float mass = 5;
+                    float mass = 100;
                     float compliance = 0.000001f;
                     world.enqueue_command(xpbd::spawn_polygon_command(position, radius, segments, mass, compliance));
                 }
@@ -255,18 +255,14 @@ int main()
         // ImGui::SliderFloat("gravity.x", &world.gravity.x, -20, 20);
         // ImGui::SliderFloat("gravity.y", &world.gravity.y, -20, 20);
         ImGui::SliderInt("Draw thickness", &drawThickness, 1, 10);
-        if (ImGui::SliderInt("targetRPM", &targetRPM, -2000, 2000))
+        if (ImGui::SliderInt("targetRPM", &targetRPM, -1, 1))
         {
+            for (size_t i = 0; i < world.scene.angular_motor_storage.size(); ++i)
             {
-                std::lock_guard<std::mutex> lock(world.sceneMutex);
-                for (size_t i = 0; i < world.scene.angular_motor_storage.size(); ++i)
-                {
-                    auto *motor = world.scene.angular_motor_storage.at(i);
-                    const auto id = world.scene.angular_motor_storage.handle_at(i);
-                    if (motor && id)
-                        world.scene.update_angular_motor(
-                            *id, targetRPM, motor->maxTorque);
-                }
+                auto *motor = world.scene.angular_motor_storage.at(i);
+                const auto id = world.scene.angular_motor_storage.handle_at(i);
+                if (motor && id)
+                    world.enqueue_command(xpbd::update_angular_motor_command(*id, targetRPM * 2000, motor->maxTorque));
             }
         }
 

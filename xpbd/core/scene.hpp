@@ -2,6 +2,7 @@
 #include "storage/component_storage.hpp"
 #include "storage/handles.hpp"
 
+#include <cstdint>
 #include <string>
 
 namespace xpbd
@@ -43,10 +44,10 @@ struct Scene
     VolumeConstraintId add_volume_constraint(const std::vector<ParticleId> &indices, float compliance, float restPressure, float volume);
     bool remove_volume_constraint(VolumeConstraintId id);
 
-    PointsColliderId add_points_collider(const std::vector<ParticleId> &indices, float staticFriction, float kineticFriction, float compliance, int8_t layer, int8_t mask);
+    PointsColliderId add_points_collider(const std::vector<ParticleId> &indices, float staticFriction, float kineticFriction, float compliance, uint32_t layer, uint32_t mask);
     bool remove_points_collider(PointsColliderId id);
     void remove_particle_from_points_collider(ParticleId particleId);
-    PolygonColliderId add_polygon_collider(const std::vector<ParticleId> &indices, float staticFriction, float kineticFriction, float compliance, int8_t layer, int8_t mask);
+    PolygonColliderId add_polygon_collider(const std::vector<ParticleId> &indices, float staticFriction, float kineticFriction, float compliance, uint32_t layer, uint32_t mask);
     bool remove_polygon_collider(PolygonColliderId id);
 
     AngularMotorId add_angular_motor(ParticleId id1, ParticleId id2, ParticleId id3, ParticleId id4, float targetRPM, float maxTorque);

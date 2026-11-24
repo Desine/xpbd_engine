@@ -8,6 +8,7 @@
 #include "glm/glm.hpp"
 #include "storage/handles.hpp"
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <stdexcept>
 
@@ -251,8 +252,8 @@ PointsColliderId Scene::add_points_collider(
     float staticFriction,
     float kineticFriction,
     float compliance,
-    int8_t layer,
-    int8_t mask)
+    uint32_t layer,
+    uint32_t mask)
 {
     if (indices.empty())
         return {};
@@ -280,8 +281,8 @@ PolygonColliderId Scene::add_polygon_collider(
     float staticFriction,
     float kineticFriction,
     float compliance,
-    int8_t layer,
-    int8_t mask)
+    uint32_t layer,
+    uint32_t mask)
 {
     if (indices.size() < 3)
         return {};
