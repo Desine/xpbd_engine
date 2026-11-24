@@ -6,11 +6,82 @@
 #include "cluster.hpp"
 
 #include "glm/glm.hpp"
+#include "storage/handles.hpp"
+#include <cstddef>
 #include <memory>
 #include <stdexcept>
 
 namespace xpbd
 {
+
+template <typename Storage, typename Predicate>
+void remove_matching(Storage &storage, Predicate predicate)
+{
+    for (size_t i = storage.size(); i > 0; --i)
+    {
+        const auto id = storage.handle_at(i - 1);
+        const auto *value = storage.at(i - 1);
+        if (id && value && predicate(*value))
+            storage.remove(*id);
+    }
+}
+template <typename IdRange>
+bool contains_particle(const IdRange &ids, ParticleId particleId)
+{
+    return std::find(ids.begin(), ids.end(), particleId) != ids.end();
+}
+
+void Scene::remove_particle_from_points_collider(ParticleId particleId)
+{
+    for (size_t i = points_collider_storage.size(); i > 0; --i)
+    {
+        const size_t index = i - 1;
+
+        auto* collider = points_collider_storage.at(index);
+        if (!collider)
+            continue;
+
+        auto& indices = collider->indices;
+
+        auto it = std::find(indices.begin(), indices.end(), particleId);
+        if (it == indices.end())
+            continue;
+
+        indices.erase(it);
+
+        if (indices.empty())
+        {
+            auto id = points_collider_storage.handle_at(index);
+            if (id)
+                points_collider_storage.remove(*id);
+        }
+    }
+}
+
+bool Scene::remove_particle(ParticleId id)
+{
+    if (!particle_storage.contains(id))
+        return false;
+
+    remove_matching(distance_constraint_storage, [id](const DistanceConstraint &c)
+                    { return c.id1 == id || c.id2 == id; });
+    remove_matching(angle_constraint_storage, [id](const AngleConstraint &c)
+                    { return c.id1 == id || c.id2 == id || c.id3 == id || c.id4 == id; });
+    remove_matching(volume_constraint_storage, [id](const VolumeConstraint &c)
+                    { return contains_particle(c.indices, id); });
+
+    remove_particle_from_points_collider(id);
+    remove_matching(polygon_collider_storage, [id](const PointsCollider &c)
+                    { return contains_particle(c.indices, id); });
+
+    remove_matching(angular_motor_storage, [id](const AngularMotor &m)
+                    { return m.id1 == id || m.id2 == id || m.id3 == id || m.id4 == id; });
+    remove_matching(angular_servo_storage, [id](const AngularServo &s)
+                    { return s.id1 == id || s.id2 == id || s.id3 == id || s.id4 == id; });
+
+    return particle_storage.remove(id);
+}
+
 EntityId Scene::add_entity()
 {
     EntityId id = entity_storage.create();
@@ -46,7 +117,6 @@ DistanceConstraintId Scene::add_distance_constraint(
 {
     const auto *p1 = particle_storage.get(id1);
     const auto *p2 = particle_storage.get(id2);
-
     if (!p1 || !p2)
         return {};
 
@@ -68,14 +138,16 @@ DistanceConstraintId Scene::add_distance_constraint(
         return {};
 
     DistanceConstraint dc{};
-
     dc.id1 = id1;
     dc.id2 = id2;
     dc.minDist = minDist;
     dc.maxDist = maxDist;
     dc.compliance = compliance;
-
     return distance_constraint_storage.create(std::move(dc));
+}
+bool Scene::remove_distance_constraint(DistanceConstraintId id)
+{
+    return distance_constraint_storage.remove(id);
 }
 
 AngleConstraintId Scene::add_angle_constraint(
@@ -89,7 +161,6 @@ AngleConstraintId Scene::add_angle_constraint(
     const auto *p2 = particle_storage.get(id2);
     const auto *p3 = particle_storage.get(id3);
     const auto *p4 = particle_storage.get(id4);
-
     if (!p1 || !p2 || !p3 || !p4)
         return {};
 
@@ -119,7 +190,6 @@ AngleConstraintId Scene::add_angle_constraint(
         return {};
 
     AngleConstraint ac{};
-
     ac.id1 = id1;
     ac.id2 = id2;
     ac.id3 = id3;
@@ -127,30 +197,11 @@ AngleConstraintId Scene::add_angle_constraint(
     ac.minAngle = minAngle;
     ac.maxAngle = maxAngle;
     ac.compliance = compliance;
-
     return angle_constraint_storage.create(std::move(ac));
 }
-
-VolumeConstraintId Scene::add_volume_constraint(
-    const std::vector<ParticleId> &indices,
-    float compliance)
+bool Scene::remove_angle_constraint(AngleConstraintId id)
 {
-    if (indices.size() < 3)
-        return {};
-
-    for (ParticleId id : indices)
-    {
-        if (!particle_storage.contains(id))
-            return {};
-    }
-
-    VolumeConstraint vc{};
-
-    vc.indices = indices;
-    vc.volume = polygon_area(particle_storage, indices);
-    vc.compliance = compliance;
-
-    return volume_constraint_storage.create(std::move(vc));
+    return angle_constraint_storage.remove(id);
 }
 
 VolumeConstraintId Scene::add_volume_constraint(
@@ -162,19 +213,12 @@ VolumeConstraintId Scene::add_volume_constraint(
         return {};
 
     for (ParticleId id : indices)
-    {
         if (!particle_storage.contains(id))
             return {};
-    }
 
-    VolumeConstraint vc{};
+    float volume = polygon_area(particle_storage, indices);
 
-    vc.indices = indices;
-    vc.volume = polygon_area(particle_storage, indices);
-    vc.restPressure = restPressure;
-    vc.compliance = compliance;
-
-    return volume_constraint_storage.create(std::move(vc));
+    return add_volume_constraint(indices, compliance, restPressure, volume);
 }
 
 VolumeConstraintId Scene::add_volume_constraint(
@@ -187,19 +231,19 @@ VolumeConstraintId Scene::add_volume_constraint(
         return {};
 
     for (ParticleId id : indices)
-    {
         if (!particle_storage.contains(id))
             return {};
-    }
 
     VolumeConstraint vc{};
-
     vc.indices = indices;
     vc.volume = volume;
     vc.restPressure = restPressure;
     vc.compliance = compliance;
-
     return volume_constraint_storage.create(std::move(vc));
+}
+bool Scene::remove_volume_constraint(VolumeConstraintId id)
+{
+    return volume_constraint_storage.remove(id);
 }
 
 PointsColliderId Scene::add_points_collider(
@@ -214,21 +258,21 @@ PointsColliderId Scene::add_points_collider(
         return {};
 
     for (ParticleId id : indices)
-    {
         if (!particle_storage.contains(id))
             return {};
-    }
 
     PointsCollider collider{};
-
     collider.indices = indices;
     collider.staticFriction = staticFriction;
     collider.kineticFriction = kineticFriction;
     collider.compliance = compliance;
     collider.layer = layer;
     collider.mask = mask;
-
     return points_collider_storage.create(std::move(collider));
+}
+bool Scene::remove_points_collider(PointsColliderId id)
+{
+    return points_collider_storage.remove(id);
 }
 
 PolygonColliderId Scene::add_polygon_collider(
@@ -259,6 +303,10 @@ PolygonColliderId Scene::add_polygon_collider(
 
     return polygon_collider_storage.create(std::move(collider));
 }
+bool Scene::remove_polygon_collider(PolygonColliderId id)
+{
+    return polygon_collider_storage.remove(id);
+}
 
 AngularMotorId Scene::add_angular_motor(
     ParticleId id1,
@@ -275,14 +323,12 @@ AngularMotorId Scene::add_angular_motor(
         return {};
 
     AngularMotor motor{};
-
     motor.id1 = id1;
     motor.id2 = id2;
     motor.id3 = id3;
     motor.id4 = id4;
     motor.targetRPM = targetRPM;
     motor.maxTorque = maxTorque;
-
     return angular_motor_storage.create(std::move(motor));
 }
 
@@ -300,6 +346,10 @@ bool Scene::update_angular_motor(
     motor->maxTorque = maxTorque;
 
     return true;
+}
+bool Scene::remove_angular_motor(AngularMotorId id)
+{
+    return angular_motor_storage.remove(id);
 }
 
 AngularServoId Scene::add_angular_servo(
@@ -319,7 +369,6 @@ AngularServoId Scene::add_angular_servo(
         return {};
 
     AngularServo servo{};
-
     servo.id1 = id1;
     servo.id2 = id2;
     servo.id3 = id3;
@@ -328,7 +377,6 @@ AngularServoId Scene::add_angular_servo(
     servo.kp = kp;
     servo.kd = kd;
     servo.maxTorque = maxTorque;
-
     return angular_servo_storage.create(std::move(servo));
 }
 
@@ -350,6 +398,10 @@ bool Scene::update_angular_servo(
     servo->maxTorque = maxTorque;
 
     return true;
+}
+bool Scene::remove_angular_servo(AngularServoId id)
+{
+    return angular_servo_storage.remove(id);
 }
 
 void Scene::load_from_json(

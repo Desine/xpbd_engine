@@ -1,12 +1,14 @@
 #include "xpbd.hpp"
 #include "renderer.hpp"
 #include "json_body_loader.hpp"
+#include "core/storage/handles.hpp"
 
 #include "imgui.h"
 #include "imgui-SFML.h"
 #include <SFML/Graphics.hpp>
 
 #include "glm/glm.hpp"
+#include <print>
 #include <vector>
 #include "tracy/Tracy.hpp"
 
@@ -217,6 +219,14 @@ int main()
                     else
                         world.pause_update();
                     paused = world.updateState == xpbd::World::UpdateState::Paused;
+                }
+                // remove_particle
+                if (keyReleased->code == sf::Keyboard::Key::T)
+                {
+                    std::optional<xpbd::ParticleId> id = world.scene.particle_storage.handle_at(6);
+
+                    if (id)
+                        world.enqueue_command(xpbd::remove_particle_command{*id});
                 }
             }
         }

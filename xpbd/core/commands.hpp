@@ -1,4 +1,6 @@
 #pragma once
+#include "storage/handles.hpp"
+
 #include "glm/glm.hpp"
 #include <string>
 #include <variant>
@@ -26,7 +28,15 @@ struct spawn_polygon_command
     float mass;
     float compliance;
 };
+struct remove_particle_command
+{
+    ParticleId id;
+};
 
-using Command = std::variant<init_command, set_tickRate_command,
-                             spawn_from_json_command, spawn_polygon_command>;
+using Command = std::variant<
+    init_command,
+    set_tickRate_command,
+    spawn_from_json_command,
+    spawn_polygon_command,
+    remove_particle_command>;
 } // namespace xpbd
