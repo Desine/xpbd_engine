@@ -39,10 +39,10 @@ void solve_distance_constraint(
 
     float C = 0.0f;
 
-    if (len < dc.minDist)
-        C = len - dc.minDist;
-    else if (len > dc.maxDist)
-        C = len - dc.maxDist;
+    if (len < dc.min_dist)
+        C = len - dc.min_dist;
+    else if (len > dc.max_dist)
+        C = len - dc.max_dist;
     else
     {
         dc.lambda = 0.0f;

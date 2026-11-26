@@ -1,20 +1,32 @@
 #include "scene.hpp"
+#include "nlohmann/json.hpp"
+#include "particle.hpp"
 #include "storage/component_storage.hpp"
 #include "../utils.hpp"
 #include "../solver/volume_constraints.hpp"
-#include "../json_body_loader.hpp"
 #include "cluster.hpp"
 
 #include "glm/glm.hpp"
 #include "storage/handles.hpp"
 #include <cstddef>
 #include <cstdint>
+#include <exception>
+#include <format>
+#include <fstream>
+#include <iostream>
 #include <memory>
+#include <optional>
+#include <print>
 #include <stdexcept>
+#include <string>
+#include <unordered_set>
+#include <utility>
 
 namespace xpbd
 {
 
+namespace
+{
 template <typename Storage, typename Predicate>
 void remove_matching(Storage &storage, Predicate predicate)
 {
@@ -31,6 +43,7 @@ bool contains_particle(const IdRange &ids, ParticleId particleId)
 {
     return std::find(ids.begin(), ids.end(), particleId) != ids.end();
 }
+} // namespace
 
 void Scene::remove_particle_from_points_collider(ParticleId particleId)
 {
@@ -38,11 +51,11 @@ void Scene::remove_particle_from_points_collider(ParticleId particleId)
     {
         const size_t index = i - 1;
 
-        auto* collider = points_collider_storage.at(index);
+        auto *collider = points_collider_storage.at(index);
         if (!collider)
             continue;
 
-        auto& indices = collider->indices;
+        auto &indices = collider->indices;
 
         auto it = std::find(indices.begin(), indices.end(), particleId);
         if (it == indices.end())
@@ -59,6 +72,19 @@ void Scene::remove_particle_from_points_collider(ParticleId particleId)
     }
 }
 
+ParticleId Scene::add_particle(
+    const glm::vec2 &pos,
+    float mass,
+    const glm::vec2 &vel)
+{
+    Particle particle{
+        pos,
+        pos,
+        vel,
+        mass > 0.0f ? 1.0f / mass : 0.0f};
+
+    return particle_storage.create(std::move(particle));
+}
 bool Scene::remove_particle(ParticleId id)
 {
     if (!particle_storage.contains(id))
@@ -85,30 +111,28 @@ bool Scene::remove_particle(ParticleId id)
 
 EntityId Scene::add_entity()
 {
-    EntityId id = entity_storage.create();
-
-    auto *entity = entity_storage.get(id);
-
-    if (!entity)
-        return {};
-
-    entity->id = id;
-
-    return id;
+    return entity_storage.create();
 }
-
-ParticleId Scene::add_particle(
-    const glm::vec2 &pos,
-    float mass,
-    const glm::vec2 &vel)
+bool Scene::remove_entity(EntityId id)
 {
-    Particle particle{
-        pos,
-        pos,
-        vel,
-        mass > 0.0f ? 1.0f / mass : 0.0f};
+    Entity *entity = entity_storage.get(id);
+    if (!entity) return false;
 
-    return particle_storage.create(std::move(particle));
+    for (auto &pid : entity->particles)
+        remove_particle(pid);
+
+    for (auto &e : entity->children)
+        remove_entity(e);
+
+    Entity *parent = entity_storage.get(entity->parent);
+    if (parent)
+    {
+        auto it = std::find(parent->children.begin(), parent->children.end(), id);
+        if (it != parent->children.end())
+            parent->children.erase(it);
+    }
+
+    return entity_storage.remove(id);
 }
 
 DistanceConstraintId Scene::add_distance_constraint(
@@ -126,13 +150,12 @@ DistanceConstraintId Scene::add_distance_constraint(
     return add_distance_constraint(
         id1, id2, compliance, distance, distance);
 }
-
 DistanceConstraintId Scene::add_distance_constraint(
     ParticleId id1,
     ParticleId id2,
     float compliance,
-    float minDist,
-    float maxDist)
+    float min_dist,
+    float max_dist)
 {
     if (!particle_storage.contains(id1) ||
         !particle_storage.contains(id2))
@@ -141,8 +164,8 @@ DistanceConstraintId Scene::add_distance_constraint(
     DistanceConstraint dc{};
     dc.id1 = id1;
     dc.id2 = id2;
-    dc.minDist = minDist;
-    dc.maxDist = maxDist;
+    dc.min_dist = min_dist;
+    dc.max_dist = max_dist;
     dc.compliance = compliance;
     return distance_constraint_storage.create(std::move(dc));
 }
@@ -174,15 +197,14 @@ AngleConstraintId Scene::add_angle_constraint(
         id1, id2, id3, id4,
         compliance, angle, angle);
 }
-
 AngleConstraintId Scene::add_angle_constraint(
     ParticleId id1,
     ParticleId id2,
     ParticleId id3,
     ParticleId id4,
     float compliance,
-    float minAngle,
-    float maxAngle)
+    float min_angle,
+    float max_angle)
 {
     if (!particle_storage.contains(id1) ||
         !particle_storage.contains(id2) ||
@@ -195,8 +217,8 @@ AngleConstraintId Scene::add_angle_constraint(
     ac.id2 = id2;
     ac.id3 = id3;
     ac.id4 = id4;
-    ac.minAngle = minAngle;
-    ac.maxAngle = maxAngle;
+    ac.min_angle = min_angle;
+    ac.max_angle = max_angle;
     ac.compliance = compliance;
     return angle_constraint_storage.create(std::move(ac));
 }
@@ -208,7 +230,7 @@ bool Scene::remove_angle_constraint(AngleConstraintId id)
 VolumeConstraintId Scene::add_volume_constraint(
     const std::vector<ParticleId> &indices,
     float compliance,
-    float restPressure)
+    float rest_pressure)
 {
     if (indices.size() < 3)
         return {};
@@ -219,13 +241,12 @@ VolumeConstraintId Scene::add_volume_constraint(
 
     float volume = polygon_area(particle_storage, indices);
 
-    return add_volume_constraint(indices, compliance, restPressure, volume);
+    return add_volume_constraint(indices, compliance, rest_pressure, volume);
 }
-
 VolumeConstraintId Scene::add_volume_constraint(
     const std::vector<ParticleId> &indices,
     float compliance,
-    float restPressure,
+    float rest_pressure,
     float volume)
 {
     if (indices.size() < 3)
@@ -238,7 +259,7 @@ VolumeConstraintId Scene::add_volume_constraint(
     VolumeConstraint vc{};
     vc.indices = indices;
     vc.volume = volume;
-    vc.restPressure = restPressure;
+    vc.rest_pressure = rest_pressure;
     vc.compliance = compliance;
     return volume_constraint_storage.create(std::move(vc));
 }
@@ -249,8 +270,8 @@ bool Scene::remove_volume_constraint(VolumeConstraintId id)
 
 PointsColliderId Scene::add_points_collider(
     const std::vector<ParticleId> &indices,
-    float staticFriction,
-    float kineticFriction,
+    float static_friction,
+    float kinetic_friction,
     float compliance,
     uint32_t layer,
     uint32_t mask)
@@ -264,8 +285,8 @@ PointsColliderId Scene::add_points_collider(
 
     PointsCollider collider{};
     collider.indices = indices;
-    collider.staticFriction = staticFriction;
-    collider.kineticFriction = kineticFriction;
+    collider.static_friction = static_friction;
+    collider.kinetic_friction = kinetic_friction;
     collider.compliance = compliance;
     collider.layer = layer;
     collider.mask = mask;
@@ -278,8 +299,8 @@ bool Scene::remove_points_collider(PointsColliderId id)
 
 PolygonColliderId Scene::add_polygon_collider(
     const std::vector<ParticleId> &indices,
-    float staticFriction,
-    float kineticFriction,
+    float static_friction,
+    float kinetic_friction,
     float compliance,
     uint32_t layer,
     uint32_t mask)
@@ -296,8 +317,8 @@ PolygonColliderId Scene::add_polygon_collider(
     PointsCollider collider{};
 
     collider.indices = indices;
-    collider.staticFriction = staticFriction;
-    collider.kineticFriction = kineticFriction;
+    collider.static_friction = static_friction;
+    collider.kinetic_friction = kinetic_friction;
     collider.compliance = compliance;
     collider.layer = layer;
     collider.mask = mask;
@@ -314,8 +335,8 @@ AngularMotorId Scene::add_angular_motor(
     ParticleId id2,
     ParticleId id3,
     ParticleId id4,
-    float targetRPM,
-    float maxTorque)
+    float target_rpm,
+    float max_torque)
 {
     if (!particle_storage.contains(id1) ||
         !particle_storage.contains(id2) ||
@@ -328,23 +349,23 @@ AngularMotorId Scene::add_angular_motor(
     motor.id2 = id2;
     motor.id3 = id3;
     motor.id4 = id4;
-    motor.targetRPM = targetRPM;
-    motor.maxTorque = maxTorque;
+    motor.target_rpm = target_rpm;
+    motor.max_torque = max_torque;
     return angular_motor_storage.create(std::move(motor));
 }
 
 bool Scene::update_angular_motor(
     AngularMotorId id,
-    float targetRPM,
-    float maxTorque)
+    float target_rpm,
+    float max_torque)
 {
     auto *motor = angular_motor_storage.get(id);
 
     if (!motor)
         return false;
 
-    motor->targetRPM = targetRPM;
-    motor->maxTorque = maxTorque;
+    motor->target_rpm = target_rpm;
+    motor->max_torque = max_torque;
 
     return true;
 }
@@ -358,10 +379,10 @@ AngularServoId Scene::add_angular_servo(
     ParticleId id2,
     ParticleId id3,
     ParticleId id4,
-    float targetAngle,
+    float target_angle,
     float kp,
     float kd,
-    float maxTorque)
+    float max_torque)
 {
     if (!particle_storage.contains(id1) ||
         !particle_storage.contains(id2) ||
@@ -374,29 +395,28 @@ AngularServoId Scene::add_angular_servo(
     servo.id2 = id2;
     servo.id3 = id3;
     servo.id4 = id4;
-    servo.targetAngle = targetAngle;
+    servo.target_angle = target_angle;
     servo.kp = kp;
     servo.kd = kd;
-    servo.maxTorque = maxTorque;
+    servo.max_torque = max_torque;
     return angular_servo_storage.create(std::move(servo));
 }
-
 bool Scene::update_angular_servo(
     AngularServoId id,
-    float targetAngle,
+    float target_angle,
     float kp,
     float kd,
-    float maxTorque)
+    float max_torque)
 {
     auto *servo = angular_servo_storage.get(id);
 
     if (!servo)
         return false;
 
-    servo->targetAngle = targetAngle;
+    servo->target_angle = target_angle;
     servo->kp = kp;
     servo->kd = kd;
-    servo->maxTorque = maxTorque;
+    servo->max_torque = max_torque;
 
     return true;
 }
@@ -405,75 +425,6 @@ bool Scene::remove_angular_servo(AngularServoId id)
     return angular_servo_storage.remove(id);
 }
 
-void Scene::load_from_json(
-    const std::string &name,
-    const glm::vec2 &position)
-{
-    std::unique_ptr<cluster::Cluster> cluster(json_body_loader::load(name, position));
-    if (!cluster)
-        return;
-
-    std::vector<ParticleId> particles;
-    particles.reserve(cluster->particles.size());
-    for (const auto &particle : cluster->particles)
-    {
-        Particle value{particle.pos, particle.prev, particle.vel, particle.w};
-        particles.push_back(particle_storage.create(std::move(value)));
-    }
-
-    auto particle_id = [&particles](size_t index) -> ParticleId
-    {
-        if (index >= particles.size())
-            throw std::out_of_range("Body contains an invalid particle index");
-        return particles[index];
-    };
-
-    for (const auto &dc : cluster->distanceConstraints)
-        add_distance_constraint(particle_id(dc.i1), particle_id(dc.i2),
-                                dc.compliance, dc.minDist, dc.maxDist);
-
-    for (const auto &ac : cluster->angleConstraints)
-        add_angle_constraint(particle_id(ac.i1), particle_id(ac.i2),
-                             particle_id(ac.i3), particle_id(ac.i4),
-                             ac.compliance, ac.minAngle, ac.maxAngle);
-
-    for (const auto &vc : cluster->volumeConstraints)
-    {
-        std::vector<ParticleId> ids;
-        ids.reserve(vc.indices.size());
-        for (size_t index : vc.indices)
-            ids.push_back(particle_id(index));
-        add_volume_constraint(ids, vc.compliance, vc.restPressure, vc.volume);
-    }
-
-    for (const auto &collider : cluster->polygonColliders)
-    {
-        std::vector<ParticleId> ids;
-        ids.reserve(collider.indices.size());
-        for (size_t index : collider.indices)
-            ids.push_back(particle_id(index));
-        add_polygon_collider(ids, collider.staticFriction, collider.kineticFriction,
-                             collider.compliance, collider.layer, collider.mask);
-    }
-    for (const auto &collider : cluster->pointsColliders)
-    {
-        std::vector<ParticleId> ids;
-        ids.reserve(collider.indices.size());
-        for (size_t index : collider.indices)
-            ids.push_back(particle_id(index));
-        add_points_collider(ids, collider.staticFriction, collider.kineticFriction,
-                            collider.compliance, collider.layer, collider.mask);
-    }
-
-    for (const auto &motor : cluster->angularMotors)
-        add_angular_motor(particle_id(motor.i1), particle_id(motor.i2),
-                          particle_id(motor.i3), particle_id(motor.i4),
-                          motor.targetRPM, motor.maxTorque);
-    for (const auto &servo : cluster->angularServos)
-        add_angular_servo(particle_id(servo.i1), particle_id(servo.i2),
-                          particle_id(servo.i3), particle_id(servo.i4),
-                          servo.targetAngle, servo.kp, servo.kd, servo.maxTorque);
-}
 void Scene::clear()
 {
     entity_storage.clear();

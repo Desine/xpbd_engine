@@ -1,6 +1,6 @@
+#include "core/scene.hpp"
 #include "xpbd.hpp"
 #include "renderer.hpp"
-#include "json_body_loader.hpp"
 #include "core/storage/handles.hpp"
 
 #include "imgui.h"
@@ -19,8 +19,8 @@ void draw_worldDraw(xpbd::cluster::Cluster clusterDraw, glm::vec2 offset = {0.0f
     for (auto p : clusterDraw.particles)
         renderer::draw_circle(p.pos, circleSize);
 
-    for (size_t i = 0; i < clusterDraw.distanceConstraints.size(); ++i)
-        renderer::draw_line(clusterDraw.particles[clusterDraw.distanceConstraints[i].i1].pos + offset, clusterDraw.particles[clusterDraw.distanceConstraints[i].i2].pos + offset);
+    for (size_t i = 0; i < clusterDraw.distance_constraints.size(); ++i)
+        renderer::draw_line(clusterDraw.particles[clusterDraw.distance_constraints[i].i1].pos + offset, clusterDraw.particles[clusterDraw.distance_constraints[i].i2].pos + offset);
 
     renderer::set_color(sf::Color::Green);
     for (auto &pc : clusterDraw.polygonColliders)
@@ -90,19 +90,17 @@ void spawn_many(
 
 int main()
 {
-    json_body_loader::folder = std::filesystem::current_path().generic_string() + "/body/";
-
     xpbd::World world;
     world.enqueue_command(xpbd::init_command());
     world.enqueue_command(xpbd::spawn_from_json_command("ground", {0, -10}));
     bool paused = world.updateState == xpbd::World::UpdateState::Paused;
     int drawThickness = 1;
-    int targetRPM = 0;
+    int target_rpm = 0;
 
     glm::vec2 spawn_pos(0.0f, -5.0f);
-    spawn_many(world, spawn_pos, 5, 2, 3, 2, "car");
+    // spawn_many(world, spawn_pos, 5, 2, 3, 2, "car");
     spawn_pos = {0.0f, 0.0f};
-    spawn_many(world, spawn_pos, 5, 10, 3, 2, "balloon");
+    // spawn_many(world, spawn_pos, 5, 10, 3, 2, "balloon");
 
     xpbd::cluster::Cluster clusterDraw;
 
@@ -202,8 +200,6 @@ int main()
                 }
                 if (keyReleased->code == sf::Keyboard::Key::F)
                     world.enqueue_command(xpbd::spawn_from_json_command("person", position));
-                if (keyReleased->code == sf::Keyboard::Key::G)
-                    world.enqueue_command(xpbd::spawn_from_json_command("square", position));
 
                 // clear world
                 if (keyReleased->code == sf::Keyboard::Key::R)
@@ -227,6 +223,14 @@ int main()
 
                     if (id)
                         world.enqueue_command(xpbd::remove_particle_command{*id});
+                }
+                // remove entity
+                if (keyReleased->code == sf::Keyboard::Key::Y)
+                {
+                    std::optional<xpbd::EntityId> id = world.scene.entity_storage.handle_at(1);
+                    
+                    if (id)
+                        world.enqueue_command(xpbd::remove_entity_command{*id});
                 }
             }
         }
@@ -255,14 +259,14 @@ int main()
         // ImGui::SliderFloat("gravity.x", &world.gravity.x, -20, 20);
         // ImGui::SliderFloat("gravity.y", &world.gravity.y, -20, 20);
         ImGui::SliderInt("Draw thickness", &drawThickness, 1, 10);
-        if (ImGui::SliderInt("targetRPM", &targetRPM, -1, 1))
+        if (ImGui::SliderInt("target_rpm", &target_rpm, -1, 1))
         {
             for (size_t i = 0; i < world.scene.angular_motor_storage.size(); ++i)
             {
                 auto *motor = world.scene.angular_motor_storage.at(i);
                 const auto id = world.scene.angular_motor_storage.handle_at(i);
                 if (motor && id)
-                    world.enqueue_command(xpbd::update_angular_motor_command(*id, targetRPM * 2000, motor->maxTorque));
+                    world.enqueue_command(xpbd::update_angular_motor_command(*id, target_rpm * 2000, motor->max_torque));
             }
         }
 

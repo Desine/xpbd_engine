@@ -5,7 +5,6 @@
 #include "colliders.hpp"
 #include "actuators.hpp"
 #include "../utils.hpp"
-#include "../json_body_loader.hpp"
 
 #include <vector>
 #include <string>
@@ -36,12 +35,12 @@ void merge_clusters(Cluster &into, Cluster &from)
     }
 
     // Distance constraints
-    into.distanceConstraints.reserve(into.distanceConstraints.size() + from.distanceConstraints.size());
-    for (auto &dc : from.distanceConstraints)
+    into.distance_constraints.reserve(into.distance_constraints.size() + from.distance_constraints.size());
+    for (auto &dc : from.distance_constraints)
     {
         dc.i1 += offset;
         dc.i2 += offset;
-        into.distanceConstraints.push_back(dc);
+        into.distance_constraints.push_back(dc);
     }
 
     // Angle constraints
@@ -112,11 +111,11 @@ void add_particle(Cluster &cluster, const glm::vec2 &pos, float mass, glm::vec2 
     cluster.particles.emplace_back(pos, pos, vel, mass == 0 ? 0 : 1 / mass);
 }
 
-void add_distance_constraint(Cluster &cluster, size_t i1, size_t i2, float compliance, float minDist, float maxDist)
+void add_distance_constraint(Cluster &cluster, size_t i1, size_t i2, float compliance, float min_dist, float max_dist)
 {
     float compressionDamping = 0.5f;
     float extensionDamping = 0.5f;
-    cluster.distanceConstraints.emplace_back(i1, i2, minDist, maxDist, compressionDamping, extensionDamping, compliance);
+    cluster.distance_constraints.emplace_back(i1, i2, min_dist, max_dist, compressionDamping, extensionDamping, compliance);
 }
 void add_distance_constraint(Cluster &cluster, size_t i1, size_t i2, float compliance)
 {
@@ -124,9 +123,9 @@ void add_distance_constraint(Cluster &cluster, size_t i1, size_t i2, float compl
     add_distance_constraint(cluster, i1, i2, compliance, restDist, restDist);
 }
 
-void add_angle_constraint(Cluster &cluster, size_t i1, size_t i2, size_t i3, size_t i4, float compliance, float minAngle, float maxAngle)
+void add_angle_constraint(Cluster &cluster, size_t i1, size_t i2, size_t i3, size_t i4, float compliance, float min_angle, float max_angle)
 {
-    cluster.angleConstraints.emplace_back(i1, i2, i3, i4, minAngle, maxAngle, compliance);
+    cluster.angleConstraints.emplace_back(i1, i2, i3, i4, min_angle, max_angle, compliance);
 }
 void add_angle_constraint(Cluster &cluster, size_t i1, size_t i2, size_t i3, size_t i4, float compliance)
 {
@@ -151,44 +150,44 @@ float polygon_area(const std::vector<Particle> &p, const std::vector<size_t> &in
     }
     return 0.5f * area;
 }
-void add_volume_constraint(Cluster &cluster, const std::vector<size_t> &indices, float compliance, float restPressure)
+void add_volume_constraint(Cluster &cluster, const std::vector<size_t> &indices, float compliance, float rest_pressure)
 {
     float volume = polygon_area(cluster.particles, indices);
-    cluster.volumeConstraints.emplace_back(indices, volume, restPressure, compliance);
+    cluster.volumeConstraints.emplace_back(indices, volume, rest_pressure, compliance);
 }
 void add_volume_constraint(Cluster &cluster, const std::vector<size_t> &indices, float compliance)
 {
-    float restPressure = 1.0f;
-    add_volume_constraint(cluster, indices, compliance, restPressure);
+    float rest_pressure = 1.0f;
+    add_volume_constraint(cluster, indices, compliance, rest_pressure);
 }
 
-void add_polygon_collider(Cluster &cluster, const std::vector<size_t> &indices, float staticFriction, float kineticFriction, float compliance, int8_t layer, int8_t mask)
+void add_polygon_collider(Cluster &cluster, const std::vector<size_t> &indices, float static_friction, float kinetic_friction, float compliance, int8_t layer, int8_t mask)
 {
-    cluster.polygonColliders.emplace_back(indices, staticFriction, kineticFriction, compliance, layer, mask);
+    cluster.polygonColliders.emplace_back(indices, static_friction, kinetic_friction, compliance, layer, mask);
 }
-void add_points_collider(Cluster &cluster, const std::vector<size_t> &indices, float staticFriction, float kineticFriction, float compliance, int8_t layer, int8_t mask)
+void add_points_collider(Cluster &cluster, const std::vector<size_t> &indices, float static_friction, float kinetic_friction, float compliance, int8_t layer, int8_t mask)
 {
-    cluster.pointsColliders.emplace_back(indices, staticFriction, kineticFriction, compliance, layer, mask);
+    cluster.pointsColliders.emplace_back(indices, static_friction, kinetic_friction, compliance, layer, mask);
 }
 void add_angular_motor(
     Cluster &cluster,
     size_t i1, size_t i2,
     size_t i3, size_t i4,
-    float targetRPM,
-    float maxTorque)
+    float target_rpm,
+    float max_torque)
 {
-    cluster.angularMotors.emplace_back(i1, i2, i3, i4, targetRPM, maxTorque);
+    cluster.angularMotors.emplace_back(i1, i2, i3, i4, target_rpm, max_torque);
 }
 void add_angular_servo(
     Cluster &cluster,
     size_t i1, size_t i2,
     size_t i3, size_t i4,
-    float targetAngle,
+    float target_angle,
     float kp,
     float kd,
-    float maxTorque)
+    float max_torque)
 {
-    cluster.angularServos.emplace_back(i1, i2, i3, i4, targetAngle, kp, kd, maxTorque);
+    cluster.angularServos.emplace_back(i1, i2, i3, i4, target_angle, kp, kd, max_torque);
 }
 
 void spawn_polygon(Cluster &cluster, glm::vec2 pos, float radius, size_t segments, float mass, float compliance)
@@ -217,13 +216,13 @@ void spawn_polygon(Cluster &cluster, glm::vec2 pos, float radius, size_t segment
 
     add_volume_constraint(cluster, ids, compliance);
 
-    float staticFriction = 0.4f;
-    float kineticFriction = 0.3f;
+    float static_friction = 0.4f;
+    float kinetic_friction = 0.3f;
 
     int8_t layer = 1;
     int8_t mask = 1;
 
-    add_polygon_collider(cluster, ids, staticFriction, kineticFriction, 0.0f, layer, mask);
+    add_polygon_collider(cluster, ids, static_friction, kinetic_friction, 0.0f, layer, mask);
 }
 } // namespace cluster
 } // namespace xpbd

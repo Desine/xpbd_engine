@@ -19,16 +19,16 @@ namespace xpbd
     {
         ParticleId id1, id2;
         ParticleId id3, id4;
-        float targetRPM;
-        float maxTorque;
+        float target_rpm;
+        float max_torque;
     };
     struct AngularServo
     {
         ParticleId id1, id2;
         ParticleId id3, id4;
-        float targetAngle;
+        float target_angle;
         float kp;
         float kd;
-        float maxTorque;
+        float max_torque;
     };
 } // namespace xpbd

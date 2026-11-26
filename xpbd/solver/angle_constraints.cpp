@@ -47,21 +47,21 @@ void solve_angle_constraint(
     if (angle < 0.0f)
         angle += TWO_PI;
 
-    float minAngle = std::fmod(ac.minAngle, TWO_PI);
-    float maxAngle = std::fmod(ac.maxAngle, TWO_PI);
+    float min_angle = std::fmod(ac.min_angle, TWO_PI);
+    float max_angle = std::fmod(ac.max_angle, TWO_PI);
 
-    if (minAngle < 0.0f)
-        minAngle += TWO_PI;
+    if (min_angle < 0.0f)
+        min_angle += TWO_PI;
 
-    if (maxAngle < 0.0f)
-        maxAngle += TWO_PI;
+    if (max_angle < 0.0f)
+        max_angle += TWO_PI;
 
     bool inside;
 
-    if (minAngle <= maxAngle)
-        inside = angle >= minAngle && angle <= maxAngle;
+    if (min_angle <= max_angle)
+        inside = angle >= min_angle && angle <= max_angle;
     else
-        inside = angle >= minAngle || angle <= maxAngle;
+        inside = angle >= min_angle || angle <= max_angle;
 
     if (inside)
     {
@@ -76,8 +76,8 @@ void solve_angle_constraint(
             std::cos(a - b));
     };
 
-    float diffMin = signedAngleDiff(angle, minAngle);
-    float diffMax = signedAngleDiff(angle, maxAngle);
+    float diffMin = signedAngleDiff(angle, min_angle);
+    float diffMax = signedAngleDiff(angle, max_angle);
 
     float C;
 

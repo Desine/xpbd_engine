@@ -2,6 +2,7 @@
 #include "handles.hpp"
 #include "object_pool.hpp"
 
+#include <string>
 #include <vector>
 
 namespace xpbd
@@ -15,6 +16,7 @@ public:
 protected:
     ObjectPool<Tag> handles;
     std::vector<Data> data;
+    std::vector<std::string> names;
 
 public:
     static_assert(
@@ -25,7 +27,9 @@ public:
         std::is_nothrow_move_assignable_v<Data>,
         "Data must be nothrow move assignable");
 
-    Id create(Data value = {});
+    Id create(Data value = {}, std::string = {});
+    bool set_name(Id id, std::string name);
+    const std::string *get_name(Id id) const noexcept;
     Data *get(Id id) noexcept;
     const Data *get(Id id) const noexcept;
     bool remove(Id id);
@@ -41,9 +45,19 @@ public:
 };
 
 template <typename Data, typename Tag>
-DenseStorage<Data, Tag>::Id DenseStorage<Data, Tag>::create(Data value)
+typename DenseStorage<Data, Tag>::Id DenseStorage<Data, Tag>::create(Data value, std::string name)
 {
     data.emplace_back(std::move(value));
+
+    try
+    {
+        names.emplace_back(std::move(name));
+    }
+    catch (...)
+    {
+        data.pop_back();
+        throw;
+    }
 
     try
     {
@@ -51,9 +65,33 @@ DenseStorage<Data, Tag>::Id DenseStorage<Data, Tag>::create(Data value)
     }
     catch (...)
     {
+        names.pop_back();
         data.pop_back();
         throw;
     }
+}
+
+template <typename Data, typename Tag>
+bool DenseStorage<Data, Tag>::set_name(Id id, std::string name)
+{
+    auto index = handles.get_dense_index(id);
+
+    if (!index)
+        return false;
+
+    names[*index] = std::move(name);
+    return true;
+}
+
+template <typename Data, typename Tag>
+const std::string *DenseStorage<Data, Tag>::get_name(Id id) const noexcept
+{
+    auto index = handles.get_dense_index(id);
+
+    if (!index)
+        return nullptr;
+
+    return &names[*index];
 }
 
 template <typename Data, typename Tag>

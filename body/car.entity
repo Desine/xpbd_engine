@@ -1,0 +1,47 @@
+motor_target_rpm:0.0
+motor_max_torque:4000.0
+$car_body
+{
+  "name": "car",
+  "offset": [0.0, 0.0],
+  "entities" : [
+    {
+      "name": "wheel_l",
+      "file_name": "wheel",
+      "offset": $car_body.wheel_hub_l_pos
+    },
+    {
+      "name": "wheel_r",
+      "file_name": "wheel",
+      "offset": $car_body.wheel_hub_r_pos
+    },
+    {
+      "name": "body",
+      "file_name": "car_body"
+    }
+  ],
+  "DistanceConstraints": [
+    { "p1": "body.wheel_hub_l", "p2": "wheel_l.axle", "compliance": 0.0 },
+    { "p1": "body.wheel_hub_r", "p2": "wheel_r.axle", "compliance": 0.0 }
+  ],
+  "AngularMotors": [
+    {
+        "p1": "body.bottom_r",
+        "p2": "body.wheel_hub_l",
+        "p3": "wheel_l.motor_ref1",
+        "p4": "wheel_l.motor_ref2",
+
+        "target_rpm": $motor_target_rpm,
+        "max_torque": $motor_max_torque
+    },
+    {
+        "p1": "body.bottom_l",
+        "p2": "body.wheel_hub_r",
+        "p3": "wheel_r.motor_ref1",
+        "p4": "wheel_r.motor_ref2",
+
+        "target_rpm": $motor_target_rpm,
+        "max_torque": $motor_max_torque
+    }
+  ]
+}

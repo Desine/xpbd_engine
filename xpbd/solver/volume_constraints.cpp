@@ -49,7 +49,7 @@ void solve_volume_constraint(
     size_t N = indices.size();
 
     float volume = polygon_area(p, indices);
-    float C = volume - vc.volume * vc.restPressure;
+    float C = volume - vc.volume * vc.rest_pressure;
 
     float denom = 0.0f;
     std::vector<glm::vec2> grads(N);

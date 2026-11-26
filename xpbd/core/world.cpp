@@ -182,8 +182,8 @@ void World::step()
                 PointsPolygonCollision collision;
                 collision.points = points.indices;
                 collision.polygon = polygon.indices;
-                collision.staticFriction = 0.5f * (points.staticFriction + polygon.staticFriction);
-                collision.kineticFriction = 0.5f * (points.kineticFriction + polygon.kineticFriction);
+                collision.static_friction = 0.5f * (points.static_friction + polygon.static_friction);
+                collision.kinetic_friction = 0.5f * (points.kinetic_friction + polygon.kinetic_friction);
                 collision.compliance = 0.5f * (points.compliance + polygon.compliance);
                 collision.box = intersection;
                 collision.cache = caches[target];
@@ -223,7 +223,7 @@ void World::set_tickRate(float rate)
 void World::spawn_from_json(const std::string &name, const glm::vec2 &position)
 {
     std::lock_guard<std::mutex> lock(sceneMutex);
-    scene.load_from_json(name, position);
+    scene.spawn_entity(name, position);
 }
 
 void World::spawn_polygon(glm::vec2 pos, float radius, size_t segments, float mass, float compliance)
@@ -275,8 +275,10 @@ void World::execute_enqueued_commands()
                            spawn_polygon(arg.pos, arg.radius, arg.segments, arg.mass, arg.compliance);
                        else if constexpr (std::is_same_v<T, remove_particle_command>)
                            scene.remove_particle(arg.id);
+                       else if constexpr (std::is_same_v<T, remove_entity_command>)
+                           scene.remove_entity(arg.id);
                        else if constexpr (std::is_same_v<T, update_angular_motor_command>)
-                           scene.update_angular_motor(arg.id, arg.targetRPM, arg.maxTorque);
+                           scene.update_angular_motor(arg.id, arg.target_rpm, arg.max_torque);
                        //
                    },
                    command);
@@ -309,15 +311,15 @@ cluster::Cluster World::make_draw_snapshot() const
     for (size_t i = 0; i < scene.distance_constraint_storage.size(); ++i)
     {
         const auto &c = *scene.distance_constraint_storage.at(i);
-        result.distanceConstraints.push_back({indexOf(c.id1), indexOf(c.id2), c.minDist, c.maxDist, c.compressionDamping, c.extensionDamping, c.compliance, c.lambda});
+        result.distance_constraints.push_back({indexOf(c.id1), indexOf(c.id2), c.min_dist, c.max_dist, c.compressionDamping, c.extensionDamping, c.compliance, c.lambda});
     }
     for (size_t i = 0; i < scene.polygon_collider_storage.size(); ++i)
     {
         cluster::PointsCollider c{};
         const auto &src = *scene.polygon_collider_storage.at(i);
         for (auto id : src.indices) c.indices.push_back(indexOf(id));
-        c.staticFriction = src.staticFriction;
-        c.kineticFriction = src.kineticFriction;
+        c.static_friction = src.static_friction;
+        c.kinetic_friction = src.kinetic_friction;
         c.compliance = src.compliance;
         c.layer = src.layer;
         c.mask = src.mask;
@@ -328,8 +330,8 @@ cluster::Cluster World::make_draw_snapshot() const
         cluster::PointsCollider c{};
         const auto &src = *scene.points_collider_storage.at(i);
         for (auto id : src.indices) c.indices.push_back(indexOf(id));
-        c.staticFriction = src.staticFriction;
-        c.kineticFriction = src.kineticFriction;
+        c.static_friction = src.static_friction;
+        c.kinetic_friction = src.kinetic_friction;
         c.compliance = src.compliance;
         c.layer = src.layer;
         c.mask = src.mask;

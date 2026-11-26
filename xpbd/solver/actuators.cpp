@@ -116,11 +116,11 @@ void solve_angularMotor(
 
     constexpr float RPM_TO_RAD = 2.0f * 3.14159265359f / 60.0f;
 
-    float targetOmega = motor.targetRPM * RPM_TO_RAD;
+    float targetOmega = motor.target_rpm * RPM_TO_RAD;
 
     float deltaOmega = targetOmega - data.omega;
     float deltaL = deltaOmega / data.invI;
-    float maxImpulse = motor.maxTorque * dt;
+    float maxImpulse = motor.max_torque * dt;
 
     deltaL = glm::clamp(
         deltaL,
@@ -148,7 +148,7 @@ void solve_angularServo(
             data))
         return;
 
-    float angleError = servo.targetAngle - data.angle;
+    float angleError = servo.target_angle - data.angle;
 
     angleError = std::atan2(
         std::sin(angleError),
@@ -160,8 +160,8 @@ void solve_angularServo(
 
     torque = glm::clamp(
         torque,
-        -servo.maxTorque,
-        servo.maxTorque);
+        -servo.max_torque,
+        servo.max_torque);
 
     apply_torque(
         p,

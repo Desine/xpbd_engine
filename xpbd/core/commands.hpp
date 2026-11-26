@@ -36,16 +36,20 @@ struct remove_particle_command
 struct update_angular_motor_command
 {
     AngularMotorId id;
-    float targetRPM;
-    float maxTorque;
+    float target_rpm;
+    float max_torque;
 };
 struct update_angular_servo_command
 {
     AngularMotorId id;
-    float targetAngle;
+    float target_angle;
     float kp;
     float kd;
-    float maxTorque;
+    float max_torque;
+};
+struct remove_entity_command
+{
+    EntityId id;
 };
 
 using Command = std::variant<
@@ -54,6 +58,7 @@ using Command = std::variant<
     spawn_from_json_command,
     spawn_polygon_command,
     remove_particle_command,
+    remove_entity_command,
     update_angular_motor_command,
     update_angular_servo_command>;
 } // namespace xpbd

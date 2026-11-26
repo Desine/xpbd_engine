@@ -10,8 +10,8 @@ namespace xpbd
 struct PointsCollider
 {
     std::vector<ParticleId> indices;
-    float staticFriction;
-    float kineticFriction;
+    float static_friction;
+    float kinetic_friction;
     float compliance;
     uint32_t layer;
     uint32_t mask;
@@ -33,8 +33,8 @@ struct PointsPolygonCollision
 {
     std::vector<ParticleId> points;
     std::vector<ParticleId> polygon;
-    float staticFriction;
-    float kineticFriction;
+    float static_friction;
+    float kinetic_friction;
     float compliance;
     AABB box;
     PolygonCache cache;
@@ -44,8 +44,8 @@ struct PointEdgeCollisionConstraints
     ParticleId point;
     ParticleId edge1;
     ParticleId edge2;
-    float staticFriction;
-    float kineticFriction;
+    float static_friction;
+    float kinetic_friction;
     float compliance;
     float lambdaN = 0.0f;
     float lambdaT = 0.0f;

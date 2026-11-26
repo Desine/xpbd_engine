@@ -125,7 +125,7 @@ void get_point_edge_collisions_of_points_inside_polygon(
         if (!Utils::point_in_polygon(point, polygonPositions))
             continue;
 
-        float minDist = std::numeric_limits<float>::max();
+        float min_dist = std::numeric_limits<float>::max();
         size_t nearestEdge = 0;
 
         for (size_t i = 0; i < n; ++i)
@@ -139,9 +139,9 @@ void get_point_edge_collisions_of_points_inside_polygon(
             glm::vec2 closest = polygonPositions[i] + edges[i] * t;
 
             float dist = glm::dot(point - closest, point - closest);
-            if (dist < minDist)
+            if (dist < min_dist)
             {
-                minDist = dist;
+                min_dist = dist;
                 nearestEdge = i;
             }
         }
@@ -189,8 +189,8 @@ void add_point_edge_collision_constraints_from_points_polygon_collision(
             c.point,
             c.edge1,
             c.edge2,
-            collision.staticFriction,
-            collision.kineticFriction,
+            collision.static_friction,
+            collision.kinetic_friction,
             collision.compliance,
             0.0f,
             0.0f);
@@ -271,7 +271,7 @@ void solve_point_edge_collision_constraints(
         glm::vec2 relDisp = dp - edgeDisp;
         float Ct = glm::dot(relDisp, tangent);
         float deltaLambdaT = -Ct / w;
-        float maxLambdaT = c.staticFriction * fabs(c.lambdaN);
+        float maxLambdaT = c.static_friction * fabs(c.lambdaN);
         float oldLambdaT = c.lambdaT;
 
         c.lambdaT = glm::clamp(
@@ -348,7 +348,7 @@ void apply_point_edge_collision_constraints_kinetic_friction(
         glm::vec2 tangentVelocity = vt / vtLength;
 
         float maxImpulse =
-            c.kineticFriction * fabs(c.lambdaN) / dt;
+            c.kinetic_friction * fabs(c.lambdaN) / dt;
 
         float impulse =
             glm::min(vtLength / w, maxImpulse);
