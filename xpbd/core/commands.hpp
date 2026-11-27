@@ -1,5 +1,6 @@
 #pragma once
 #include "actuators.hpp"
+#include "scene.hpp"
 #include "storage/handles.hpp"
 
 #include "glm/glm.hpp"
@@ -50,6 +51,7 @@ struct update_angular_servo_command
 struct remove_entity_command
 {
     EntityId id;
+    EntityRemoveMode mode;
 };
 
 using Command = std::variant<

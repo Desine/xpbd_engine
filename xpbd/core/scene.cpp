@@ -113,18 +113,40 @@ EntityId Scene::add_entity()
 {
     return entity_storage.create();
 }
-bool Scene::remove_entity(EntityId id)
+bool Scene::remove_entity(EntityId id, EntityRemoveMode mode)
 {
     Entity *entity = entity_storage.get(id);
     if (!entity) return false;
+    Entity *parent = entity_storage.get(entity->parent);
 
     for (auto &pid : entity->particles)
         remove_particle(pid);
 
-    for (auto &e : entity->children)
-        remove_entity(e);
+    if (mode == EntityRemoveMode::Cascade)
+    {
+        for (auto &e : entity->children)
+            remove_entity(e, EntityRemoveMode::Cascade);
+    }
+    else
+    {
+        for (auto &child_id : entity->children)
+        {
+            if (auto child_entity = entity_storage.get(child_id))
+            {
+                if (mode == EntityRemoveMode::ReparentToParent && parent)
+                {
+                    parent->children.push_back(child_id);
 
-    Entity *parent = entity_storage.get(entity->parent);
+                    child_entity->parent = entity->parent;
+                }
+                else // mode == EntityRemoveMode::Detach
+                {
+                    child_entity->parent = {};
+                }
+            }
+        }
+    }
+
     if (parent)
     {
         auto it = std::find(parent->children.begin(), parent->children.end(), id);

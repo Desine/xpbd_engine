@@ -276,7 +276,7 @@ void World::execute_enqueued_commands()
                        else if constexpr (std::is_same_v<T, remove_particle_command>)
                            scene.remove_particle(arg.id);
                        else if constexpr (std::is_same_v<T, remove_entity_command>)
-                           scene.remove_entity(arg.id);
+                           scene.remove_entity(arg.id, arg.mode);
                        else if constexpr (std::is_same_v<T, update_angular_motor_command>)
                            scene.update_angular_motor(arg.id, arg.target_rpm, arg.max_torque);
                        //

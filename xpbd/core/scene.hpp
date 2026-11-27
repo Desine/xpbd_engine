@@ -7,14 +7,14 @@
 
 namespace xpbd
 {
+enum class EntityRemoveMode
+{
+    Cascade,
+    Detach,
+    ReparentToParent
+};
 struct Scene
 {
-    enum class EntityRemoveMode
-    {
-        Cascade,
-        Detach,
-        ReparentToParent
-    };
 
     EntityStorage entity_storage;
     ParticleStorage particle_storage;
@@ -30,7 +30,7 @@ struct Scene
     AngularServoStorage angular_servo_storage;
 
     EntityId add_entity();
-    bool remove_entity(EntityId entity_id);
+    bool remove_entity(EntityId entity_id, EntityRemoveMode mode = EntityRemoveMode::Cascade);
 
     ParticleId add_particle(const glm::vec2 &pos, float mass, const glm::vec2 &vel = {});
     bool remove_particle(ParticleId id);
@@ -65,5 +65,7 @@ struct Scene
         const glm::vec2 &position,
         std::string name = {},
         EntityId root_id = {});
+
+    void print_entity_tree();
 };
 } // namespace xpbd

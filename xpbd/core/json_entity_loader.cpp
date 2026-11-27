@@ -353,16 +353,11 @@ EntityId Scene::spawn_entity(
                     entity_name);
 
                 if (!childId.valid())
-                {
-                    entity_storage.remove(root_id);
                     throw std::runtime_error(
                         "Failed to spawn child entity: " + entity_file_name);
-                }
 
                 Entity *parent = entity_storage.get(root_id);
-                if (!parent)
-                    throw std::runtime_error("!parent");
-
+                if (!parent) throw std::runtime_error("!parent");
                 parent->children.push_back(childId);
             }
         }

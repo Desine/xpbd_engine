@@ -227,10 +227,10 @@ int main()
                 // remove entity
                 if (keyReleased->code == sf::Keyboard::Key::Y)
                 {
-                    std::optional<xpbd::EntityId> id = world.scene.entity_storage.handle_at(1);
+                    std::optional<xpbd::EntityId> id = world.scene.entity_storage.handle_at(2);
                     
                     if (id)
-                        world.enqueue_command(xpbd::remove_entity_command{*id});
+                        world.enqueue_command(xpbd::remove_entity_command{*id, xpbd::EntityRemoveMode::ReparentToParent});
                 }
             }
         }
