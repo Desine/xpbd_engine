@@ -117,41 +117,63 @@ bool Scene::remove_entity(EntityId id, EntityRemoveMode mode)
 {
     Entity *entity = entity_storage.get(id);
     if (!entity) return false;
-    Entity *parent = entity_storage.get(entity->parent);
 
-    for (auto &pid : entity->particles)
-        remove_particle(pid);
+    EntityId parent_id = entity->parent_id;
+    Entity *parent_entity = entity_storage.get(parent_id);
+    std::vector<EntityId> children_ids = entity->children_ids;
+
+    for (auto &p_id : entity->particles_ids)
+        remove_particle(p_id);
+
+    for (auto &dc_id : entity->distance_constraint_ids)
+        remove_distance_constraint(dc_id);
+    for (auto &ac_id : entity->angle_constraint_ids)
+        remove_angle_constraint(ac_id);
+    for (auto &vc_id : entity->volume_constraint_ids)
+        remove_volume_constraint(vc_id);
+
+    for (auto &pc_id : entity->points_collider_ids)
+        remove_points_collider(pc_id);
+    for (auto &pc_id : entity->polygon_collider_ids)
+        remove_polygon_collider(pc_id);
+
+    for (auto &am_id : entity->angular_motor_ids)
+        remove_angular_motor(am_id);
+    for (auto &as_id : entity->angular_servo_ids)
+        remove_angular_servo(as_id);
 
     if (mode == EntityRemoveMode::Cascade)
     {
-        for (auto &e : entity->children)
-            remove_entity(e, EntityRemoveMode::Cascade);
+        for (auto &child_id : entity->children_ids)
+            remove_entity(child_id, EntityRemoveMode::Cascade);
     }
     else
     {
-        for (auto &child_id : entity->children)
+        for (auto &child_id : children_ids)
         {
-            if (auto child_entity = entity_storage.get(child_id))
-            {
-                if (mode == EntityRemoveMode::ReparentToParent && parent)
-                {
-                    parent->children.push_back(child_id);
+            auto child_entity = entity_storage.get(child_id);
+            if (!child_entity) continue;
 
-                    child_entity->parent = entity->parent;
-                }
-                else // mode == EntityRemoveMode::Detach
-                {
-                    child_entity->parent = {};
-                }
+            parent_entity = entity_storage.get(parent_id);
+            if (mode == EntityRemoveMode::ReparentToParent && parent_entity)
+            {
+                parent_entity->children_ids.push_back(child_id);
+
+                child_entity->parent_id = parent_id;
+            }
+            else if (mode == EntityRemoveMode::Detach)
+            {
+                child_entity->parent_id = {};
             }
         }
     }
 
-    if (parent)
+    parent_entity = entity_storage.get(parent_id);
+    if (parent_entity)
     {
-        auto it = std::find(parent->children.begin(), parent->children.end(), id);
-        if (it != parent->children.end())
-            parent->children.erase(it);
+        auto it = std::find(parent_entity->children_ids.begin(), parent_entity->children_ids.end(), id);
+        if (it != parent_entity->children_ids.end())
+            parent_entity->children_ids.erase(it);
     }
 
     return entity_storage.remove(id);
@@ -458,6 +480,41 @@ void Scene::clear()
     polygon_collider_storage.clear();
     angular_motor_storage.clear();
     angular_servo_storage.clear();
+}
+
+void Scene::print_branch(EntityId id, size_t depth)
+{
+    auto *entity = entity_storage.get(id);
+    if (!entity)
+        return;
+
+    for (size_t i = 0; i < depth; i++)
+        std::print(" - ");
+    std::print("{}\n", *entity_storage.get_name(id));
+
+    std::print("   ");
+    for (size_t i = 0; i < depth; i++)
+        std::print(" - ");
+    std::print("distance_constraints.size(): {}\n", entity->distance_constraint_ids.size());
+
+    for (EntityId child_id : entity->children_ids)
+    {
+        print_branch(child_id, depth + 1);
+    }
+}
+void Scene::print_entity_tree()
+{
+    std::println("\n--- --- Scene::print_entity_tree() --- ---");
+
+    for (size_t i = 0; i < entity_storage.size(); i++)
+    {
+        Entity *entity = entity_storage.at(i);
+        if (entity && !entity->parent_id.valid())
+        {
+            if (auto id = entity_storage.handle_at(i))
+                print_branch(*id);
+        }
+    }
 }
 
 } // namespace xpbd

@@ -66,6 +66,7 @@ struct Scene
         std::string name = {},
         EntityId root_id = {});
 
+    void print_branch(EntityId id, size_t depth = 0);
     void print_entity_tree();
 };
 } // namespace xpbd

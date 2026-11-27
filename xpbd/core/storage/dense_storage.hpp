@@ -130,10 +130,13 @@ bool DenseStorage<Data, Tag>::remove(Id id)
     if (!handles.remove(id))
         return false;
 
-    if (denseIndex != lastIndex)
+    if (denseIndex != lastIndex){
         data[denseIndex] = std::move(data[lastIndex]);
+        names[denseIndex] = std::move(names[lastIndex]);
+    }
 
     data.pop_back();
+    names.pop_back();
 
     return true;
 }

@@ -9,20 +9,20 @@ namespace xpbd
 {
     struct Entity
     {
-        EntityId parent;
+        EntityId parent_id;
 
-        std::vector<EntityId> children;
+        std::vector<EntityId> children_ids;
 
-        std::vector<ParticleId> particles;
+        std::vector<ParticleId> particles_ids;
 
-        std::vector<DistanceConstraintId> distance_constraints;
-        std::vector<AngleConstraintId> angle_constraints;
-        std::vector<VolumeConstraintId> volume_constraints;
+        std::vector<DistanceConstraintId> distance_constraint_ids;
+        std::vector<AngleConstraintId> angle_constraint_ids;
+        std::vector<VolumeConstraintId> volume_constraint_ids;
 
-        std::vector<PointsColliderId> points_colliders;
-        std::vector<PolygonColliderId> polygon_colliders;
+        std::vector<PointsColliderId> points_collider_ids;
+        std::vector<PolygonColliderId> polygon_collider_ids;
 
-        std::vector<AngularMotorId> angular_motors;
-        std::vector<AngularServoId> angular_servos;
+        std::vector<AngularMotorId> angular_motor_ids;
+        std::vector<AngularServoId> angular_servo_ids;
     };
 } // namespace xpbd

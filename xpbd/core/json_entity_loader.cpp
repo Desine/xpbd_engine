@@ -240,14 +240,14 @@ ParticleId get_particle_id_by_path(
     {
         return get_particle_id_by_name(
             particle_storage,
-            root_entity->particles,
+            root_entity->particles_ids,
             path);
     }
 
     const std::string entity_name = path.substr(0, separator);
     const std::string particle_name = path.substr(separator + 1);
 
-    for (EntityId child_id : root_entity->children)
+    for (EntityId child_id : root_entity->children_ids)
     {
         const Entity *child = entity_storage.get(child_id);
         if (!child)
@@ -259,7 +259,7 @@ ParticleId get_particle_id_by_path(
         {
             return get_particle_id_by_name(
                 particle_storage,
-                child->particles,
+                child->particles_ids,
                 particle_name);
         }
     }
@@ -281,10 +281,10 @@ ParticleId get_particle_id(
         const int index = value.get<int>();
 
         if (index < 0 ||
-            static_cast<size_t>(index) >= root_entity->particles.size())
+            static_cast<size_t>(index) >= root_entity->particles_ids.size())
             return {};
 
-        return root_entity->particles[index];
+        return root_entity->particles_ids[index];
     }
 
     if (value.is_string())
@@ -317,7 +317,7 @@ EntityId Scene::spawn_entity(
     const std::string &file_name,
     const glm::vec2 &position,
     std::string name,
-    EntityId root_id)
+    EntityId parent_id)
 {
     const std::string folder = std::filesystem::current_path().generic_string() + "/body/";
     const std::string extension = ".entity";
@@ -325,7 +325,10 @@ EntityId Scene::spawn_entity(
 
     EntityId entity_id = add_entity();
     if (!entity_id.valid()) return {};
-    if (!root_id.valid()) root_id = entity_id;
+    Entity *entity = entity_storage.get(entity_id);
+    entity->parent_id = parent_id;
+    if (!parent_id.valid())
+        parent_id = entity_id;
 
     try
     {
@@ -337,11 +340,11 @@ EntityId Scene::spawn_entity(
 
         if (j.contains("entities") && j["entities"].is_array())
         {
-            for (const auto &entity : j["entities"])
+            for (const auto &en : j["entities"])
             {
-                std::string entity_name = entity.value("name", "");
-                std::string entity_file_name = entity.value("file_name", "");
-                glm::vec2 offset = get_vec2(entity, "offset");
+                std::string entity_name = en.value("name", "");
+                std::string entity_file_name = en.value("file_name", "");
+                glm::vec2 offset = get_vec2(en, "offset");
 
                 std::println(
                     "entity_file_name: {}, offset: {}, entity_name: {}",
@@ -350,15 +353,16 @@ EntityId Scene::spawn_entity(
                 EntityId childId = spawn_entity(
                     entity_file_name,
                     offset + position,
-                    entity_name);
+                    entity_name,
+                    entity_id);
 
                 if (!childId.valid())
                     throw std::runtime_error(
                         "Failed to spawn child entity: " + entity_file_name);
 
-                Entity *parent = entity_storage.get(root_id);
-                if (!parent) throw std::runtime_error("!parent");
-                parent->children.push_back(childId);
+                entity = entity_storage.get(entity_id);
+                if (!entity) throw std::runtime_error("!entity");
+                entity->children_ids.push_back(childId);
             }
         }
 
@@ -381,9 +385,9 @@ EntityId Scene::spawn_entity(
                 if (!particle_storage.set_name(particle_id, particle_name))
                     throw std::runtime_error("can't set particle name: " + particle_name + ", index: " + std::to_string(index));
 
-                Entity *entity = entity_storage.get(entity_id);
+                entity = entity_storage.get(entity_id);
                 if (!entity) throw std::runtime_error("!entity");
-                entity->particles.push_back(particle_id);
+                entity->particles_ids.push_back(particle_id);
 
                 index++;
             }
@@ -394,8 +398,8 @@ EntityId Scene::spawn_entity(
         {
             for (const auto &dc : j["DistanceConstraints"])
             {
-                const ParticleId p1 = get_particle_id(dc, "p1", root_id, entity_storage, particle_storage);
-                const ParticleId p2 = get_particle_id(dc, "p2", root_id, entity_storage, particle_storage);
+                const ParticleId p1 = get_particle_id(dc, "p1", entity_id, entity_storage, particle_storage);
+                const ParticleId p2 = get_particle_id(dc, "p2", entity_id, entity_storage, particle_storage);
 
                 const float compliance = dc.value("compliance", 0.0f);
 
@@ -419,9 +423,9 @@ EntityId Scene::spawn_entity(
                     distance_constraint_id = add_distance_constraint(p1, p2, compliance);
                 }
 
-                Entity *entity = entity_storage.get(entity_id);
+                entity = entity_storage.get(entity_id);
                 if (!entity) throw std::runtime_error("!entity");
-                entity->distance_constraints.push_back(distance_constraint_id);
+                entity->distance_constraint_ids.push_back(distance_constraint_id);
             }
         }
 
@@ -430,10 +434,10 @@ EntityId Scene::spawn_entity(
         {
             for (const auto &ac : j["AngleConstraints"])
             {
-                const ParticleId p1 = get_particle_id(ac, "p1", root_id, entity_storage, particle_storage);
-                const ParticleId p2 = get_particle_id(ac, "p2", root_id, entity_storage, particle_storage);
-                const ParticleId p3 = get_particle_id(ac, "p3", root_id, entity_storage, particle_storage);
-                const ParticleId p4 = get_particle_id(ac, "p4", root_id, entity_storage, particle_storage);
+                const ParticleId p1 = get_particle_id(ac, "p1", entity_id, entity_storage, particle_storage);
+                const ParticleId p2 = get_particle_id(ac, "p2", entity_id, entity_storage, particle_storage);
+                const ParticleId p3 = get_particle_id(ac, "p3", entity_id, entity_storage, particle_storage);
+                const ParticleId p4 = get_particle_id(ac, "p4", entity_id, entity_storage, particle_storage);
 
                 const float compliance = ac.value("compliance", 0.0f);
 
@@ -457,9 +461,9 @@ EntityId Scene::spawn_entity(
                     angle_constraint_id = add_angle_constraint(p1, p2, p3, p4, compliance);
                 }
 
-                Entity *entity = entity_storage.get(entity_id);
+                entity = entity_storage.get(entity_id);
                 if (!entity) throw std::runtime_error("!entity");
-                entity->angle_constraints.push_back(angle_constraint_id);
+                entity->angle_constraint_ids.push_back(angle_constraint_id);
             }
         }
 
@@ -470,7 +474,7 @@ EntityId Scene::spawn_entity(
             {
                 std::vector<ParticleId> indices;
                 for (const auto &idx : vc["indices"])
-                    indices.push_back(get_particle_id(idx, root_id, entity_storage, particle_storage));
+                    indices.push_back(get_particle_id(idx, entity_id, entity_storage, particle_storage));
 
                 const float compliance = vc.value("compliance", 0.0f);
 
@@ -487,9 +491,9 @@ EntityId Scene::spawn_entity(
                     volume_constraint_id = add_volume_constraint(indices, compliance);
                 }
 
-                Entity *entity = entity_storage.get(entity_id);
+                entity = entity_storage.get(entity_id);
                 if (!entity) throw std::runtime_error("!entity");
-                entity->volume_constraints.push_back(volume_constraint_id);
+                entity->volume_constraint_ids.push_back(volume_constraint_id);
             }
         }
 
@@ -500,7 +504,7 @@ EntityId Scene::spawn_entity(
             {
                 std::vector<ParticleId> indices;
                 for (const auto &idx : cc["indices"])
-                    indices.push_back(get_particle_id(idx, root_id, entity_storage, particle_storage));
+                    indices.push_back(get_particle_id(idx, entity_id, entity_storage, particle_storage));
 
                 const float static_friction = cc.value("static_friction", 0.0f);
                 const float kinetic_friction = cc.value("kinetic_friction", 0.0f);
@@ -518,9 +522,9 @@ EntityId Scene::spawn_entity(
                     layer,
                     mask);
 
-                Entity *entity = entity_storage.get(entity_id);
+                entity = entity_storage.get(entity_id);
                 if (!entity) throw std::runtime_error("!entity");
-                entity->polygon_colliders.push_back(polygon_collider_id);
+                entity->polygon_collider_ids.push_back(polygon_collider_id);
             }
         }
 
@@ -531,7 +535,7 @@ EntityId Scene::spawn_entity(
             {
                 std::vector<ParticleId> indices;
                 for (const auto &idx : cc["indices"])
-                    indices.push_back(get_particle_id(idx, root_id, entity_storage, particle_storage));
+                    indices.push_back(get_particle_id(idx, entity_id, entity_storage, particle_storage));
 
                 const float static_friction = cc.value("static_friction", 0.0f);
                 const float kinetic_friction = cc.value("kinetic_friction", 0.0f);
@@ -549,9 +553,9 @@ EntityId Scene::spawn_entity(
                     layer,
                     mask);
 
-                Entity *entity = entity_storage.get(entity_id);
+                entity = entity_storage.get(entity_id);
                 if (!entity) throw std::runtime_error("!entity");
-                entity->points_colliders.push_back(points_collider_id);
+                entity->points_collider_ids.push_back(points_collider_id);
             }
         }
 
@@ -560,10 +564,10 @@ EntityId Scene::spawn_entity(
         {
             for (const auto &m : j["AngularMotors"])
             {
-                const ParticleId p1 = get_particle_id(m, "p1", root_id, entity_storage, particle_storage);
-                const ParticleId p2 = get_particle_id(m, "p2", root_id, entity_storage, particle_storage);
-                const ParticleId p3 = get_particle_id(m, "p3", root_id, entity_storage, particle_storage);
-                const ParticleId p4 = get_particle_id(m, "p4", root_id, entity_storage, particle_storage);
+                const ParticleId p1 = get_particle_id(m, "p1", entity_id, entity_storage, particle_storage);
+                const ParticleId p2 = get_particle_id(m, "p2", entity_id, entity_storage, particle_storage);
+                const ParticleId p3 = get_particle_id(m, "p3", entity_id, entity_storage, particle_storage);
+                const ParticleId p4 = get_particle_id(m, "p4", entity_id, entity_storage, particle_storage);
 
                 const float target_rpm = m.value("target_rpm", 0.0f);
                 const float max_torque = m.value("max_torque", 100.0f);
@@ -575,9 +579,9 @@ EntityId Scene::spawn_entity(
                     target_rpm,
                     max_torque);
 
-                Entity *entity = entity_storage.get(entity_id);
+                entity = entity_storage.get(entity_id);
                 if (!entity) throw std::runtime_error("!entity");
-                entity->angular_motors.push_back(angular_motor_id);
+                entity->angular_motor_ids.push_back(angular_motor_id);
             }
         }
 
@@ -586,10 +590,10 @@ EntityId Scene::spawn_entity(
         {
             for (const auto &s : j["AngularServos"])
             {
-                const ParticleId p1 = get_particle_id(s, "p1", root_id, entity_storage, particle_storage);
-                const ParticleId p2 = get_particle_id(s, "p2", root_id, entity_storage, particle_storage);
-                const ParticleId p3 = get_particle_id(s, "p3", root_id, entity_storage, particle_storage);
-                const ParticleId p4 = get_particle_id(s, "p4", root_id, entity_storage, particle_storage);
+                const ParticleId p1 = get_particle_id(s, "p1", entity_id, entity_storage, particle_storage);
+                const ParticleId p2 = get_particle_id(s, "p2", entity_id, entity_storage, particle_storage);
+                const ParticleId p3 = get_particle_id(s, "p3", entity_id, entity_storage, particle_storage);
+                const ParticleId p4 = get_particle_id(s, "p4", entity_id, entity_storage, particle_storage);
 
                 const float target_angle = glm::radians(s.value("target_angle", 0.0f));
                 const float kp = s.value("kp", 0.0f);
@@ -605,16 +609,16 @@ EntityId Scene::spawn_entity(
                     kd,
                     max_torque);
 
-                Entity *entity = entity_storage.get(entity_id);
+                entity = entity_storage.get(entity_id);
                 if (!entity) throw std::runtime_error("!entity");
-                entity->angular_servos.push_back(angular_servo_id);
+                entity->angular_servo_ids.push_back(angular_servo_id);
             }
         }
     }
     catch (std::runtime_error &e)
     {
         std::println("fail spawn_entity, file_name: {}\neror: {}", file_name, e.what());
-        entity_storage.get_name(entity_id);
+        entity_storage.remove(entity_id);
     }
     return entity_id;
 }

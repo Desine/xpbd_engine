@@ -213,7 +213,10 @@ int main()
                     if (world.updateState == xpbd::World::UpdateState::Paused || world.updateState == xpbd::World::UpdateState::StepOnce)
                         world.resume_update();
                     else
+                    {
                         world.pause_update();
+                        world.scene.print_entity_tree();
+                    }
                     paused = world.updateState == xpbd::World::UpdateState::Paused;
                 }
                 // remove_particle
@@ -227,10 +230,13 @@ int main()
                 // remove entity
                 if (keyReleased->code == sf::Keyboard::Key::Y)
                 {
-                    std::optional<xpbd::EntityId> id = world.scene.entity_storage.handle_at(2);
-                    
+                    std::optional<xpbd::EntityId> id = world.scene.entity_storage.handle_at(1);
+
                     if (id)
-                        world.enqueue_command(xpbd::remove_entity_command{*id, xpbd::EntityRemoveMode::ReparentToParent});
+                    {
+                        std::println("removing name: {}", *world.scene.entity_storage.get_name(*id));
+                        world.enqueue_command(xpbd::remove_entity_command{*id, xpbd::EntityRemoveMode::Detach});
+                    }
                 }
             }
         }
